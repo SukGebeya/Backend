@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: go-boilerplate-postgres-dev
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: go-boilerplate-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: go-boilerplate-app-dev
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/app?sslmode=disable
+      REDIS_URL: redis:6379
+      PORT: "8080"
+      JWT_ACCESS_PRIVATE_KEY_PATH: /app/keys/access_private.pem
+      JWT_ACCESS_PUBLIC_KEY_PATH: /app/keys/access_public.pem
+      JWT_REFRESH_PRIVATE_KEY_PATH: /app/keys/refresh_private.pem
+      JWT_REFRESH_PUBLIC_KEY_PATH: /app/keys/refresh_public.pem
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 168h
+      ENVIRONMENT: development
+    volumes:
+      - .:/app
+      - go_mod_cache:/go/pkg/mod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+  go_mod_cache:
