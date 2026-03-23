@@ -4,17 +4,17 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
-	"github.com/go-redis/redis/v8"
-	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/SukGebeya/Backend/docs"
 	"github.com/SukGebeya/Backend/internal/http/handler"
 	httpmiddleware "github.com/SukGebeya/Backend/internal/http/middleware"
 	"github.com/SukGebeya/Backend/internal/service"
 	"github.com/SukGebeya/Backend/pkg/jwt"
 	"github.com/SukGebeya/Backend/pkg/logger"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+	"github.com/go-redis/redis/v8"
+	"github.com/jackc/pgx/v5/pgxpool"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
@@ -26,6 +26,9 @@ func NewRouter(
 	authService *service.AuthService,
 	userService *service.UserService,
 	merchantService *service.MerchantService,
+	categoryService *service.CategoryService,
+	productService *service.ProductService,
+	variantService *service.ProductVariantService,
 	jwtManager *jwt.Manager,
 	rateLimiter *httpmiddleware.RateLimiter,
 	db *pgxpool.Pool,
@@ -52,6 +55,8 @@ func NewRouter(
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userService)
 	merchantHandler := handler.NewMerchantHandler(merchantService)
+	categoryHandler := handler.NewCategoryHandler(categoryService)
+	productHandler := handler.NewProductHandler(productService, variantService, merchantService)
 	healthHandler := handler.NewHealthHandler(db, redisClient)
 
 	r.Route("/api/v1", func(r chi.Router) {
@@ -83,12 +88,17 @@ func NewRouter(
 			r.Delete("/users/{id}", userHandler.Delete)
 		})
 
-		r.Group(func(r chi.Router) {
-			r.Use(httpmiddleware.Auth(jwtManager))
+		// Public routes - categories and products
+		r.Get("/categories", categoryHandler.ListCategories)
+		r.Get("/categories/{id}", categoryHandler.GetCategory)
+		r.Get("/categories/slug/{slug}", categoryHandler.GetCategoryBySlug)
 
-			r.Get("/shops/{shop_slug}", merchantHandler.GetShop)
-		})
+		r.Get("/products", productHandler.ListProducts)
+		r.Get("/products/{slug}", productHandler.GetProduct)
 
+		r.Get("/shops/{shop_slug}", merchantHandler.GetShop)
+
+		// Merchant routes
 		r.Group(func(r chi.Router) {
 			r.Use(httpmiddleware.Auth(jwtManager))
 			r.Use(httpmiddleware.Authorize("merchant"))
@@ -96,6 +106,22 @@ func NewRouter(
 			r.Post("/merchant/onboard", merchantHandler.Onboard)
 			r.Get("/merchant/profile", merchantHandler.GetProfile)
 			r.Put("/merchant/profile", merchantHandler.UpdateProfile)
+
+			r.Get("/merchant/products", productHandler.ListMyProducts)
+			r.Post("/merchant/products", productHandler.CreateProduct)
+			r.Put("/merchant/products/{id}", productHandler.UpdateProduct)
+			r.Delete("/merchant/products/{id}", productHandler.DeleteProduct)
+			r.Post("/merchant/products/{id}/variants", productHandler.AddVariant)
+		})
+
+		// Admin routes
+		r.Group(func(r chi.Router) {
+			r.Use(httpmiddleware.Auth(jwtManager))
+			r.Use(httpmiddleware.Authorize("admin"))
+
+			r.Post("/admin/categories", categoryHandler.CreateCategory)
+			r.Put("/admin/categories/{id}", categoryHandler.UpdateCategory)
+			r.Delete("/admin/categories/{id}", categoryHandler.DeleteCategory)
 		})
 	})
 

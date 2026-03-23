@@ -135,6 +135,11 @@ func main() {
 	appLogger.Info("Redis connection established", "addr", cfg.RedisURL)
 
 	userRepo := repository.NewUserRepository(pool)
+	merchantRepo := repository.NewMerchantRepository(pool)
+	categoryRepo := repository.NewCategoryRepository(pool)
+	productRepo := repository.NewProductRepository(pool)
+	variantRepo := repository.NewProductVariantRepository(pool)
+	imageRepo := repository.NewProductImageRepository(pool)
 	refreshTokenRepo := repository.NewCircuitBreakerRefreshTokenRepository(redisClient)
 	rateLimitRepo := repository.NewCircuitBreakerRateLimitRepository(redisClient)
 
@@ -163,11 +168,14 @@ func main() {
 
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, jwtManager, passwordHasher, cfg.JWT.RefreshTTL)
 	userService := service.NewUserService(userRepo)
-	merchantService := service.NewMerchantService(repository.NewMerchantRepository(pool))
+	merchantService := service.NewMerchantService(merchantRepo)
+	categoryService := service.NewCategoryService(categoryRepo)
+	productService := service.NewProductService(productRepo, variantRepo, imageRepo)
+	variantService := service.NewProductVariantService(variantRepo)
 
 	rateLimiter := httpmiddleware.NewRateLimiter(rateLimitRepo, cfg.RateLimit.Requests, int64(cfg.RateLimit.Window.Seconds()))
 
-	router := apphttp.NewRouter(authService, userService, merchantService, jwtManager, rateLimiter, pool, redisClient, appLogger)
+	router := apphttp.NewRouter(authService, userService, merchantService, categoryService, productService, variantService, jwtManager, rateLimiter, pool, redisClient, appLogger)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

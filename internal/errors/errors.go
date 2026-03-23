@@ -133,3 +133,31 @@ func MerchantNotFound(message string) *AppError {
 func ShopSlugExists(message string) *AppError {
 	return NewError(CodeShopSlugExists, message, http.StatusConflict, nil)
 }
+
+func CategoryNotFound(message string) *AppError {
+	return NewError(Code("CATEGORY_NOT_FOUND"), message, http.StatusNotFound, nil)
+}
+
+func ProductNotFound(message string) *AppError {
+	return NewError(Code("PRODUCT_NOT_FOUND"), message, http.StatusNotFound, nil)
+}
+
+func VariantNotFound(message string) *AppError {
+	return NewError(Code("VARIANT_NOT_FOUND"), message, http.StatusNotFound, nil)
+}
+
+func CategoryExists(message string) *AppError {
+	return NewError(Code("CATEGORY_EXISTS"), message, http.StatusConflict, nil)
+}
+
+func ProductExists(message string) *AppError {
+	return NewError(Code("PRODUCT_EXISTS"), message, http.StatusConflict, nil)
+}
+
+func VariantExists(message string) *AppError {
+	return NewError(Code("VARIANT_EXISTS"), message, http.StatusConflict, nil)
+}
+
+func InsufficientInventory(message string) *AppError {
+	return NewError(Code("INSUFFICIENT_INVENTORY"), message, http.StatusBadRequest, nil)
+}

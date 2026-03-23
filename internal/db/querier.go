@@ -7,28 +7,72 @@ package db
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
-	CountUsers(ctx context.Context) (*int64, error)
-	CreateMerchantProfile(ctx context.Context, arg CreateMerchantProfileParams) (CreateMerchantProfileRow, error)
-	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
-	DeleteUser(ctx context.Context, id pgtype.UUID) error
-	GetMerchantProfileByID(ctx context.Context, id pgtype.UUID) (GetMerchantProfileByIDRow, error)
-	GetMerchantProfileBySlug(ctx context.Context, shopSlug *string) (GetMerchantProfileBySlugRow, error)
-	GetMerchantProfileByUserID(ctx context.Context, userID pgtype.UUID) (GetMerchantProfileByUserIDRow, error)
-	GetUserByEmail(ctx context.Context, email *string) (GetUserByEmailRow, error)
-	GetUserByEmailOrPhone(ctx context.Context, identifier *string) (GetUserByEmailOrPhoneRow, error)
-	GetUserByID(ctx context.Context, id pgtype.UUID) (GetUserByIDRow, error)
-	GetUserByPhone(ctx context.Context, phone *string) (GetUserByPhoneRow, error)
-	ListMerchantProfiles(ctx context.Context, arg ListMerchantProfilesParams) ([]ListMerchantProfilesRow, error)
-	ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error)
-	ListVerifiedMerchants(ctx context.Context, arg ListVerifiedMerchantsParams) ([]ListVerifiedMerchantsRow, error)
-	UpdateMerchantBlnkWallet(ctx context.Context, arg UpdateMerchantBlnkWalletParams) (UpdateMerchantBlnkWalletRow, error)
-	UpdateMerchantProfile(ctx context.Context, arg UpdateMerchantProfileParams) (UpdateMerchantProfileRow, error)
+	CommitInventory(ctx context.Context, arg CommitInventoryParams) error
+	CountProductsByMerchant(ctx context.Context, merchantID uuid.UUID) (int64, error)
+	CountUsers(ctx context.Context) (int64, error)
+	CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error)
+	CreateInventory(ctx context.Context, arg CreateInventoryParams) (Inventory, error)
+	CreateMerchantProfile(ctx context.Context, arg CreateMerchantProfileParams) (MerchantProfile, error)
+	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
+	CreateProductImage(ctx context.Context, arg CreateProductImageParams) (ProductImage, error)
+	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	CreateVariant(ctx context.Context, arg CreateVariantParams) (ProductVariant, error)
+	DeleteCategory(ctx context.Context, id uuid.UUID) error
+	DeleteProduct(ctx context.Context, id uuid.UUID) error
+	DeleteProductImage(ctx context.Context, id uuid.UUID) error
+	DeleteProductImages(ctx context.Context, productID uuid.UUID) error
+	DeleteUser(ctx context.Context, id uuid.UUID) error
+	DeleteVariant(ctx context.Context, id uuid.UUID) error
+	DeleteVariantsByProduct(ctx context.Context, productID uuid.UUID) error
+	GetActiveVariantsByProduct(ctx context.Context, productID uuid.UUID) ([]ProductVariant, error)
+	GetCategoryByID(ctx context.Context, id uuid.UUID) (Category, error)
+	GetCategoryBySlug(ctx context.Context, slug string) (Category, error)
+	GetInventoryByID(ctx context.Context, id uuid.UUID) (Inventory, error)
+	GetInventoryByProductID(ctx context.Context, productID uuid.UUID) ([]Inventory, error)
+	GetInventoryByVariantID(ctx context.Context, variantID uuid.UUID) (Inventory, error)
+	GetMerchantProfileByID(ctx context.Context, id uuid.UUID) (MerchantProfile, error)
+	GetMerchantProfileBySlug(ctx context.Context, shopSlug string) (MerchantProfile, error)
+	GetMerchantProfileByUserID(ctx context.Context, userID uuid.UUID) (MerchantProfile, error)
+	GetProductByID(ctx context.Context, id uuid.UUID) (Product, error)
+	GetProductBySlug(ctx context.Context, slug string) (Product, error)
+	GetProductBySlugAndMerchant(ctx context.Context, arg GetProductBySlugAndMerchantParams) (Product, error)
+	// Product Images
+	GetProductImages(ctx context.Context, productID uuid.UUID) ([]ProductImage, error)
+	GetProductPrimaryImage(ctx context.Context, productID uuid.UUID) (ProductImage, error)
+	GetUserByEmail(ctx context.Context, email *string) (User, error)
+	GetUserByEmailOrPhone(ctx context.Context, identifier *string) (User, error)
+	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
+	GetUserByPhone(ctx context.Context, phone *string) (User, error)
+	// Product Variants
+	GetVariantByID(ctx context.Context, id uuid.UUID) (ProductVariant, error)
+	GetVariantBySKU(ctx context.Context, sku string) (ProductVariant, error)
+	GetVariantsByProduct(ctx context.Context, productID uuid.UUID) ([]ProductVariant, error)
+	ListCategories(ctx context.Context) ([]Category, error)
+	ListCategoriesByParent(ctx context.Context, parentID pgtype.UUID) ([]Category, error)
+	ListMerchantProfiles(ctx context.Context, arg ListMerchantProfilesParams) ([]MerchantProfile, error)
+	ListProducts(ctx context.Context, arg ListProductsParams) ([]Product, error)
+	ListProductsByCategory(ctx context.Context, arg ListProductsByCategoryParams) ([]Product, error)
+	ListProductsByMerchant(ctx context.Context, arg ListProductsByMerchantParams) ([]Product, error)
+	ListProductsByMerchantAndStatus(ctx context.Context, arg ListProductsByMerchantAndStatusParams) ([]Product, error)
+	ListTopLevelCategories(ctx context.Context) ([]Category, error)
+	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	ListVerifiedMerchants(ctx context.Context, arg ListVerifiedMerchantsParams) ([]MerchantProfile, error)
+	ReleaseInventory(ctx context.Context, arg ReleaseInventoryParams) error
+	ReserveInventory(ctx context.Context, arg ReserveInventoryParams) error
+	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (Category, error)
+	UpdateInventoryQuantity(ctx context.Context, arg UpdateInventoryQuantityParams) (Inventory, error)
+	UpdateMerchantBlnkWallet(ctx context.Context, arg UpdateMerchantBlnkWalletParams) (MerchantProfile, error)
+	UpdateMerchantProfile(ctx context.Context, arg UpdateMerchantProfileParams) (MerchantProfile, error)
 	UpdateMerchantTotalSales(ctx context.Context, arg UpdateMerchantTotalSalesParams) error
-	UpdateUser(ctx context.Context, arg UpdateUserParams) (UpdateUserRow, error)
+	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)
+	UpdateProductImage(ctx context.Context, arg UpdateProductImageParams) (ProductImage, error)
+	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
+	UpdateVariant(ctx context.Context, arg UpdateVariantParams) (ProductVariant, error)
 }
 
 var _ Querier = (*Queries)(nil)

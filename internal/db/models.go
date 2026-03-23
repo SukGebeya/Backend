@@ -3,3 +3,98 @@
 //   sqlc v1.30.0
 
 package db
+
+import (
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+type Category struct {
+	ID        uuid.UUID          `json:"id"`
+	ParentID  pgtype.UUID        `json:"parent_id"`
+	Name      string             `json:"name"`
+	Slug      string             `json:"slug"`
+	IconUrl   *string            `json:"icon_url"`
+	IsActive  bool               `json:"is_active"`
+	SortOrder int32              `json:"sort_order"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type Inventory struct {
+	ID        uuid.UUID          `json:"id"`
+	VariantID uuid.UUID          `json:"variant_id"`
+	Quantity  int32              `json:"quantity"`
+	Reserved  int32              `json:"reserved"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type MerchantProfile struct {
+	ID              uuid.UUID          `json:"id"`
+	UserID          uuid.UUID          `json:"user_id"`
+	ShopName        string             `json:"shop_name"`
+	ShopSlug        string             `json:"shop_slug"`
+	ShopDescription *string            `json:"shop_description"`
+	ShopLogoUrl     *string            `json:"shop_logo_url"`
+	ShopBannerUrl   *string            `json:"shop_banner_url"`
+	ContactPhone    string             `json:"contact_phone"`
+	ContactEmail    *string            `json:"contact_email"`
+	Address         *string            `json:"address"`
+	City            string             `json:"city"`
+	BlnkBalanceID   *string            `json:"blnk_balance_id"`
+	BlnkLedgerID    *string            `json:"blnk_ledger_id"`
+	IsVerified      bool               `json:"is_verified"`
+	TotalSalesCents int64              `json:"total_sales_cents"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type Product struct {
+	ID          uuid.UUID          `json:"id"`
+	MerchantID  uuid.UUID          `json:"merchant_id"`
+	CategoryID  pgtype.UUID        `json:"category_id"`
+	Name        string             `json:"name"`
+	Slug        string             `json:"slug"`
+	Description *string            `json:"description"`
+	Status      string             `json:"status"`
+	IsDigital   bool               `json:"is_digital"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ProductImage struct {
+	ID        uuid.UUID `json:"id"`
+	ProductID uuid.UUID `json:"product_id"`
+	Url       string    `json:"url"`
+	AltText   *string   `json:"alt_text"`
+	SortOrder int32     `json:"sort_order"`
+	IsPrimary bool      `json:"is_primary"`
+}
+
+type ProductVariant struct {
+	ID                uuid.UUID          `json:"id"`
+	ProductID         uuid.UUID          `json:"product_id"`
+	Sku               string             `json:"sku"`
+	Title             string             `json:"title"`
+	PriceCents        int64              `json:"price_cents"`
+	ComparePriceCents *int64             `json:"compare_price_cents"`
+	Currency          string             `json:"currency"`
+	Attributes        []byte             `json:"attributes"`
+	IsActive          bool               `json:"is_active"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+type User struct {
+	ID           uuid.UUID          `json:"id"`
+	Email        *string            `json:"email"`
+	Phone        *string            `json:"phone"`
+	PasswordHash string             `json:"password_hash"`
+	Role         string             `json:"role"`
+	FullName     *string            `json:"full_name"`
+	AvatarUrl    *string            `json:"avatar_url"`
+	KycStatus    string             `json:"kyc_status"`
+	NationalID   *string            `json:"national_id"`
+	IsActive     bool               `json:"is_active"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}

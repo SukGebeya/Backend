@@ -2,8 +2,7 @@ version: "2"
 sql:
   - engine: "postgresql"
     queries: "sqlc/queries"
-    database:
-      uri: "postgres://postgres:postgres@localhost:5432/app?sslmode=disable"
+    schema: "sqlc/schema.sql"
     gen:
       go:
         package: "db"

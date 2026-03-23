@@ -9,7 +9,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createMerchantProfile = `-- name: CreateMerchantProfile :one
@@ -22,42 +21,22 @@ RETURNING id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, sh
 `
 
 type CreateMerchantProfileParams struct {
-	ID              pgtype.UUID `json:"id"`
-	UserID          pgtype.UUID `json:"user_id"`
-	ShopName        *string     `json:"shop_name"`
-	ShopSlug        *string     `json:"shop_slug"`
-	ShopDescription *string     `json:"shop_description"`
-	ShopLogoUrl     *string     `json:"shop_logo_url"`
-	ShopBannerUrl   *string     `json:"shop_banner_url"`
-	ContactPhone    *string     `json:"contact_phone"`
-	ContactEmail    *string     `json:"contact_email"`
-	Address         *string     `json:"address"`
-	City            *string     `json:"city"`
-	BlnkBalanceID   *string     `json:"blnk_balance_id"`
-	BlnkLedgerID    *string     `json:"blnk_ledger_id"`
+	ID              uuid.UUID `json:"id"`
+	UserID          uuid.UUID `json:"user_id"`
+	ShopName        string    `json:"shop_name"`
+	ShopSlug        string    `json:"shop_slug"`
+	ShopDescription *string   `json:"shop_description"`
+	ShopLogoUrl     *string   `json:"shop_logo_url"`
+	ShopBannerUrl   *string   `json:"shop_banner_url"`
+	ContactPhone    string    `json:"contact_phone"`
+	ContactEmail    *string   `json:"contact_email"`
+	Address         *string   `json:"address"`
+	City            string    `json:"city"`
+	BlnkBalanceID   *string   `json:"blnk_balance_id"`
+	BlnkLedgerID    *string   `json:"blnk_ledger_id"`
 }
 
-type CreateMerchantProfileRow struct {
-	ID              uuid.UUID          `json:"id"`
-	UserID          uuid.UUID          `json:"user_id"`
-	ShopName        string             `json:"shop_name"`
-	ShopSlug        string             `json:"shop_slug"`
-	ShopDescription *string            `json:"shop_description"`
-	ShopLogoUrl     *string            `json:"shop_logo_url"`
-	ShopBannerUrl   *string            `json:"shop_banner_url"`
-	ContactPhone    string             `json:"contact_phone"`
-	ContactEmail    *string            `json:"contact_email"`
-	Address         *string            `json:"address"`
-	City            string             `json:"city"`
-	BlnkBalanceID   *string            `json:"blnk_balance_id"`
-	BlnkLedgerID    *string            `json:"blnk_ledger_id"`
-	IsVerified      bool               `json:"is_verified"`
-	TotalSalesCents int64              `json:"total_sales_cents"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-}
-
-func (q *Queries) CreateMerchantProfile(ctx context.Context, arg CreateMerchantProfileParams) (CreateMerchantProfileRow, error) {
+func (q *Queries) CreateMerchantProfile(ctx context.Context, arg CreateMerchantProfileParams) (MerchantProfile, error) {
 	row := q.db.QueryRow(ctx, createMerchantProfile,
 		arg.ID,
 		arg.UserID,
@@ -73,7 +52,7 @@ func (q *Queries) CreateMerchantProfile(ctx context.Context, arg CreateMerchantP
 		arg.BlnkBalanceID,
 		arg.BlnkLedgerID,
 	)
-	var i CreateMerchantProfileRow
+	var i MerchantProfile
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
@@ -102,29 +81,9 @@ FROM merchant_profiles
 WHERE id = $1
 `
 
-type GetMerchantProfileByIDRow struct {
-	ID              uuid.UUID          `json:"id"`
-	UserID          uuid.UUID          `json:"user_id"`
-	ShopName        string             `json:"shop_name"`
-	ShopSlug        string             `json:"shop_slug"`
-	ShopDescription *string            `json:"shop_description"`
-	ShopLogoUrl     *string            `json:"shop_logo_url"`
-	ShopBannerUrl   *string            `json:"shop_banner_url"`
-	ContactPhone    string             `json:"contact_phone"`
-	ContactEmail    *string            `json:"contact_email"`
-	Address         *string            `json:"address"`
-	City            string             `json:"city"`
-	BlnkBalanceID   *string            `json:"blnk_balance_id"`
-	BlnkLedgerID    *string            `json:"blnk_ledger_id"`
-	IsVerified      bool               `json:"is_verified"`
-	TotalSalesCents int64              `json:"total_sales_cents"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-}
-
-func (q *Queries) GetMerchantProfileByID(ctx context.Context, id pgtype.UUID) (GetMerchantProfileByIDRow, error) {
+func (q *Queries) GetMerchantProfileByID(ctx context.Context, id uuid.UUID) (MerchantProfile, error) {
 	row := q.db.QueryRow(ctx, getMerchantProfileByID, id)
-	var i GetMerchantProfileByIDRow
+	var i MerchantProfile
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
@@ -153,29 +112,9 @@ FROM merchant_profiles
 WHERE shop_slug = $1
 `
 
-type GetMerchantProfileBySlugRow struct {
-	ID              uuid.UUID          `json:"id"`
-	UserID          uuid.UUID          `json:"user_id"`
-	ShopName        string             `json:"shop_name"`
-	ShopSlug        string             `json:"shop_slug"`
-	ShopDescription *string            `json:"shop_description"`
-	ShopLogoUrl     *string            `json:"shop_logo_url"`
-	ShopBannerUrl   *string            `json:"shop_banner_url"`
-	ContactPhone    string             `json:"contact_phone"`
-	ContactEmail    *string            `json:"contact_email"`
-	Address         *string            `json:"address"`
-	City            string             `json:"city"`
-	BlnkBalanceID   *string            `json:"blnk_balance_id"`
-	BlnkLedgerID    *string            `json:"blnk_ledger_id"`
-	IsVerified      bool               `json:"is_verified"`
-	TotalSalesCents int64              `json:"total_sales_cents"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-}
-
-func (q *Queries) GetMerchantProfileBySlug(ctx context.Context, shopSlug *string) (GetMerchantProfileBySlugRow, error) {
+func (q *Queries) GetMerchantProfileBySlug(ctx context.Context, shopSlug string) (MerchantProfile, error) {
 	row := q.db.QueryRow(ctx, getMerchantProfileBySlug, shopSlug)
-	var i GetMerchantProfileBySlugRow
+	var i MerchantProfile
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
@@ -204,29 +143,9 @@ FROM merchant_profiles
 WHERE user_id = $1
 `
 
-type GetMerchantProfileByUserIDRow struct {
-	ID              uuid.UUID          `json:"id"`
-	UserID          uuid.UUID          `json:"user_id"`
-	ShopName        string             `json:"shop_name"`
-	ShopSlug        string             `json:"shop_slug"`
-	ShopDescription *string            `json:"shop_description"`
-	ShopLogoUrl     *string            `json:"shop_logo_url"`
-	ShopBannerUrl   *string            `json:"shop_banner_url"`
-	ContactPhone    string             `json:"contact_phone"`
-	ContactEmail    *string            `json:"contact_email"`
-	Address         *string            `json:"address"`
-	City            string             `json:"city"`
-	BlnkBalanceID   *string            `json:"blnk_balance_id"`
-	BlnkLedgerID    *string            `json:"blnk_ledger_id"`
-	IsVerified      bool               `json:"is_verified"`
-	TotalSalesCents int64              `json:"total_sales_cents"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-}
-
-func (q *Queries) GetMerchantProfileByUserID(ctx context.Context, userID pgtype.UUID) (GetMerchantProfileByUserIDRow, error) {
+func (q *Queries) GetMerchantProfileByUserID(ctx context.Context, userID uuid.UUID) (MerchantProfile, error) {
 	row := q.db.QueryRow(ctx, getMerchantProfileByUserID, userID)
-	var i GetMerchantProfileByUserIDRow
+	var i MerchantProfile
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
@@ -257,39 +176,19 @@ LIMIT $2 OFFSET $1
 `
 
 type ListMerchantProfilesParams struct {
-	PageOffset *int64 `json:"page_offset"`
-	PageLimit  *int64 `json:"page_limit"`
+	PageOffset int32 `json:"page_offset"`
+	PageLimit  int32 `json:"page_limit"`
 }
 
-type ListMerchantProfilesRow struct {
-	ID              uuid.UUID          `json:"id"`
-	UserID          uuid.UUID          `json:"user_id"`
-	ShopName        string             `json:"shop_name"`
-	ShopSlug        string             `json:"shop_slug"`
-	ShopDescription *string            `json:"shop_description"`
-	ShopLogoUrl     *string            `json:"shop_logo_url"`
-	ShopBannerUrl   *string            `json:"shop_banner_url"`
-	ContactPhone    string             `json:"contact_phone"`
-	ContactEmail    *string            `json:"contact_email"`
-	Address         *string            `json:"address"`
-	City            string             `json:"city"`
-	BlnkBalanceID   *string            `json:"blnk_balance_id"`
-	BlnkLedgerID    *string            `json:"blnk_ledger_id"`
-	IsVerified      bool               `json:"is_verified"`
-	TotalSalesCents int64              `json:"total_sales_cents"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-}
-
-func (q *Queries) ListMerchantProfiles(ctx context.Context, arg ListMerchantProfilesParams) ([]ListMerchantProfilesRow, error) {
+func (q *Queries) ListMerchantProfiles(ctx context.Context, arg ListMerchantProfilesParams) ([]MerchantProfile, error) {
 	rows, err := q.db.Query(ctx, listMerchantProfiles, arg.PageOffset, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListMerchantProfilesRow{}
+	items := []MerchantProfile{}
 	for rows.Next() {
-		var i ListMerchantProfilesRow
+		var i MerchantProfile
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
@@ -328,39 +227,19 @@ LIMIT $2 OFFSET $1
 `
 
 type ListVerifiedMerchantsParams struct {
-	PageOffset *int64 `json:"page_offset"`
-	PageLimit  *int64 `json:"page_limit"`
+	PageOffset int32 `json:"page_offset"`
+	PageLimit  int32 `json:"page_limit"`
 }
 
-type ListVerifiedMerchantsRow struct {
-	ID              uuid.UUID          `json:"id"`
-	UserID          uuid.UUID          `json:"user_id"`
-	ShopName        string             `json:"shop_name"`
-	ShopSlug        string             `json:"shop_slug"`
-	ShopDescription *string            `json:"shop_description"`
-	ShopLogoUrl     *string            `json:"shop_logo_url"`
-	ShopBannerUrl   *string            `json:"shop_banner_url"`
-	ContactPhone    string             `json:"contact_phone"`
-	ContactEmail    *string            `json:"contact_email"`
-	Address         *string            `json:"address"`
-	City            string             `json:"city"`
-	BlnkBalanceID   *string            `json:"blnk_balance_id"`
-	BlnkLedgerID    *string            `json:"blnk_ledger_id"`
-	IsVerified      bool               `json:"is_verified"`
-	TotalSalesCents int64              `json:"total_sales_cents"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-}
-
-func (q *Queries) ListVerifiedMerchants(ctx context.Context, arg ListVerifiedMerchantsParams) ([]ListVerifiedMerchantsRow, error) {
+func (q *Queries) ListVerifiedMerchants(ctx context.Context, arg ListVerifiedMerchantsParams) ([]MerchantProfile, error) {
 	rows, err := q.db.Query(ctx, listVerifiedMerchants, arg.PageOffset, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListVerifiedMerchantsRow{}
+	items := []MerchantProfile{}
 	for rows.Next() {
-		var i ListVerifiedMerchantsRow
+		var i MerchantProfile
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
@@ -398,34 +277,14 @@ RETURNING id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, sh
 `
 
 type UpdateMerchantBlnkWalletParams struct {
-	BlnkBalanceID *string     `json:"blnk_balance_id"`
-	BlnkLedgerID  *string     `json:"blnk_ledger_id"`
-	ID            pgtype.UUID `json:"id"`
+	BlnkBalanceID *string   `json:"blnk_balance_id"`
+	BlnkLedgerID  *string   `json:"blnk_ledger_id"`
+	ID            uuid.UUID `json:"id"`
 }
 
-type UpdateMerchantBlnkWalletRow struct {
-	ID              uuid.UUID          `json:"id"`
-	UserID          uuid.UUID          `json:"user_id"`
-	ShopName        string             `json:"shop_name"`
-	ShopSlug        string             `json:"shop_slug"`
-	ShopDescription *string            `json:"shop_description"`
-	ShopLogoUrl     *string            `json:"shop_logo_url"`
-	ShopBannerUrl   *string            `json:"shop_banner_url"`
-	ContactPhone    string             `json:"contact_phone"`
-	ContactEmail    *string            `json:"contact_email"`
-	Address         *string            `json:"address"`
-	City            string             `json:"city"`
-	BlnkBalanceID   *string            `json:"blnk_balance_id"`
-	BlnkLedgerID    *string            `json:"blnk_ledger_id"`
-	IsVerified      bool               `json:"is_verified"`
-	TotalSalesCents int64              `json:"total_sales_cents"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-}
-
-func (q *Queries) UpdateMerchantBlnkWallet(ctx context.Context, arg UpdateMerchantBlnkWalletParams) (UpdateMerchantBlnkWalletRow, error) {
+func (q *Queries) UpdateMerchantBlnkWallet(ctx context.Context, arg UpdateMerchantBlnkWalletParams) (MerchantProfile, error) {
 	row := q.db.QueryRow(ctx, updateMerchantBlnkWallet, arg.BlnkBalanceID, arg.BlnkLedgerID, arg.ID)
-	var i UpdateMerchantBlnkWalletRow
+	var i MerchantProfile
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
@@ -468,41 +327,21 @@ RETURNING id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, sh
 `
 
 type UpdateMerchantProfileParams struct {
-	ShopName        *string     `json:"shop_name"`
-	ShopDescription *string     `json:"shop_description"`
-	ShopLogoUrl     *string     `json:"shop_logo_url"`
-	ShopBannerUrl   *string     `json:"shop_banner_url"`
-	ContactPhone    *string     `json:"contact_phone"`
-	ContactEmail    *string     `json:"contact_email"`
-	Address         *string     `json:"address"`
-	City            *string     `json:"city"`
-	BlnkBalanceID   *string     `json:"blnk_balance_id"`
-	BlnkLedgerID    *string     `json:"blnk_ledger_id"`
-	IsVerified      *bool       `json:"is_verified"`
-	ID              pgtype.UUID `json:"id"`
+	ShopName        string    `json:"shop_name"`
+	ShopDescription *string   `json:"shop_description"`
+	ShopLogoUrl     *string   `json:"shop_logo_url"`
+	ShopBannerUrl   *string   `json:"shop_banner_url"`
+	ContactPhone    string    `json:"contact_phone"`
+	ContactEmail    *string   `json:"contact_email"`
+	Address         *string   `json:"address"`
+	City            string    `json:"city"`
+	BlnkBalanceID   *string   `json:"blnk_balance_id"`
+	BlnkLedgerID    *string   `json:"blnk_ledger_id"`
+	IsVerified      bool      `json:"is_verified"`
+	ID              uuid.UUID `json:"id"`
 }
 
-type UpdateMerchantProfileRow struct {
-	ID              uuid.UUID          `json:"id"`
-	UserID          uuid.UUID          `json:"user_id"`
-	ShopName        string             `json:"shop_name"`
-	ShopSlug        string             `json:"shop_slug"`
-	ShopDescription *string            `json:"shop_description"`
-	ShopLogoUrl     *string            `json:"shop_logo_url"`
-	ShopBannerUrl   *string            `json:"shop_banner_url"`
-	ContactPhone    string             `json:"contact_phone"`
-	ContactEmail    *string            `json:"contact_email"`
-	Address         *string            `json:"address"`
-	City            string             `json:"city"`
-	BlnkBalanceID   *string            `json:"blnk_balance_id"`
-	BlnkLedgerID    *string            `json:"blnk_ledger_id"`
-	IsVerified      bool               `json:"is_verified"`
-	TotalSalesCents int64              `json:"total_sales_cents"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
-}
-
-func (q *Queries) UpdateMerchantProfile(ctx context.Context, arg UpdateMerchantProfileParams) (UpdateMerchantProfileRow, error) {
+func (q *Queries) UpdateMerchantProfile(ctx context.Context, arg UpdateMerchantProfileParams) (MerchantProfile, error) {
 	row := q.db.QueryRow(ctx, updateMerchantProfile,
 		arg.ShopName,
 		arg.ShopDescription,
@@ -517,7 +356,7 @@ func (q *Queries) UpdateMerchantProfile(ctx context.Context, arg UpdateMerchantP
 		arg.IsVerified,
 		arg.ID,
 	)
-	var i UpdateMerchantProfileRow
+	var i MerchantProfile
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
@@ -547,8 +386,8 @@ WHERE id = $2
 `
 
 type UpdateMerchantTotalSalesParams struct {
-	Amount *int64      `json:"amount"`
-	ID     pgtype.UUID `json:"id"`
+	Amount int64     `json:"amount"`
+	ID     uuid.UUID `json:"id"`
 }
 
 func (q *Queries) UpdateMerchantTotalSales(ctx context.Context, arg UpdateMerchantTotalSalesParams) error {

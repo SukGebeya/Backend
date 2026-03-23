@@ -9,16 +9,15 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const countUsers = `-- name: CountUsers :one
 SELECT COUNT(*) FROM users
 `
 
-func (q *Queries) CountUsers(ctx context.Context) (*int64, error) {
+func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
 	row := q.db.QueryRow(ctx, countUsers)
-	var count *int64
+	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
@@ -30,31 +29,16 @@ RETURNING id, email, phone, password_hash, role, full_name, avatar_url, kyc_stat
 `
 
 type CreateUserParams struct {
-	ID           pgtype.UUID `json:"id"`
-	Email        *string     `json:"email"`
-	Phone        *string     `json:"phone"`
-	PasswordHash *string     `json:"password_hash"`
-	Role         *string     `json:"role"`
-	KycStatus    *string     `json:"kyc_status"`
-	IsActive     *bool       `json:"is_active"`
+	ID           uuid.UUID `json:"id"`
+	Email        *string   `json:"email"`
+	Phone        *string   `json:"phone"`
+	PasswordHash string    `json:"password_hash"`
+	Role         string    `json:"role"`
+	KycStatus    string    `json:"kyc_status"`
+	IsActive     bool      `json:"is_active"`
 }
 
-type CreateUserRow struct {
-	ID           uuid.UUID          `json:"id"`
-	Email        *string            `json:"email"`
-	Phone        *string            `json:"phone"`
-	PasswordHash string             `json:"password_hash"`
-	Role         string             `json:"role"`
-	FullName     *string            `json:"full_name"`
-	AvatarUrl    *string            `json:"avatar_url"`
-	KycStatus    string             `json:"kyc_status"`
-	NationalID   *string            `json:"national_id"`
-	IsActive     bool               `json:"is_active"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
-}
-
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, createUser,
 		arg.ID,
 		arg.Email,
@@ -64,7 +48,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 		arg.KycStatus,
 		arg.IsActive,
 	)
-	var i CreateUserRow
+	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
@@ -86,7 +70,7 @@ const deleteUser = `-- name: DeleteUser :exec
 DELETE FROM users WHERE id = $1
 `
 
-func (q *Queries) DeleteUser(ctx context.Context, id pgtype.UUID) error {
+func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, deleteUser, id)
 	return err
 }
@@ -97,24 +81,9 @@ FROM users
 WHERE email = $1
 `
 
-type GetUserByEmailRow struct {
-	ID           uuid.UUID          `json:"id"`
-	Email        *string            `json:"email"`
-	Phone        *string            `json:"phone"`
-	PasswordHash string             `json:"password_hash"`
-	Role         string             `json:"role"`
-	FullName     *string            `json:"full_name"`
-	AvatarUrl    *string            `json:"avatar_url"`
-	KycStatus    string             `json:"kyc_status"`
-	NationalID   *string            `json:"national_id"`
-	IsActive     bool               `json:"is_active"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
-}
-
-func (q *Queries) GetUserByEmail(ctx context.Context, email *string) (GetUserByEmailRow, error) {
+func (q *Queries) GetUserByEmail(ctx context.Context, email *string) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByEmail, email)
-	var i GetUserByEmailRow
+	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
@@ -138,24 +107,9 @@ FROM users
 WHERE email = $1 OR phone = $1
 `
 
-type GetUserByEmailOrPhoneRow struct {
-	ID           uuid.UUID          `json:"id"`
-	Email        *string            `json:"email"`
-	Phone        *string            `json:"phone"`
-	PasswordHash string             `json:"password_hash"`
-	Role         string             `json:"role"`
-	FullName     *string            `json:"full_name"`
-	AvatarUrl    *string            `json:"avatar_url"`
-	KycStatus    string             `json:"kyc_status"`
-	NationalID   *string            `json:"national_id"`
-	IsActive     bool               `json:"is_active"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
-}
-
-func (q *Queries) GetUserByEmailOrPhone(ctx context.Context, identifier *string) (GetUserByEmailOrPhoneRow, error) {
+func (q *Queries) GetUserByEmailOrPhone(ctx context.Context, identifier *string) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByEmailOrPhone, identifier)
-	var i GetUserByEmailOrPhoneRow
+	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
@@ -179,24 +133,9 @@ FROM users
 WHERE id = $1
 `
 
-type GetUserByIDRow struct {
-	ID           uuid.UUID          `json:"id"`
-	Email        *string            `json:"email"`
-	Phone        *string            `json:"phone"`
-	PasswordHash string             `json:"password_hash"`
-	Role         string             `json:"role"`
-	FullName     *string            `json:"full_name"`
-	AvatarUrl    *string            `json:"avatar_url"`
-	KycStatus    string             `json:"kyc_status"`
-	NationalID   *string            `json:"national_id"`
-	IsActive     bool               `json:"is_active"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
-}
-
-func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (GetUserByIDRow, error) {
+func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByID, id)
-	var i GetUserByIDRow
+	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
@@ -220,24 +159,9 @@ FROM users
 WHERE phone = $1
 `
 
-type GetUserByPhoneRow struct {
-	ID           uuid.UUID          `json:"id"`
-	Email        *string            `json:"email"`
-	Phone        *string            `json:"phone"`
-	PasswordHash string             `json:"password_hash"`
-	Role         string             `json:"role"`
-	FullName     *string            `json:"full_name"`
-	AvatarUrl    *string            `json:"avatar_url"`
-	KycStatus    string             `json:"kyc_status"`
-	NationalID   *string            `json:"national_id"`
-	IsActive     bool               `json:"is_active"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
-}
-
-func (q *Queries) GetUserByPhone(ctx context.Context, phone *string) (GetUserByPhoneRow, error) {
+func (q *Queries) GetUserByPhone(ctx context.Context, phone *string) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByPhone, phone)
-	var i GetUserByPhoneRow
+	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
@@ -263,34 +187,19 @@ LIMIT $2 OFFSET $1
 `
 
 type ListUsersParams struct {
-	PageOffset *int64 `json:"page_offset"`
-	PageLimit  *int64 `json:"page_limit"`
+	PageOffset int32 `json:"page_offset"`
+	PageLimit  int32 `json:"page_limit"`
 }
 
-type ListUsersRow struct {
-	ID           uuid.UUID          `json:"id"`
-	Email        *string            `json:"email"`
-	Phone        *string            `json:"phone"`
-	PasswordHash string             `json:"password_hash"`
-	Role         string             `json:"role"`
-	FullName     *string            `json:"full_name"`
-	AvatarUrl    *string            `json:"avatar_url"`
-	KycStatus    string             `json:"kyc_status"`
-	NationalID   *string            `json:"national_id"`
-	IsActive     bool               `json:"is_active"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
-}
-
-func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error) {
+func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error) {
 	rows, err := q.db.Query(ctx, listUsers, arg.PageOffset, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListUsersRow{}
+	items := []User{}
 	for rows.Next() {
-		var i ListUsersRow
+		var i User
 		if err := rows.Scan(
 			&i.ID,
 			&i.Email,
@@ -333,34 +242,19 @@ RETURNING id, email, phone, password_hash, role, full_name, avatar_url, kyc_stat
 `
 
 type UpdateUserParams struct {
-	Email        *string     `json:"email"`
-	Phone        *string     `json:"phone"`
-	PasswordHash *string     `json:"password_hash"`
-	Role         *string     `json:"role"`
-	FullName     *string     `json:"full_name"`
-	AvatarUrl    *string     `json:"avatar_url"`
-	KycStatus    *string     `json:"kyc_status"`
-	NationalID   *string     `json:"national_id"`
-	IsActive     *bool       `json:"is_active"`
-	ID           pgtype.UUID `json:"id"`
+	Email        *string   `json:"email"`
+	Phone        *string   `json:"phone"`
+	PasswordHash string    `json:"password_hash"`
+	Role         string    `json:"role"`
+	FullName     *string   `json:"full_name"`
+	AvatarUrl    *string   `json:"avatar_url"`
+	KycStatus    string    `json:"kyc_status"`
+	NationalID   *string   `json:"national_id"`
+	IsActive     bool      `json:"is_active"`
+	ID           uuid.UUID `json:"id"`
 }
 
-type UpdateUserRow struct {
-	ID           uuid.UUID          `json:"id"`
-	Email        *string            `json:"email"`
-	Phone        *string            `json:"phone"`
-	PasswordHash string             `json:"password_hash"`
-	Role         string             `json:"role"`
-	FullName     *string            `json:"full_name"`
-	AvatarUrl    *string            `json:"avatar_url"`
-	KycStatus    string             `json:"kyc_status"`
-	NationalID   *string            `json:"national_id"`
-	IsActive     bool               `json:"is_active"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
-}
-
-func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (UpdateUserRow, error) {
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, updateUser,
 		arg.Email,
 		arg.Phone,
@@ -373,7 +267,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (UpdateU
 		arg.IsActive,
 		arg.ID,
 	)
-	var i UpdateUserRow
+	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
