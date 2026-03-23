@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/nate/go-boilerplate/internal/domain"
+	"github.com/SukGebeya/Backend/internal/domain"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -21,7 +21,9 @@ func NewUserBuilder() *UserBuilder {
 			Email:        &email,
 			Phone:        &phone,
 			PasswordHash: "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZRGdjGj/n3/ItB/XBG/eCknfIrqS6",
-			Role:         domain.RoleUser,
+			Role:         domain.RoleBuyer,
+			KYCStatus:    domain.KYCStatusPending,
+			IsActive:     true,
 			CreatedAt:    time.Now(),
 			UpdatedAt:    time.Now(),
 		},
@@ -66,67 +68,4 @@ func (b *UserBuilder) WithUpdatedAt(updatedAt time.Time) *UserBuilder {
 
 func (b *UserBuilder) Build() *domain.User {
 	return b.user
-}
-
-type NoteBuilder struct {
-	note *domain.Note
-}
-
-func NewNoteBuilder() *NoteBuilder {
-	return &NoteBuilder{
-		note: &domain.Note{
-			ID:        uuid.New(),
-			UserID:    uuid.New(),
-			Title:     "Test Note",
-			Content:   "This is a test note",
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-			DeletedAt: nil,
-		},
-	}
-}
-
-func (b *NoteBuilder) WithID(id uuid.UUID) *NoteBuilder {
-	b.note.ID = id
-	return b
-}
-
-func (b *NoteBuilder) WithUserID(userID uuid.UUID) *NoteBuilder {
-	b.note.UserID = userID
-	return b
-}
-
-func (b *NoteBuilder) WithTitle(title string) *NoteBuilder {
-	b.note.Title = title
-	return b
-}
-
-func (b *NoteBuilder) WithContent(content string) *NoteBuilder {
-	b.note.Content = content
-	return b
-}
-
-func (b *NoteBuilder) WithCreatedAt(createdAt time.Time) *NoteBuilder {
-	b.note.CreatedAt = createdAt
-	return b
-}
-
-func (b *NoteBuilder) WithUpdatedAt(updatedAt time.Time) *NoteBuilder {
-	b.note.UpdatedAt = updatedAt
-	return b
-}
-
-func (b *NoteBuilder) WithDeletedAt(deletedAt time.Time) *NoteBuilder {
-	b.note.DeletedAt = &deletedAt
-	return b
-}
-
-func (b *NoteBuilder) Deleted() *NoteBuilder {
-	now := time.Now()
-	b.note.DeletedAt = &now
-	return b
-}
-
-func (b *NoteBuilder) Build() *domain.Note {
-	return b.note
 }

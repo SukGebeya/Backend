@@ -3,10 +3,10 @@ package handler
 import (
 	"net/http"
 
-	"github.com/nate/go-boilerplate/internal/http/middleware"
-	"github.com/nate/go-boilerplate/internal/service"
-	"github.com/nate/go-boilerplate/pkg/response"
-	"github.com/nate/go-boilerplate/pkg/validation"
+	"github.com/SukGebeya/Backend/internal/http/middleware"
+	"github.com/SukGebeya/Backend/internal/service"
+	"github.com/SukGebeya/Backend/pkg/response"
+	"github.com/SukGebeya/Backend/pkg/validation"
 )
 
 type UserHandler struct {

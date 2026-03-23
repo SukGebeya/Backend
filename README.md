@@ -29,8 +29,8 @@ A production-ready Go REST API boilerplate with clean architecture, JWT authenti
 
 ```bash
 # Clone the repository
-git clone https://github.com/nate/go-boilerplate.git
-cd go-boilerplate
+git clone https://github.com/nate/sukgebeya.git
+cd sukgebeya
 
 # Copy environment file
 cp .env.example .env

@@ -139,7 +139,7 @@ func TestManager_GenerateAndValidateAccessToken(t *testing.T) {
 	assert.Equal(t, userID, claims.UserID)
 	assert.Equal(t, email, claims.Email)
 	assert.Equal(t, role, claims.Role)
-	assert.Equal(t, "go-boilerplate", claims.Issuer)
+	assert.Equal(t, "sukgebeya", claims.Issuer)
 	assert.Equal(t, userID.String(), claims.Subject)
 }
 

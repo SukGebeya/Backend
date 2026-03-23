@@ -3,10 +3,11 @@ package handler
 import (
 	"net/http"
 
-	"github.com/nate/go-boilerplate/internal/http/middleware"
-	"github.com/nate/go-boilerplate/internal/service"
-	"github.com/nate/go-boilerplate/pkg/response"
-	"github.com/nate/go-boilerplate/pkg/validation"
+	"github.com/SukGebeya/Backend/internal/domain"
+	"github.com/SukGebeya/Backend/internal/http/middleware"
+	"github.com/SukGebeya/Backend/internal/service"
+	"github.com/SukGebeya/Backend/pkg/response"
+	"github.com/SukGebeya/Backend/pkg/validation"
 )
 
 type AuthHandler struct {
@@ -21,6 +22,7 @@ type RegisterRequest struct {
 	Email    *string `json:"email" validate:"omitempty,email" example:"user@example.com"`
 	Phone    *string `json:"phone" validate:"omitempty,phone" example:"+1234567890"`
 	Password string  `json:"password" validate:"required,min=8" example:"securepassword123"`
+	Role     string  `json:"role" validate:"omitempty,oneof=buyer merchant" example:"buyer"`
 }
 
 type LoginRequest struct {
@@ -68,10 +70,16 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	role := domain.RoleBuyer
+	if req.Role != "" {
+		role = domain.Role(req.Role)
+	}
+
 	result, err := h.authService.Register(r.Context(), service.RegisterInput{
 		Email:    req.Email,
 		Phone:    req.Phone,
 		Password: req.Password,
+		Role:     role,
 	})
 	if err != nil {
 		response.Error(w, err)

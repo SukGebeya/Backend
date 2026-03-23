@@ -54,13 +54,16 @@ vet:
 # ==================== Database Migrations ====================
 
 migrate-up:
-	goose -dir migrations postgres "$(DATABASE_URL)" up
+	@eval $$(grep -v '^#' .env | grep -v '^$$' | sed 's/^/export /') && \
+	goose -dir migrations postgres "$$DATABASE_URL" up
 
 migrate-down:
-	goose -dir migrations postgres "$(DATABASE_URL)" down
+	@eval $$(grep -v '^#' .env | grep -v '^$$' | sed 's/^/export /') && \
+	goose -dir migrations postgres "$$DATABASE_URL" down
 
 migrate-status:
-	goose -dir migrations postgres "$(DATABASE_URL)" status
+	@eval $$(grep -v '^#' .env | grep -v '^$$' | sed 's/^/export /') && \
+	goose -dir migrations postgres "$$DATABASE_URL" status
 
 migrate-create:
 	@read -p "Enter migration name: " name; \

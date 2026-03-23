@@ -11,7 +11,7 @@ const docTemplate = `{
         "title": "{{.Title}}",
         "contact": {
             "name": "API Support",
-            "url": "https://github.com/nate/go-boilerplate",
+            "url": "https://github.com/SukGebeya/Backend",
             "email": "support@example.com"
         },
         "license": {
@@ -57,19 +57,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or validation error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Invalid credentials",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -106,19 +106,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or validation error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Invalid refresh token",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -149,13 +149,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Authentication required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -215,13 +215,13 @@ const docTemplate = `{
                     "401": {
                         "description": "Authentication required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -264,19 +264,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or validation error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Authentication required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -320,25 +320,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid note ID format",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Authentication required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Note not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -389,25 +389,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body, note ID, or validation error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Authentication required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Note not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -446,25 +446,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid note ID format",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Authentication required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Note not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -505,25 +505,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid note ID format",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Authentication required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Note not found or not deleted",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -563,19 +563,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or validation error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Invalid or expired refresh token",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -615,19 +615,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or validation error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Email or phone already registered",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -680,19 +680,19 @@ const docTemplate = `{
                     "401": {
                         "description": "Authentication required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Admin access required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -726,19 +726,19 @@ const docTemplate = `{
                     "401": {
                         "description": "Authentication required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "User not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -781,25 +781,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or validation error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Authentication required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Email or phone already in use",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -843,31 +843,31 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid user ID format",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Authentication required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Admin access required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "User not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -906,31 +906,31 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid user ID format",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Authentication required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Admin access required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "User not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_go-boilerplate_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -967,7 +967,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "github_com_nate_go-boilerplate_pkg_response.ErrorResponse": {
+        "github_com_nate_sukgebeya_pkg_response.ErrorResponse": {
             "type": "object",
             "properties": {
                 "code": {

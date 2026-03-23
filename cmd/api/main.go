@@ -34,18 +34,18 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/SukGebeya/Backend/internal/config"
+	apphttp "github.com/SukGebeya/Backend/internal/http"
+	httpmiddleware "github.com/SukGebeya/Backend/internal/http/middleware"
+	"github.com/SukGebeya/Backend/internal/repository"
+	"github.com/SukGebeya/Backend/internal/service"
+	"github.com/SukGebeya/Backend/pkg/jwt"
+	"github.com/SukGebeya/Backend/pkg/logger"
+	"github.com/SukGebeya/Backend/pkg/password"
+	"github.com/SukGebeya/Backend/pkg/validation"
 	"github.com/go-redis/redis/v8"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/nate/go-boilerplate/internal/config"
-	apphttp "github.com/nate/go-boilerplate/internal/http"
-	httpmiddleware "github.com/nate/go-boilerplate/internal/http/middleware"
-	"github.com/nate/go-boilerplate/internal/repository"
-	"github.com/nate/go-boilerplate/internal/service"
-	"github.com/nate/go-boilerplate/pkg/jwt"
-	"github.com/nate/go-boilerplate/pkg/logger"
-	"github.com/nate/go-boilerplate/pkg/password"
-	"github.com/nate/go-boilerplate/pkg/validation"
 	"github.com/pressly/goose/v3"
 )
 
@@ -55,7 +55,7 @@ import (
 // @description Features include JWT authentication, rate limiting, soft deletes, and Redis-based token storage.
 
 // @contact.name API Support
-// @contact.url https://github.com/natnael-alemayehu/go-boilerplate
+// @contact.url https://github.com/natnael-alemayehu/sukgebeya
 // @contact.email support@example.com
 
 // @license.name MIT
@@ -135,7 +135,6 @@ func main() {
 	appLogger.Info("Redis connection established", "addr", cfg.RedisURL)
 
 	userRepo := repository.NewUserRepository(pool)
-	noteRepo := repository.NewNoteRepository(pool)
 	refreshTokenRepo := repository.NewCircuitBreakerRefreshTokenRepository(redisClient)
 	rateLimitRepo := repository.NewCircuitBreakerRateLimitRepository(redisClient)
 
@@ -164,11 +163,11 @@ func main() {
 
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, jwtManager, passwordHasher, cfg.JWT.RefreshTTL)
 	userService := service.NewUserService(userRepo)
-	noteService := service.NewNoteService(noteRepo)
+	merchantService := service.NewMerchantService(repository.NewMerchantRepository(pool))
 
 	rateLimiter := httpmiddleware.NewRateLimiter(rateLimitRepo, cfg.RateLimit.Requests, int64(cfg.RateLimit.Window.Seconds()))
 
-	router := apphttp.NewRouter(authService, userService, noteService, jwtManager, rateLimiter, pool, redisClient, appLogger)
+	router := apphttp.NewRouter(authService, userService, merchantService, jwtManager, rateLimiter, pool, redisClient, appLogger)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

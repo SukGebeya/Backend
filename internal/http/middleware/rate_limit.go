@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strconv"
 
-	apperrors "github.com/nate/go-boilerplate/internal/errors"
-	"github.com/nate/go-boilerplate/internal/repository"
-	"github.com/nate/go-boilerplate/pkg/response"
+	apperrors "github.com/SukGebeya/Backend/internal/errors"
+	"github.com/SukGebeya/Backend/internal/repository"
+	"github.com/SukGebeya/Backend/pkg/response"
 )
 
 type RateLimiter struct {

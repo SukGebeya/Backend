@@ -1,8 +1,9 @@
 version: "2"
 sql:
   - engine: "postgresql"
-    queries: "sqlc/queries/queries.sql"
-    schema: "migrations"
+    queries: "sqlc/queries"
+    database:
+      uri: "postgres://postgres:postgres@localhost:5432/app?sslmode=disable"
     gen:
       go:
         package: "db"

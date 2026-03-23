@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"github.com/nate/go-boilerplate/internal/service"
+	"github.com/SukGebeya/Backend/internal/service"
 )
 
 type TokenResponse struct {

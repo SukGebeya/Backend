@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/nate/go-boilerplate/internal/domain"
-	domainerrors "github.com/nate/go-boilerplate/internal/errors"
-	"github.com/nate/go-boilerplate/internal/repository"
+	"github.com/SukGebeya/Backend/internal/domain"
+	domainerrors "github.com/SukGebeya/Backend/internal/errors"
+	"github.com/SukGebeya/Backend/internal/repository"
 )
 
 var _ UserManager = (*UserService)(nil)

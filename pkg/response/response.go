@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	apperrors "github.com/nate/go-boilerplate/internal/errors"
+	apperrors "github.com/SukGebeya/Backend/internal/errors"
 )
 
 type ErrorResponse struct {

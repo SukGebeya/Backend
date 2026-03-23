@@ -3,28 +3,3 @@
 //   sqlc v1.30.0
 
 package db
-
-import (
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
-)
-
-type Note struct {
-	ID        uuid.UUID          `json:"id"`
-	UserID    uuid.UUID          `json:"user_id"`
-	Title     string             `json:"title"`
-	Content   *string            `json:"content"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
-}
-
-type User struct {
-	ID           uuid.UUID          `json:"id"`
-	Email        *string            `json:"email"`
-	Phone        *string            `json:"phone"`
-	PasswordHash string             `json:"password_hash"`
-	Role         string             `json:"role"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
-}

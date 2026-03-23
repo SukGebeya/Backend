@@ -1,4 +1,4 @@
-module github.com/nate/go-boilerplate
+module github.com/SukGebeya/Backend
 
 go 1.24.0
 

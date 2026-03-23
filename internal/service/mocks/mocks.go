@@ -14,8 +14,8 @@ import (
 	reflect "reflect"
 
 	uuid "github.com/google/uuid"
-	domain "github.com/nate/go-boilerplate/internal/domain"
-	service "github.com/nate/go-boilerplate/internal/service"
+	domain "github.com/SukGebeya/Backend/internal/domain"
+	service "github.com/SukGebeya/Backend/internal/service"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -116,133 +116,6 @@ func (mr *MockAuthenticatorMockRecorder) Register(ctx, input any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockAuthenticator)(nil).Register), ctx, input)
 }
 
-// MockNoteManager is a mock of NoteManager interface.
-type MockNoteManager struct {
-	ctrl     *gomock.Controller
-	recorder *MockNoteManagerMockRecorder
-	isgomock struct{}
-}
-
-// MockNoteManagerMockRecorder is the mock recorder for MockNoteManager.
-type MockNoteManagerMockRecorder struct {
-	mock *MockNoteManager
-}
-
-// NewMockNoteManager creates a new mock instance.
-func NewMockNoteManager(ctrl *gomock.Controller) *MockNoteManager {
-	mock := &MockNoteManager{ctrl: ctrl}
-	mock.recorder = &MockNoteManagerMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockNoteManager) EXPECT() *MockNoteManagerMockRecorder {
-	return m.recorder
-}
-
-// Create mocks base method.
-func (m *MockNoteManager) Create(ctx context.Context, input service.CreateNoteInput) (*domain.Note, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", ctx, input)
-	ret0, _ := ret[0].(*domain.Note)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Create indicates an expected call of Create.
-func (mr *MockNoteManagerMockRecorder) Create(ctx, input any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockNoteManager)(nil).Create), ctx, input)
-}
-
-// GetByID mocks base method.
-func (m *MockNoteManager) GetByID(ctx context.Context, id uuid.UUID) (*domain.Note, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetByID", ctx, id)
-	ret0, _ := ret[0].(*domain.Note)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetByID indicates an expected call of GetByID.
-func (mr *MockNoteManagerMockRecorder) GetByID(ctx, id any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockNoteManager)(nil).GetByID), ctx, id)
-}
-
-// GetByIDAndUserID mocks base method.
-func (m *MockNoteManager) GetByIDAndUserID(ctx context.Context, id, userID uuid.UUID) (*domain.Note, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetByIDAndUserID", ctx, id, userID)
-	ret0, _ := ret[0].(*domain.Note)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetByIDAndUserID indicates an expected call of GetByIDAndUserID.
-func (mr *MockNoteManagerMockRecorder) GetByIDAndUserID(ctx, id, userID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByIDAndUserID", reflect.TypeOf((*MockNoteManager)(nil).GetByIDAndUserID), ctx, id, userID)
-}
-
-// ListByUserID mocks base method.
-func (m *MockNoteManager) ListByUserID(ctx context.Context, userID uuid.UUID, opts domain.NoteListOptions) (*domain.PaginatedResult[domain.Note], error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListByUserID", ctx, userID, opts)
-	ret0, _ := ret[0].(*domain.PaginatedResult[domain.Note])
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListByUserID indicates an expected call of ListByUserID.
-func (mr *MockNoteManagerMockRecorder) ListByUserID(ctx, userID, opts any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListByUserID", reflect.TypeOf((*MockNoteManager)(nil).ListByUserID), ctx, userID, opts)
-}
-
-// Restore mocks base method.
-func (m *MockNoteManager) Restore(ctx context.Context, id, userID uuid.UUID) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Restore", ctx, id, userID)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Restore indicates an expected call of Restore.
-func (mr *MockNoteManagerMockRecorder) Restore(ctx, id, userID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Restore", reflect.TypeOf((*MockNoteManager)(nil).Restore), ctx, id, userID)
-}
-
-// SoftDelete mocks base method.
-func (m *MockNoteManager) SoftDelete(ctx context.Context, id, userID uuid.UUID) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SoftDelete", ctx, id, userID)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SoftDelete indicates an expected call of SoftDelete.
-func (mr *MockNoteManagerMockRecorder) SoftDelete(ctx, id, userID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SoftDelete", reflect.TypeOf((*MockNoteManager)(nil).SoftDelete), ctx, id, userID)
-}
-
-// Update mocks base method.
-func (m *MockNoteManager) Update(ctx context.Context, input service.UpdateNoteInput) (*domain.Note, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Update", ctx, input)
-	ret0, _ := ret[0].(*domain.Note)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Update indicates an expected call of Update.
-func (mr *MockNoteManagerMockRecorder) Update(ctx, input any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockNoteManager)(nil).Update), ctx, input)
-}
-
 // MockUserManager is a mock of UserManager interface.
 type MockUserManager struct {
 	ctrl     *gomock.Controller
@@ -339,4 +212,88 @@ func (m *MockUserManager) UpdateProfile(ctx context.Context, userID uuid.UUID, i
 func (mr *MockUserManagerMockRecorder) UpdateProfile(ctx, userID, input any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateProfile", reflect.TypeOf((*MockUserManager)(nil).UpdateProfile), ctx, userID, input)
+}
+
+// MockMerchantOnboarder is a mock of MerchantOnboarder interface.
+type MockMerchantOnboarder struct {
+	ctrl     *gomock.Controller
+	recorder *MockMerchantOnboarderMockRecorder
+	isgomock struct{}
+}
+
+// MockMerchantOnboarderMockRecorder is the mock recorder for MockMerchantOnboarder.
+type MockMerchantOnboarderMockRecorder struct {
+	mock *MockMerchantOnboarder
+}
+
+// NewMockMerchantOnboarder creates a new mock instance.
+func NewMockMerchantOnboarder(ctrl *gomock.Controller) *MockMerchantOnboarder {
+	mock := &MockMerchantOnboarder{ctrl: ctrl}
+	mock.recorder = &MockMerchantOnboarderMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockMerchantOnboarder) EXPECT() *MockMerchantOnboarderMockRecorder {
+	return m.recorder
+}
+
+// GetBySlug mocks base method.
+func (m *MockMerchantOnboarder) GetBySlug(ctx context.Context, slug string) (*domain.MerchantProfile, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBySlug", ctx, slug)
+	ret0, _ := ret[0].(*domain.MerchantProfile)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBySlug indicates an expected call of GetBySlug.
+func (mr *MockMerchantOnboarderMockRecorder) GetBySlug(ctx, slug any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBySlug", reflect.TypeOf((*MockMerchantOnboarder)(nil).GetBySlug), ctx, slug)
+}
+
+// GetByUserID mocks base method.
+func (m *MockMerchantOnboarder) GetByUserID(ctx context.Context, userID uuid.UUID) (*domain.MerchantProfile, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByUserID", ctx, userID)
+	ret0, _ := ret[0].(*domain.MerchantProfile)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByUserID indicates an expected call of GetByUserID.
+func (mr *MockMerchantOnboarderMockRecorder) GetByUserID(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByUserID", reflect.TypeOf((*MockMerchantOnboarder)(nil).GetByUserID), ctx, userID)
+}
+
+// Onboard mocks base method.
+func (m *MockMerchantOnboarder) Onboard(ctx context.Context, input service.OnboardInput) (*domain.MerchantProfile, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Onboard", ctx, input)
+	ret0, _ := ret[0].(*domain.MerchantProfile)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Onboard indicates an expected call of Onboard.
+func (mr *MockMerchantOnboarderMockRecorder) Onboard(ctx, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Onboard", reflect.TypeOf((*MockMerchantOnboarder)(nil).Onboard), ctx, input)
+}
+
+// Update mocks base method.
+func (m *MockMerchantOnboarder) Update(ctx context.Context, merchantID uuid.UUID, input service.UpdateMerchantInput) (*domain.MerchantProfile, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Update", ctx, merchantID, input)
+	ret0, _ := ret[0].(*domain.MerchantProfile)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Update indicates an expected call of Update.
+func (mr *MockMerchantOnboarderMockRecorder) Update(ctx, merchantID, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockMerchantOnboarder)(nil).Update), ctx, merchantID, input)
 }

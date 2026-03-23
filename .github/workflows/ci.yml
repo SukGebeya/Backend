@@ -129,7 +129,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKER_USERNAME }}/go-boilerplate
+          images: ${{ secrets.DOCKER_USERNAME }}/sukgebeya
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-

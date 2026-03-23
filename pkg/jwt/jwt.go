@@ -69,7 +69,7 @@ func (m *Manager) GenerateAccessToken(userID uuid.UUID, email, role string) (str
 			Subject:   userID.String(),
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(m.accessTTL)),
-			Issuer:    "go-boilerplate",
+			Issuer:    "sukgebeya",
 		},
 	}
 
@@ -85,7 +85,7 @@ func (m *Manager) GenerateRefreshToken(userID uuid.UUID) (string, string, error)
 		Subject:   userID.String(),
 		IssuedAt:  jwt.NewNumericDate(now),
 		ExpiresAt: jwt.NewNumericDate(now.Add(m.refreshTTL)),
-		Issuer:    "go-boilerplate",
+		Issuer:    "sukgebeya",
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)

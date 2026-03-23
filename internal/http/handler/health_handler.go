@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/nate/go-boilerplate/pkg/response"
+	"github.com/SukGebeya/Backend/pkg/response"
 )
 
 type HealthHandler struct {

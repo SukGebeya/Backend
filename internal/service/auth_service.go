@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/nate/go-boilerplate/internal/domain"
-	domainerrors "github.com/nate/go-boilerplate/internal/errors"
-	"github.com/nate/go-boilerplate/internal/repository"
-	"github.com/nate/go-boilerplate/pkg/jwt"
-	"github.com/nate/go-boilerplate/pkg/password"
+	"github.com/SukGebeya/Backend/internal/domain"
+	domainerrors "github.com/SukGebeya/Backend/internal/errors"
+	"github.com/SukGebeya/Backend/internal/repository"
+	"github.com/SukGebeya/Backend/pkg/jwt"
+	"github.com/SukGebeya/Backend/pkg/password"
 )
 
 var _ Authenticator = (*AuthService)(nil)
@@ -42,6 +42,7 @@ type RegisterInput struct {
 	Email    *string
 	Phone    *string
 	Password string
+	Role     domain.Role
 }
 
 type LoginInput struct {
@@ -84,12 +85,19 @@ func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*AuthR
 		return nil, domainerrors.Internal("failed to hash password", err)
 	}
 
+	role := input.Role
+	if !role.IsValid() {
+		role = domain.RoleBuyer
+	}
+
 	user := &domain.User{
 		ID:           uuid.New(),
 		Email:        input.Email,
 		Phone:        input.Phone,
 		PasswordHash: hashedPassword,
-		Role:         domain.RoleUser,
+		Role:         role,
+		KYCStatus:    domain.KYCStatusPending,
+		IsActive:     true,
 	}
 
 	created, err := s.userRepo.Create(ctx, user)

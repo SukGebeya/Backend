@@ -7,30 +7,28 @@ package db
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
-	CountNotesByUserID(ctx context.Context, userID uuid.UUID) (int64, error)
-	CountUsers(ctx context.Context) (int64, error)
-	CreateNote(ctx context.Context, arg CreateNoteParams) (Note, error)
-	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
-	DeleteUser(ctx context.Context, id uuid.UUID) error
-	GetNoteByID(ctx context.Context, id uuid.UUID) (Note, error)
-	GetNoteByIDAndUserID(ctx context.Context, arg GetNoteByIDAndUserIDParams) (Note, error)
-	GetNoteByIDWithDeleted(ctx context.Context, id uuid.UUID) (Note, error)
-	GetUserByEmail(ctx context.Context, email *string) (User, error)
-	GetUserByEmailOrPhone(ctx context.Context, email *string) (User, error)
-	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
-	GetUserByPhone(ctx context.Context, phone *string) (User, error)
-	HardDeleteNote(ctx context.Context, id uuid.UUID) error
-	ListNotesByUserID(ctx context.Context, arg ListNotesByUserIDParams) ([]Note, error)
-	ListNotesByUserIDWithDeleted(ctx context.Context, arg ListNotesByUserIDWithDeletedParams) ([]Note, error)
-	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
-	RestoreNote(ctx context.Context, arg RestoreNoteParams) error
-	SoftDeleteNote(ctx context.Context, arg SoftDeleteNoteParams) error
-	UpdateNote(ctx context.Context, arg UpdateNoteParams) (Note, error)
-	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
+	CountUsers(ctx context.Context) (*int64, error)
+	CreateMerchantProfile(ctx context.Context, arg CreateMerchantProfileParams) (CreateMerchantProfileRow, error)
+	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
+	DeleteUser(ctx context.Context, id pgtype.UUID) error
+	GetMerchantProfileByID(ctx context.Context, id pgtype.UUID) (GetMerchantProfileByIDRow, error)
+	GetMerchantProfileBySlug(ctx context.Context, shopSlug *string) (GetMerchantProfileBySlugRow, error)
+	GetMerchantProfileByUserID(ctx context.Context, userID pgtype.UUID) (GetMerchantProfileByUserIDRow, error)
+	GetUserByEmail(ctx context.Context, email *string) (GetUserByEmailRow, error)
+	GetUserByEmailOrPhone(ctx context.Context, identifier *string) (GetUserByEmailOrPhoneRow, error)
+	GetUserByID(ctx context.Context, id pgtype.UUID) (GetUserByIDRow, error)
+	GetUserByPhone(ctx context.Context, phone *string) (GetUserByPhoneRow, error)
+	ListMerchantProfiles(ctx context.Context, arg ListMerchantProfilesParams) ([]ListMerchantProfilesRow, error)
+	ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error)
+	ListVerifiedMerchants(ctx context.Context, arg ListVerifiedMerchantsParams) ([]ListVerifiedMerchantsRow, error)
+	UpdateMerchantBlnkWallet(ctx context.Context, arg UpdateMerchantBlnkWalletParams) (UpdateMerchantBlnkWalletRow, error)
+	UpdateMerchantProfile(ctx context.Context, arg UpdateMerchantProfileParams) (UpdateMerchantProfileRow, error)
+	UpdateMerchantTotalSales(ctx context.Context, arg UpdateMerchantTotalSalesParams) error
+	UpdateUser(ctx context.Context, arg UpdateUserParams) (UpdateUserRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

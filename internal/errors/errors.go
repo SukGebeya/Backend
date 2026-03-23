@@ -20,8 +20,9 @@ const (
 	CodeTokenExpired       Code = "TOKEN_EXPIRED"
 	CodeInvalidCredentials Code = "INVALID_CREDENTIALS"
 	CodeEmailExists        Code = "EMAIL_EXISTS"
-	CodeNoteNotFound       Code = "NOTE_NOT_FOUND"
 	CodeUserNotFound       Code = "USER_NOT_FOUND"
+	CodeMerchantNotFound   Code = "MERCHANT_NOT_FOUND"
+	CodeShopSlugExists     Code = "SHOP_SLUG_EXISTS"
 )
 
 type AppError struct {
@@ -121,10 +122,14 @@ func EmailExists(message string) *AppError {
 	return NewError(CodeEmailExists, message, http.StatusConflict, nil)
 }
 
-func NoteNotFound(message string) *AppError {
-	return NewError(CodeNoteNotFound, message, http.StatusNotFound, nil)
-}
-
 func UserNotFound(message string) *AppError {
 	return NewError(CodeUserNotFound, message, http.StatusNotFound, nil)
+}
+
+func MerchantNotFound(message string) *AppError {
+	return NewError(CodeMerchantNotFound, message, http.StatusNotFound, nil)
+}
+
+func ShopSlugExists(message string) *AppError {
+	return NewError(CodeShopSlugExists, message, http.StatusConflict, nil)
 }

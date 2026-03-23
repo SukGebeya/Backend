@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/nate/go-boilerplate/internal/domain"
+	"github.com/SukGebeya/Backend/internal/domain"
 )
 
 type UserRepository interface {
@@ -19,24 +19,21 @@ type UserRepository interface {
 	Count(ctx context.Context) (int64, error)
 }
 
-type NoteRepository interface {
-	GetByID(ctx context.Context, id uuid.UUID) (*domain.Note, error)
-	GetByIDWithDeleted(ctx context.Context, id uuid.UUID) (*domain.Note, error)
-	GetByIDAndUserID(ctx context.Context, id, userID uuid.UUID) (*domain.Note, error)
-	ListByUserID(ctx context.Context, userID uuid.UUID, opts domain.NoteListOptions) (*domain.PaginatedResult[domain.Note], error)
-	Create(ctx context.Context, note *domain.Note) (*domain.Note, error)
-	Update(ctx context.Context, note *domain.Note) (*domain.Note, error)
-	SoftDelete(ctx context.Context, id, userID uuid.UUID) error
-	Restore(ctx context.Context, id, userID uuid.UUID) error
-	HardDelete(ctx context.Context, id uuid.UUID) error
-	CountByUserID(ctx context.Context, userID uuid.UUID) (int64, error)
-}
-
 type RefreshTokenRepository interface {
 	Store(ctx context.Context, userID uuid.UUID, tokenID string, ttl int64) error
 	Get(ctx context.Context, userID uuid.UUID, tokenID string) (bool, error)
 	Delete(ctx context.Context, userID uuid.UUID, tokenID string) error
 	DeleteAllForUser(ctx context.Context, userID uuid.UUID) error
+}
+
+type MerchantRepository interface {
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.MerchantProfile, error)
+	GetByUserID(ctx context.Context, userID uuid.UUID) (*domain.MerchantProfile, error)
+	GetBySlug(ctx context.Context, slug string) (*domain.MerchantProfile, error)
+	Create(ctx context.Context, merchant *domain.MerchantProfile) (*domain.MerchantProfile, error)
+	Update(ctx context.Context, merchant *domain.MerchantProfile) (*domain.MerchantProfile, error)
+	UpdateBlnkWallet(ctx context.Context, id uuid.UUID, balanceID, ledgerID string) (*domain.MerchantProfile, error)
+	List(ctx context.Context, opts domain.ListOptions) (*domain.PaginatedResult[domain.MerchantProfile], error)
 }
 
 type RateLimitRepository interface {

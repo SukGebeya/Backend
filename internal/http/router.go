@@ -9,12 +9,12 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/go-redis/redis/v8"
 	"github.com/jackc/pgx/v5/pgxpool"
-	_ "github.com/nate/go-boilerplate/docs"
-	"github.com/nate/go-boilerplate/internal/http/handler"
-	httpmiddleware "github.com/nate/go-boilerplate/internal/http/middleware"
-	"github.com/nate/go-boilerplate/internal/service"
-	"github.com/nate/go-boilerplate/pkg/jwt"
-	"github.com/nate/go-boilerplate/pkg/logger"
+	_ "github.com/SukGebeya/Backend/docs"
+	"github.com/SukGebeya/Backend/internal/http/handler"
+	httpmiddleware "github.com/SukGebeya/Backend/internal/http/middleware"
+	"github.com/SukGebeya/Backend/internal/service"
+	"github.com/SukGebeya/Backend/pkg/jwt"
+	"github.com/SukGebeya/Backend/pkg/logger"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
@@ -25,7 +25,7 @@ type Router struct {
 func NewRouter(
 	authService *service.AuthService,
 	userService *service.UserService,
-	noteService *service.NoteService,
+	merchantService *service.MerchantService,
 	jwtManager *jwt.Manager,
 	rateLimiter *httpmiddleware.RateLimiter,
 	db *pgxpool.Pool,
@@ -51,11 +51,10 @@ func NewRouter(
 
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userService)
-	noteHandler := handler.NewNoteHandler(noteService)
+	merchantHandler := handler.NewMerchantHandler(merchantService)
 	healthHandler := handler.NewHealthHandler(db, redisClient)
 
 	r.Route("/api/v1", func(r chi.Router) {
-		// Public routes
 		r.Group(func(r chi.Router) {
 			r.Post("/register", authHandler.Register)
 			r.Post("/login", authHandler.Login)
@@ -63,13 +62,11 @@ func NewRouter(
 			r.Post("/logout", authHandler.Logout)
 		})
 
-		// Authenticated routes - auth
 		r.Group(func(r chi.Router) {
 			r.Use(httpmiddleware.Auth(jwtManager))
 			r.Post("/logout-all", authHandler.LogoutAll)
 		})
 
-		// Authenticated routes - user profile
 		r.Group(func(r chi.Router) {
 			r.Use(httpmiddleware.Auth(jwtManager))
 
@@ -77,7 +74,6 @@ func NewRouter(
 			r.Put("/users/me", userHandler.UpdateProfile)
 		})
 
-		// Admin routes - user management
 		r.Group(func(r chi.Router) {
 			r.Use(httpmiddleware.Auth(jwtManager))
 			r.Use(httpmiddleware.Authorize("admin"))
@@ -87,16 +83,19 @@ func NewRouter(
 			r.Delete("/users/{id}", userHandler.Delete)
 		})
 
-		// Authenticated routes - notes
 		r.Group(func(r chi.Router) {
 			r.Use(httpmiddleware.Auth(jwtManager))
 
-			r.Get("/notes", noteHandler.List)
-			r.Post("/notes", noteHandler.Create)
-			r.Get("/notes/{id}", noteHandler.Get)
-			r.Put("/notes/{id}", noteHandler.Update)
-			r.Delete("/notes/{id}", noteHandler.Delete)
-			r.Post("/notes/{id}/restore", noteHandler.Restore)
+			r.Get("/shops/{shop_slug}", merchantHandler.GetShop)
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(httpmiddleware.Auth(jwtManager))
+			r.Use(httpmiddleware.Authorize("merchant"))
+
+			r.Post("/merchant/onboard", merchantHandler.Onboard)
+			r.Get("/merchant/profile", merchantHandler.GetProfile)
+			r.Put("/merchant/profile", merchantHandler.UpdateProfile)
 		})
 	})
 

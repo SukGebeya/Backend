@@ -7,8 +7,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/nate/go-boilerplate/internal/domain"
-	apperrors "github.com/nate/go-boilerplate/internal/errors"
+	"github.com/SukGebeya/Backend/internal/domain"
+	apperrors "github.com/SukGebeya/Backend/internal/errors"
 )
 
 func decodeJSON(r *http.Request, v any) error {
@@ -58,25 +58,6 @@ func parseListOptions(r *http.Request) domain.ListOptions {
 	}
 }
 
-func parseNoteListOptions(r *http.Request) domain.NoteListOptions {
-	return domain.NoteListOptions{
-		ListOptions: parseListOptions(r),
-		WithDeleted: parseBoolQueryParam(r, "with_deleted"),
-	}
-}
-
-func badRequest(msg string) error {
-	return apperrors.BadRequest(msg)
-}
-
-func unauthorized(msg string) error {
-	return apperrors.Unauthorized(msg)
-}
-
-func validationError(msg string) error {
-	return apperrors.Validation(msg)
-}
-
 func toUserResponse(u *domain.User) *UserResponse {
 	return &UserResponse{
 		ID:        u.ID.String(),
@@ -88,19 +69,10 @@ func toUserResponse(u *domain.User) *UserResponse {
 	}
 }
 
-func toNoteResponse(n *domain.Note) *NoteResponse {
-	var deletedAt *string
-	if n.DeletedAt != nil {
-		formatted := n.DeletedAt.Format("2006-01-02T15:04:05Z07:00")
-		deletedAt = &formatted
-	}
-	return &NoteResponse{
-		ID:        n.ID.String(),
-		UserID:    n.UserID.String(),
-		Title:     n.Title,
-		Content:   n.Content,
-		CreatedAt: n.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt: n.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		DeletedAt: deletedAt,
-	}
+func unauthorized(msg string) error {
+	return apperrors.Unauthorized(msg)
+}
+
+func forbidden(msg string) error {
+	return apperrors.Forbidden(msg)
 }

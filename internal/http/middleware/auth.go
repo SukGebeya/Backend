@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	apperrors "github.com/nate/go-boilerplate/internal/errors"
-	"github.com/nate/go-boilerplate/pkg/jwt"
-	"github.com/nate/go-boilerplate/pkg/response"
+	apperrors "github.com/SukGebeya/Backend/internal/errors"
+	"github.com/SukGebeya/Backend/pkg/jwt"
+	"github.com/SukGebeya/Backend/pkg/response"
 )
 
 type contextKey string

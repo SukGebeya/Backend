@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/nate/go-boilerplate/internal/http/middleware"
+	"github.com/SukGebeya/Backend/internal/http/middleware"
 )
 
 func ContextWithUserID(userID uuid.UUID) context.Context {
