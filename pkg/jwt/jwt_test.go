@@ -126,10 +126,9 @@ func TestManager_GenerateAndValidateAccessToken(t *testing.T) {
 	manager := NewManager(accessKeyPair, refreshKeyPair, time.Hour, 24*time.Hour)
 
 	userID := uuid.New()
-	email := "test@example.com"
 	role := "user"
 
-	token, err := manager.GenerateAccessToken(userID, email, role)
+	token, err := manager.GenerateAccessToken(userID, role)
 	require.NoError(t, err)
 	assert.NotEmpty(t, token)
 
@@ -137,7 +136,6 @@ func TestManager_GenerateAndValidateAccessToken(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, userID, claims.UserID)
-	assert.Equal(t, email, claims.Email)
 	assert.Equal(t, role, claims.Role)
 	assert.Equal(t, "sukgebeya", claims.Issuer)
 	assert.Equal(t, userID.String(), claims.Subject)
@@ -265,7 +263,7 @@ func TestManager_TokenWithWrongKey(t *testing.T) {
 	manager2 := NewManager(accessKeyPair2, refreshKeyPair2, time.Hour, 24*time.Hour)
 
 	userID := uuid.New()
-	token, err := manager1.GenerateAccessToken(userID, "test@example.com", "user")
+	token, err := manager1.GenerateAccessToken(userID, "user")
 	require.NoError(t, err)
 
 	claims, err := manager2.ValidateAccessToken(token)
@@ -283,7 +281,7 @@ func TestManager_ExpiredToken(t *testing.T) {
 	manager := NewManager(accessKeyPair, refreshKeyPair, -time.Hour, -time.Hour)
 
 	userID := uuid.New()
-	token, err := manager.GenerateAccessToken(userID, "test@example.com", "user")
+	token, err := manager.GenerateAccessToken(userID, "user")
 	require.NoError(t, err)
 
 	claims, err := manager.ValidateAccessToken(token)
@@ -301,7 +299,7 @@ func TestManager_AccessTokenUsedAsRefresh(t *testing.T) {
 	manager := NewManager(accessKeyPair, refreshKeyPair, time.Hour, 24*time.Hour)
 
 	userID := uuid.New()
-	accessToken, err := manager.GenerateAccessToken(userID, "test@example.com", "user")
+	accessToken, err := manager.GenerateAccessToken(userID, "user")
 	require.NoError(t, err)
 
 	parsedUserID, tokenID, err := manager.ValidateRefreshToken(accessToken)

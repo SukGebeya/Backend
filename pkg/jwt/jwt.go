@@ -12,7 +12,6 @@ import (
 
 type Claims struct {
 	UserID uuid.UUID `json:"user_id"`
-	Email  string    `json:"email"`
 	Role   string    `json:"role"`
 	jwt.RegisteredClaims
 }
@@ -58,14 +57,12 @@ func NewManagerFromFiles(accessPrivateKeyPath, accessPublicKeyPath, refreshPriva
 	return NewManager(accessKeyPair, refreshKeyPair, accessTTL, refreshTTL), nil
 }
 
-func (m *Manager) GenerateAccessToken(userID uuid.UUID, email, role string) (string, error) {
+func (m *Manager) GenerateAccessToken(userID uuid.UUID, role string) (string, error) {
 	now := time.Now()
 	claims := &Claims{
 		UserID: userID,
-		Email:  email,
 		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ID:        uuid.New().String(),
 			Subject:   userID.String(),
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(m.accessTTL)),

@@ -34,6 +34,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/SukGebeya/Backend/internal/blnk"
 	"github.com/SukGebeya/Backend/internal/config"
 	apphttp "github.com/SukGebeya/Backend/internal/http"
 	httpmiddleware "github.com/SukGebeya/Backend/internal/http/middleware"
@@ -145,6 +146,18 @@ func main() {
 
 	appLogger.Info("Circuit breakers enabled for Redis repositories")
 
+	blnkClient, err := blnk.NewClient(blnk.Config{
+		BaseURL:          cfg.Blnk.BaseURL,
+		SecretKey:        cfg.Blnk.SecretKey,
+		ETBLedgerID:      cfg.Blnk.ETBLedgerID,
+		EscrowBalanceID:  cfg.Blnk.EscrowBalanceID,
+		RevenueBalanceID: cfg.Blnk.RevenueBalanceID,
+	})
+	if err != nil {
+		appLogger.Error("Failed to initialize Blnk client", "error", err)
+		os.Exit(1)
+	}
+
 	jwtManager, err := jwt.NewManagerFromFiles(
 		cfg.JWT.AccessPrivateKeyPath,
 		cfg.JWT.AccessPublicKeyPath,
@@ -168,7 +181,7 @@ func main() {
 
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, jwtManager, passwordHasher, cfg.JWT.RefreshTTL)
 	userService := service.NewUserService(userRepo)
-	merchantService := service.NewMerchantService(merchantRepo)
+	merchantService := service.NewMerchantService(merchantRepo, blnkClient)
 	categoryService := service.NewCategoryService(categoryRepo)
 	productService := service.NewProductService(productRepo, variantRepo, imageRepo)
 	variantService := service.NewProductVariantService(variantRepo)

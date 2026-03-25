@@ -2,23 +2,27 @@ package service
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 
-	"github.com/google/uuid"
+	"github.com/SukGebeya/Backend/internal/blnk"
 	"github.com/SukGebeya/Backend/internal/domain"
 	domainerrors "github.com/SukGebeya/Backend/internal/errors"
 	"github.com/SukGebeya/Backend/internal/repository"
+	"github.com/google/uuid"
 )
 
 var _ MerchantOnboarder = (*MerchantService)(nil)
 
 type MerchantService struct {
 	merchantRepo repository.MerchantRepository
+	blnkClient   blnk.BlnkClient
 }
 
-func NewMerchantService(merchantRepo repository.MerchantRepository) *MerchantService {
+func NewMerchantService(merchantRepo repository.MerchantRepository, blnkClient blnk.BlnkClient) *MerchantService {
 	return &MerchantService{
 		merchantRepo: merchantRepo,
+		blnkClient:   blnkClient,
 	}
 }
 
@@ -66,6 +70,21 @@ func (s *MerchantService) Onboard(ctx context.Context, input OnboardInput) (*dom
 		return nil, domainerrors.Conflict("user already has a merchant profile")
 	}
 
+	balanceID, err := s.blnkClient.CreateMerchantWallet(ctx, input.UserID, input.ShopName)
+	if err != nil {
+		slog.Error("Onboard: failed to create Blnk wallet",
+			"error", err,
+			"user_id", input.UserID.String(),
+			"shop_name", input.ShopName,
+		)
+		return nil, domainerrors.Internal("failed to create merchant wallet", err)
+	}
+
+	slog.Debug("Onboard: created Blnk wallet",
+		"balance_id", balanceID,
+		"user_id", input.UserID.String(),
+	)
+
 	merchant := &domain.MerchantProfile{
 		ID:              uuid.New(),
 		UserID:          input.UserID,
@@ -76,12 +95,18 @@ func (s *MerchantService) Onboard(ctx context.Context, input OnboardInput) (*dom
 		ContactEmail:    input.ContactEmail,
 		Address:         input.Address,
 		City:            input.City,
+		BlnkBalanceID:   &balanceID,
 		IsVerified:      false,
 		TotalSalesCents: 0,
 	}
 
 	created, err := s.merchantRepo.Create(ctx, merchant)
 	if err != nil {
+		slog.Error("Onboard: failed to create merchant profile after Blnk wallet creation",
+			"error", err,
+			"user_id", input.UserID.String(),
+			"balance_id", balanceID,
+		)
 		return nil, domainerrors.Internal("failed to create merchant profile", err)
 	}
 

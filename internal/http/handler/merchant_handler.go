@@ -79,7 +79,7 @@ type ShopResponse struct {
 
 // Onboard godoc
 // @Summary Onboard a new merchant
-// @Description Create a merchant profile for the authenticated user. The user must have role 'merchant'.
+// @Description Create a merchant profile for the authenticated user. Any authenticated user can onboard to become a merchant.
 // @Tags merchant
 // @Accept json
 // @Produce json
@@ -88,20 +88,13 @@ type ShopResponse struct {
 // @Success 201 {object} OnboardResponse "Merchant profile created"
 // @Failure 400 {object} response.ErrorResponse "Invalid request body or validation error"
 // @Failure 401 {object} response.ErrorResponse "Authentication required"
-// @Failure 403 {object} response.ErrorResponse "User is not a merchant"
 // @Failure 409 {object} response.ErrorResponse "User already has a merchant profile"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/merchant/onboard [post]
+// @Router /merchant/onboard [post]
 func (h *MerchantHandler) Onboard(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
-		response.Error(w, unauthorized("authentication required"))
-		return
-	}
-
-	role, ok := middleware.GetRole(r.Context())
-	if !ok || role != string(domain.RoleMerchant) {
-		response.Error(w, forbidden("only merchants can onboard"))
+		response.Error(w, apperrors.Unauthorized("authentication required"))
 		return
 	}
 
@@ -161,26 +154,20 @@ func (h *MerchantHandler) Onboard(w http.ResponseWriter, r *http.Request) {
 // @Security BearerAuth
 // @Success 200 {object} MerchantProfileResponse "Merchant profile"
 // @Failure 401 {object} response.ErrorResponse "Authentication required"
-// @Failure 404 {object} response.ErrorResponse "Merchant profile not found"
+// @Failure 403 {object} response.ErrorResponse "Merchant profile required"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/merchant/profile [get]
+// @Router /merchant/profile [get]
 func (h *MerchantHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.GetUserID(r.Context())
+	merchant, ok := middleware.GetMerchantProfile(r.Context())
 	if !ok {
-		response.Error(w, unauthorized("authentication required"))
-		return
-	}
-
-	merchant, err := h.merchantService.GetByUserID(r.Context(), userID)
-	if err != nil {
-		response.Error(w, err)
+		response.Error(w, apperrors.Forbidden("merchant profile required"))
 		return
 	}
 
 	response.JSON(w, http.StatusOK, toMerchantProfileResponse(merchant))
 }
 
-// UpdateProfile godoc
+// Update Profile godoc
 // @Summary Update merchant profile
 // @Description Update the merchant profile for the authenticated user.
 // @Tags merchant
@@ -191,19 +178,13 @@ func (h *MerchantHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} MerchantProfileResponse "Updated merchant profile"
 // @Failure 400 {object} response.ErrorResponse "Invalid request body or validation error"
 // @Failure 401 {object} response.ErrorResponse "Authentication required"
-// @Failure 404 {object} response.ErrorResponse "Merchant profile not found"
+// @Failure 403 {object} response.ErrorResponse "Merchant profile required"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/merchant/profile [put]
+// @Router /merchant/profile [put]
 func (h *MerchantHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.GetUserID(r.Context())
+	merchant, ok := middleware.GetMerchantProfile(r.Context())
 	if !ok {
-		response.Error(w, unauthorized("authentication required"))
-		return
-	}
-
-	merchant, err := h.merchantService.GetByUserID(r.Context(), userID)
-	if err != nil {
-		response.Error(w, err)
+		response.Error(w, apperrors.Forbidden("merchant profile required"))
 		return
 	}
 
@@ -274,7 +255,7 @@ func (h *MerchantHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) 
 // @Success 200 {object} ShopResponse "Shop information"
 // @Failure 404 {object} response.ErrorResponse "Shop not found"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/shops/{shop_slug} [get]
+// @Router /shops/{shop_slug} [get]
 func (h *MerchantHandler) GetShop(w http.ResponseWriter, r *http.Request) {
 	shopSlug, err := parseStringParam(r, "shop_slug")
 	if err != nil {

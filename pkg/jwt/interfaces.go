@@ -7,7 +7,7 @@ import (
 )
 
 type TokenManager interface {
-	GenerateAccessToken(userID uuid.UUID, email, role string) (string, error)
+	GenerateAccessToken(userID uuid.UUID, role string) (string, error)
 	GenerateRefreshToken(userID uuid.UUID) (string, string, error)
 	ValidateAccessToken(tokenString string) (*Claims, error)
 	ValidateRefreshToken(tokenString string) (uuid.UUID, string, error)

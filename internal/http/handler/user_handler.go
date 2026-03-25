@@ -50,7 +50,7 @@ type UpdateProfileRequest struct {
 // @Failure 401 {object} response.ErrorResponse "Authentication required"
 // @Failure 404 {object} response.ErrorResponse "User not found"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/users/me [get]
+// @Router /users/me [get]
 func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
@@ -80,7 +80,7 @@ func (h *UserHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {object} response.ErrorResponse "Authentication required"
 // @Failure 409 {object} response.ErrorResponse "Email or phone already in use"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/users/me [put]
+// @Router /users/me [put]
 func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
@@ -131,7 +131,7 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {object} response.ErrorResponse "Authentication required"
 // @Failure 403 {object} response.ErrorResponse "Admin access required"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/users [get]
+// @Router /users [get]
 func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 	opts := parseListOptions(r)
 
@@ -169,7 +169,7 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 // @Failure 403 {object} response.ErrorResponse "Admin access required"
 // @Failure 404 {object} response.ErrorResponse "User not found"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/users/{id} [get]
+// @Router /users/{id} [get]
 func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 	userID, err := parseUUIDParam(r, "id")
 	if err != nil {
@@ -200,7 +200,7 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 // @Failure 403 {object} response.ErrorResponse "Admin access required"
 // @Failure 404 {object} response.ErrorResponse "User not found"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/users/{id} [delete]
+// @Router /users/{id} [delete]
 func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID, err := parseUUIDParam(r, "id")
 	if err != nil {

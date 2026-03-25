@@ -18,6 +18,7 @@ type Config struct {
 	Argon2      Argon2Config
 	RateLimit   RateLimitConfig
 	Logger      LoggerConfig
+	Blnk        BlnkConfig
 }
 
 type JWTConfig struct {
@@ -45,6 +46,14 @@ type RateLimitConfig struct {
 type LoggerConfig struct {
 	Format string
 	Level  string
+}
+
+type BlnkConfig struct {
+	BaseURL          string
+	SecretKey        string
+	ETBLedgerID      string
+	EscrowBalanceID  string
+	RevenueBalanceID string
 }
 
 func Load() (*Config, error) {
@@ -79,6 +88,13 @@ func Load() (*Config, error) {
 		Logger: LoggerConfig{
 			Format: getEnv("LOG_FORMAT", "text"),
 			Level:  getEnv("LOG_LEVEL", "info"),
+		},
+		Blnk: BlnkConfig{
+			BaseURL:          getEnv("BLNK_BASE_URL", "http://localhost:5001"),
+			SecretKey:        os.Getenv("BLNK_SECRET_KEY"),
+			ETBLedgerID:      os.Getenv("BLNK_ETB_LEDGER_ID"),
+			EscrowBalanceID:  os.Getenv("BLNK_ESCROW_BALANCE_ID"),
+			RevenueBalanceID: os.Getenv("BLNK_REVENUE_BALANCE_ID"),
 		},
 	}
 

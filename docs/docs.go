@@ -11,7 +11,7 @@ const docTemplate = `{
         "title": "{{.Title}}",
         "contact": {
             "name": "API Support",
-            "url": "https://github.com/SukGebeya/Backend",
+            "url": "https://github.com/natnael-alemayehu/sukgebeya",
             "email": "support@example.com"
         },
         "license": {
@@ -23,7 +23,363 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/v1/login": {
+        "/admin/categories": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new category (admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "categories"
+                ],
+                "summary": "Create a new category",
+                "parameters": [
+                    {
+                        "description": "Category details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.CreateCategoryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created category",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.CategoryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Category slug already exists",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/categories/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update an existing category (admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "categories"
+                ],
+                "summary": "Update a category",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Category update details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.UpdateCategoryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Updated category",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.CategoryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Category not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Category slug already exists",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a category (admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "categories"
+                ],
+                "summary": "Delete a category",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Category not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/categories": {
+            "get": {
+                "description": "Get a list of all active categories",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "categories"
+                ],
+                "summary": "List all active categories",
+                "responses": {
+                    "200": {
+                        "description": "List of categories",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_http_handler.CategoryResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/categories/slug/{slug}": {
+            "get": {
+                "description": "Get a single category by its slug",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "categories"
+                ],
+                "summary": "Get category by slug",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Category slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Category details",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.CategoryResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Category not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/categories/{id}": {
+            "get": {
+                "description": "Get a single category by its ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "categories"
+                ],
+                "summary": "Get category by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Category details",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.CategoryResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Category not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Check the health status of the API and its dependencies",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "Service is healthy",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.HealthResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service is unhealthy",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.HealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/login": {
             "post": {
                 "description": "Authenticate user with email/phone and password. Returns user info and authentication tokens.",
                 "consumes": [
@@ -57,25 +413,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or validation error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Invalid credentials",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/logout": {
+        "/logout": {
             "post": {
                 "description": "Invalidate the provided refresh token, logging out the user from the current session.",
                 "consumes": [
@@ -106,25 +462,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or validation error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Invalid refresh token",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/logout-all": {
+        "/logout-all": {
             "post": {
                 "security": [
                     {
@@ -149,26 +505,26 @@ const docTemplate = `{
                     "401": {
                         "description": "Authentication required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/notes": {
-            "get": {
+        "/merchant/onboard": {
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get a paginated list of notes belonging to the authenticated user. Supports soft-deleted notes with with_deleted parameter.",
+                "description": "Create a merchant profile for the authenticated user. Any authenticated user can onboard to become a merchant.",
                 "consumes": [
                     "application/json"
                 ],
@@ -176,12 +532,74 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "notes"
+                    "merchant"
                 ],
-                "summary": "List user's notes",
+                "summary": "Onboard a new merchant",
                 "parameters": [
                     {
-                        "minimum": 1,
+                        "description": "Merchant onboarding details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.OnboardRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Merchant profile created",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.OnboardResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or validation error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "User already has a merchant profile",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/merchant/products": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a paginated list of products for the authenticated merchant",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "merchant"
+                ],
+                "summary": "List merchant's products",
+                "parameters": [
+                    {
                         "type": "integer",
                         "default": 1,
                         "description": "Page number",
@@ -189,8 +607,6 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
-                        "maximum": 100,
-                        "minimum": 1,
                         "type": "integer",
                         "default": 20,
                         "description": "Items per page",
@@ -198,30 +614,35 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "Include soft-deleted notes",
-                        "name": "with_deleted",
+                        "type": "string",
+                        "description": "Filter by status (draft, active, archived)",
+                        "name": "status",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "List of notes",
+                        "description": "List of products",
                         "schema": {
-                            "$ref": "#/definitions/internal_http_handler.NoteListResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.PaginatedResponse"
                         }
                     },
                     "401": {
-                        "description": "Authentication required",
+                        "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -232,7 +653,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Create a new note for the authenticated user.",
+                "description": "Create a new product for the authenticated merchant",
                 "consumes": [
                     "application/json"
                 ],
@@ -240,116 +661,68 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "notes"
+                    "merchant"
                 ],
-                "summary": "Create a new note",
+                "summary": "Create a new product",
                 "parameters": [
                     {
-                        "description": "Note details",
+                        "description": "Product details",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_http_handler.CreateNoteRequest"
+                            "$ref": "#/definitions/internal_http_handler.CreateProductRequest"
                         }
                     }
                 ],
                 "responses": {
                     "201": {
-                        "description": "Note created successfully",
+                        "description": "Created product",
                         "schema": {
-                            "$ref": "#/definitions/internal_http_handler.NoteResponse"
+                            "$ref": "#/definitions/internal_http_handler.ProductResponse"
                         }
                     },
                     "400": {
-                        "description": "Invalid request body or validation error",
+                        "description": "Invalid request",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Authentication required",
+                        "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Product slug already exists",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/notes/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Retrieve a specific note by its ID. User must own the note.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "notes"
-                ],
-                "summary": "Get a note by ID",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "format": "uuid",
-                        "description": "Note ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Note details",
-                        "schema": {
-                            "$ref": "#/definitions/internal_http_handler.NoteResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid note ID format",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Authentication required",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Note not found",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
-                        }
-                    }
-                }
-            },
+        "/merchant/products/{id}": {
             "put": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update an existing note. User must own the note.",
+                "description": "Update an existing product",
                 "consumes": [
                     "application/json"
                 ],
@@ -357,57 +730,62 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "notes"
+                    "merchant"
                 ],
-                "summary": "Update a note",
+                "summary": "Update a product",
                 "parameters": [
                     {
                         "type": "string",
-                        "format": "uuid",
-                        "description": "Note ID",
+                        "description": "Product ID",
                         "name": "id",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "Updated note details",
+                        "description": "Product update details",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_http_handler.UpdateNoteRequest"
+                            "$ref": "#/definitions/internal_http_handler.UpdateProductRequest"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Note updated successfully",
+                        "description": "Updated product",
                         "schema": {
-                            "$ref": "#/definitions/internal_http_handler.NoteResponse"
+                            "$ref": "#/definitions/internal_http_handler.ProductResponse"
                         }
                     },
                     "400": {
-                        "description": "Invalid request body, note ID, or validation error",
+                        "description": "Invalid request",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Authentication required",
+                        "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Note not found",
+                        "description": "Product not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -418,7 +796,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Soft delete a note (move to trash). User must own the note.",
+                "description": "Delete a product and all its variants",
                 "consumes": [
                     "application/json"
                 ],
@@ -426,14 +804,13 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "notes"
+                    "merchant"
                 ],
-                "summary": "Soft delete a note",
+                "summary": "Delete a product",
                 "parameters": [
                     {
                         "type": "string",
-                        "format": "uuid",
-                        "description": "Note ID",
+                        "description": "Product ID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -441,43 +818,43 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "204": {
-                        "description": "Note deleted successfully"
-                    },
-                    "400": {
-                        "description": "Invalid note ID format",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
-                        }
+                        "description": "No content"
                     },
                     "401": {
-                        "description": "Authentication required",
+                        "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Note not found",
+                        "description": "Product not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/notes/{id}/restore": {
+        "/merchant/products/{id}/variants": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Restore a soft-deleted note from trash. User must own the note.",
+                "description": "Add a new variant to an existing product",
                 "consumes": [
                     "application/json"
                 ],
@@ -485,51 +862,276 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "notes"
+                    "merchant"
                 ],
-                "summary": "Restore a soft-deleted note",
+                "summary": "Add a variant to a product",
                 "parameters": [
                     {
                         "type": "string",
-                        "format": "uuid",
-                        "description": "Note ID",
+                        "description": "Product ID",
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Variant details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.CreateVariantRequest"
+                        }
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "Note restored successfully"
+                    "201": {
+                        "description": "Created variant",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.VariantResponse"
+                        }
                     },
                     "400": {
-                        "description": "Invalid note ID format",
+                        "description": "Invalid request",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Authentication required",
+                        "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Note not found or not deleted",
+                        "description": "Product not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "SKU already exists",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/refresh": {
+        "/merchant/profile": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get the merchant profile for the authenticated user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "merchant"
+                ],
+                "summary": "Get merchant profile",
+                "responses": {
+                    "200": {
+                        "description": "Merchant profile",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.MerchantProfileResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Merchant profile required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update the merchant profile for the authenticated user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "merchant"
+                ],
+                "summary": "Update merchant profile",
+                "parameters": [
+                    {
+                        "description": "Merchant profile update",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.UpdateMerchantRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Updated merchant profile",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.MerchantProfileResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or validation error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Merchant profile required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/products": {
+            "get": {
+                "description": "Get a paginated list of all active products",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "products"
+                ],
+                "summary": "List all active products",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Items per page",
+                        "name": "per_page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by category ID",
+                        "name": "category_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of products",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.PaginatedResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/products/{slug}": {
+            "get": {
+                "description": "Get a single product by its slug",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "products"
+                ],
+                "summary": "Get product by slug",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Product details with variants",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.ProductDetailResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Product not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/refresh": {
             "post": {
                 "description": "Get new access and refresh tokens using a valid refresh token.",
                 "consumes": [
@@ -563,25 +1165,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or validation error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Invalid or expired refresh token",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/register": {
+        "/register": {
             "post": {
                 "description": "Create a new user account with email or phone. Returns user info and authentication tokens.",
                 "consumes": [
@@ -615,25 +1217,69 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or validation error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Email or phone already registered",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/users": {
+        "/shops/{shop_slug}": {
+            "get": {
+                "description": "Get public shop information by shop slug.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "shops"
+                ],
+                "summary": "Get public shop information",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Shop slug",
+                        "name": "shop_slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Shop information",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.ShopResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Shop not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/users": {
             "get": {
                 "security": [
                     {
@@ -680,25 +1326,25 @@ const docTemplate = `{
                     "401": {
                         "description": "Authentication required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Admin access required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/users/me": {
+        "/users/me": {
             "get": {
                 "security": [
                     {
@@ -726,19 +1372,19 @@ const docTemplate = `{
                     "401": {
                         "description": "Authentication required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "User not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -781,31 +1427,31 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or validation error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Authentication required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Email or phone already in use",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/api/v1/users/{id}": {
+        "/users/{id}": {
             "get": {
                 "security": [
                     {
@@ -843,31 +1489,31 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid user ID format",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Authentication required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Admin access required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "User not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -906,60 +1552,31 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid user ID format",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Authentication required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Admin access required",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "User not found",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/health": {
-            "get": {
-                "description": "Check the health status of the API and its dependencies",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "health"
-                ],
-                "summary": "Health check",
-                "responses": {
-                    "200": {
-                        "description": "Service is healthy",
-                        "schema": {
-                            "$ref": "#/definitions/internal_http_handler.HealthResponse"
-                        }
-                    },
-                    "503": {
-                        "description": "Service is unhealthy",
-                        "schema": {
-                            "$ref": "#/definitions/internal_http_handler.HealthResponse"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     }
                 }
@@ -967,7 +1584,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "github_com_nate_sukgebeya_pkg_response.ErrorResponse": {
+        "github_com_SukGebeya_Backend_pkg_response.ErrorResponse": {
             "type": "object",
             "properties": {
                 "code": {
@@ -978,6 +1595,28 @@ const docTemplate = `{
                 },
                 "message": {
                     "type": "string"
+                }
+            }
+        },
+        "github_com_SukGebeya_Backend_pkg_response.PaginatedResponse": {
+            "type": "object",
+            "properties": {
+                "items": {},
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "per_page": {
+                    "type": "integer",
+                    "example": 20
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 42
+                },
+                "total_pages": {
+                    "type": "integer",
+                    "example": 3
                 }
             }
         },
@@ -992,22 +1631,154 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_http_handler.CreateNoteRequest": {
+        "internal_http_handler.CategoryResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "icon_url": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parent_id": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "sort_order": {
+                    "type": "integer"
+                }
+            }
+        },
+        "internal_http_handler.CreateCategoryRequest": {
             "type": "object",
             "required": [
+                "name",
+                "slug"
+            ],
+            "properties": {
+                "icon_url": {
+                    "type": "string",
+                    "example": "https://example.com/icons/clothing.svg"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 2,
+                    "example": "Clothing \u0026 Fashion"
+                },
+                "parent_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "slug": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 2,
+                    "example": "clothing-fashion"
+                },
+                "sort_order": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "internal_http_handler.CreateProductRequest": {
+            "type": "object",
+            "required": [
+                "name",
+                "slug"
+            ],
+            "properties": {
+                "category_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "example": "Premium Ethiopian coffee from Yirgacheffe region"
+                },
+                "is_digital": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "minLength": 2,
+                    "example": "Traditional Ethiopian Coffee"
+                },
+                "slug": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "minLength": 2,
+                    "example": "traditional-ethiopian-coffee"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "draft",
+                        "active",
+                        "archived"
+                    ],
+                    "example": "draft"
+                }
+            }
+        },
+        "internal_http_handler.CreateVariantRequest": {
+            "type": "object",
+            "required": [
+                "currency",
+                "price_cents",
+                "sku",
                 "title"
             ],
             "properties": {
-                "content": {
+                "attributes": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "compare_price_cents": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "example": 30000
+                },
+                "currency": {
                     "type": "string",
-                    "maxLength": 10000,
-                    "example": "This is the content of my new note"
+                    "example": "ETB"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "price_cents": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "example": 25000
+                },
+                "sku": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 2,
+                    "example": "COFFEE-YIRG-500G"
                 },
                 "title": {
                     "type": "string",
-                    "maxLength": 255,
-                    "minLength": 1,
-                    "example": "My New Note"
+                    "maxLength": 200,
+                    "minLength": 2,
+                    "example": "500g Ground Coffee"
                 }
             }
         },
@@ -1043,63 +1814,168 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_http_handler.NoteListResponse": {
+        "internal_http_handler.MerchantProfileResponse": {
             "type": "object",
             "properties": {
-                "notes": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/internal_http_handler.NoteResponse"
-                    }
+                "address": {
+                    "type": "string"
                 },
-                "page": {
-                    "type": "integer",
-                    "example": 1
+                "city": {
+                    "type": "string"
                 },
-                "per_page": {
-                    "type": "integer",
-                    "example": 20
+                "contact_email": {
+                    "type": "string"
                 },
-                "total": {
-                    "type": "integer",
-                    "example": 42
+                "contact_phone": {
+                    "type": "string"
                 },
-                "total_pages": {
-                    "type": "integer",
-                    "example": 3
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_verified": {
+                    "type": "boolean"
+                },
+                "shop_banner_url": {
+                    "type": "string"
+                },
+                "shop_description": {
+                    "type": "string"
+                },
+                "shop_logo_url": {
+                    "type": "string"
+                },
+                "shop_name": {
+                    "type": "string"
+                },
+                "shop_slug": {
+                    "type": "string"
+                },
+                "total_sales_cents": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
                 }
             }
         },
-        "internal_http_handler.NoteResponse": {
+        "internal_http_handler.OnboardRequest": {
+            "type": "object",
+            "required": [
+                "city",
+                "contact_phone",
+                "shop_name"
+            ],
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "example": "Bole, Addis Ababa"
+                },
+                "city": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "example": "Addis Ababa"
+                },
+                "contact_email": {
+                    "type": "string",
+                    "example": "tigist@example.com"
+                },
+                "contact_phone": {
+                    "type": "string",
+                    "example": "+251911234567"
+                },
+                "shop_description": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "example": "Traditional Ethiopian clothing handmade in Addis"
+                },
+                "shop_name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 2,
+                    "example": "Tigist Habesha Designs"
+                },
+                "shop_slug": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 2,
+                    "example": "tigist-habesha"
+                }
+            }
+        },
+        "internal_http_handler.OnboardResponse": {
             "type": "object",
             "properties": {
-                "content": {
-                    "type": "string",
-                    "example": "This is the content of my note"
-                },
-                "created_at": {
-                    "type": "string",
-                    "example": "2024-01-15T10:30:00Z"
-                },
-                "deleted_at": {
-                    "type": "string",
-                    "example": "2024-01-15T10:30:00Z"
-                },
-                "id": {
+                "merchant_id": {
                     "type": "string",
                     "example": "550e8400-e29b-41d4-a716-446655440000"
                 },
-                "title": {
+                "message": {
                     "type": "string",
-                    "example": "My Note"
+                    "example": "Merchant profile created. KYC verification pending."
+                },
+                "shop_name": {
+                    "type": "string",
+                    "example": "Tigist Habesha Designs"
+                },
+                "shop_slug": {
+                    "type": "string",
+                    "example": "tigist-habesha"
+                }
+            }
+        },
+        "internal_http_handler.ProductDetailResponse": {
+            "type": "object",
+            "properties": {
+                "product": {
+                    "$ref": "#/definitions/internal_http_handler.ProductResponse"
+                },
+                "variants": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_http_handler.VariantResponse"
+                    }
+                }
+            }
+        },
+        "internal_http_handler.ProductResponse": {
+            "type": "object",
+            "properties": {
+                "category_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_digital": {
+                    "type": "boolean"
+                },
+                "merchant_id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
                 },
                 "updated_at": {
-                    "type": "string",
-                    "example": "2024-01-15T10:30:00Z"
-                },
-                "user_id": {
-                    "type": "string",
-                    "example": "550e8400-e29b-41d4-a716-446655440001"
+                    "type": "string"
                 }
             }
         },
@@ -1133,6 +2009,46 @@ const docTemplate = `{
                 "phone": {
                     "type": "string",
                     "example": "+1234567890"
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "buyer",
+                        "merchant"
+                    ],
+                    "example": "buyer"
+                }
+            }
+        },
+        "internal_http_handler.ShopResponse": {
+            "type": "object",
+            "properties": {
+                "banner_url": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "contact_email": {
+                    "type": "string"
+                },
+                "contact_phone": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "is_verified": {
+                    "type": "boolean"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "shop_name": {
+                    "type": "string"
+                },
+                "shop_slug": {
+                    "type": "string"
                 }
             }
         },
@@ -1153,22 +2069,97 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_http_handler.UpdateNoteRequest": {
+        "internal_http_handler.UpdateCategoryRequest": {
             "type": "object",
-            "required": [
-                "title"
-            ],
             "properties": {
-                "content": {
+                "icon_url": {
                     "type": "string",
-                    "maxLength": 10000,
-                    "example": "This is the updated content"
+                    "example": "https://example.com/icons/clothing.svg"
                 },
-                "title": {
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
                     "type": "string",
-                    "maxLength": 255,
-                    "minLength": 1,
-                    "example": "Updated Note Title"
+                    "maxLength": 100,
+                    "minLength": 2,
+                    "example": "Clothing \u0026 Fashion"
+                },
+                "slug": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 2,
+                    "example": "clothing-fashion"
+                },
+                "sort_order": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "internal_http_handler.UpdateMerchantRequest": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "city": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "contact_email": {
+                    "type": "string"
+                },
+                "contact_phone": {
+                    "type": "string"
+                },
+                "shop_banner_url": {
+                    "type": "string"
+                },
+                "shop_description": {
+                    "type": "string",
+                    "maxLength": 500
+                },
+                "shop_logo_url": {
+                    "type": "string"
+                },
+                "shop_name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 2
+                }
+            }
+        },
+        "internal_http_handler.UpdateProductRequest": {
+            "type": "object",
+            "properties": {
+                "category_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 2000,
+                    "example": "Premium Ethiopian coffee from Yirgacheffe region"
+                },
+                "is_digital": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "minLength": 2,
+                    "example": "Traditional Ethiopian Coffee"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "draft",
+                        "active",
+                        "archived"
+                    ],
+                    "example": "active"
                 }
             }
         },
@@ -1238,6 +2229,45 @@ const docTemplate = `{
                 "updated_at": {
                     "type": "string",
                     "example": "2024-01-15T10:30:00Z"
+                }
+            }
+        },
+        "internal_http_handler.VariantResponse": {
+            "type": "object",
+            "properties": {
+                "attributes": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "compare_price_cents": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "price_cents": {
+                    "type": "integer"
+                },
+                "product_id": {
+                    "type": "string"
+                },
+                "sku": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         }

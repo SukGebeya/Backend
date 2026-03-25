@@ -36,6 +36,42 @@ services:
     networks:
       - backend
 
+  blnk:
+    image: jerryenebeli/blnk:latest
+    container_name: sukgebeya-blnk-dev
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./blnk.json:/blnk.json
+    depends_on:
+      blnk-postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  blnk-postgres:
+    image: postgres:16-alpine
+    container_name: sukgebeya-blnk-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: blnk
+    ports:
+      - "5433:5432"
+    volumes:
+      - blnk_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d blnk"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+
   app:
     build:
       context: .
@@ -55,12 +91,19 @@ services:
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
       JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-168h}
       ENVIRONMENT: production
+      BLNK_BASE_URL: http://blnk:8081
+      BLNK_SECRET_KEY: dev-secret-key
+      BLNK_ETB_LEDGER_ID: ""
+      BLNK_ESCROW_BALANCE_ID: ""
+      BLNK_REVENUE_BALANCE_ID: ""
     volumes:
       - ./keys:/app/keys:ro
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      blnk:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
@@ -78,3 +121,4 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  blnk_postgres_data:

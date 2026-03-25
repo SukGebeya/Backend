@@ -13,20 +13,17 @@ import (
 )
 
 type ProductHandler struct {
-	productService  *service.ProductService
-	variantService  *service.ProductVariantService
-	merchantService *service.MerchantService
+	productService *service.ProductService
+	variantService *service.ProductVariantService
 }
 
 func NewProductHandler(
 	productService *service.ProductService,
 	variantService *service.ProductVariantService,
-	merchantService *service.MerchantService,
 ) *ProductHandler {
 	return &ProductHandler{
-		productService:  productService,
-		variantService:  variantService,
-		merchantService: merchantService,
+		productService: productService,
+		variantService: variantService,
 	}
 }
 
@@ -106,9 +103,9 @@ type VariantResponse struct {
 // @Param page query int false "Page number" default(1)
 // @Param per_page query int false "Items per page" default(20)
 // @Param category_id query string false "Filter by category ID"
-// @Success 200 {object} response.PaginatedResponse{items=[]ProductResponse} "List of products"
+// @Success 200 {object} response.PaginatedResponse "List of products"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/products [get]
+// @Router /products [get]
 func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 	opts := parseListOptions(r)
 
@@ -147,7 +144,7 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} ProductDetailResponse "Product details with variants"
 // @Failure 404 {object} response.ErrorResponse "Product not found"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/products/{slug} [get]
+// @Router /products/{slug} [get]
 func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 	slug, err := parseStringParam(r, "slug")
 	if err != nil {
@@ -183,21 +180,15 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 // @Param page query int false "Page number" default(1)
 // @Param per_page query int false "Items per page" default(20)
 // @Param status query string false "Filter by status (draft, active, archived)"
-// @Success 200 {object} response.PaginatedResponse{items=[]ProductResponse} "List of products"
+// @Success 200 {object} response.PaginatedResponse "List of products"
 // @Failure 401 {object} response.ErrorResponse "Unauthorized"
 // @Failure 403 {object} response.ErrorResponse "Forbidden"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/merchant/products [get]
+// @Router /merchant/products [get]
 func (h *ProductHandler) ListMyProducts(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.GetUserID(r.Context())
+	merchant, ok := middleware.GetMerchantProfile(r.Context())
 	if !ok {
-		response.Error(w, unauthorized("authentication required"))
-		return
-	}
-
-	merchant, err := h.merchantService.GetByUserID(r.Context(), userID)
-	if err != nil {
-		response.Error(w, err)
+		response.Error(w, forbidden("merchant profile required"))
 		return
 	}
 
@@ -205,6 +196,7 @@ func (h *ProductHandler) ListMyProducts(w http.ResponseWriter, r *http.Request) 
 	statusStr := r.URL.Query().Get("status")
 
 	var result *domain.PaginatedResult[domain.Product]
+	var err error
 	if statusStr != "" {
 		status := domain.ProductStatus(statusStr)
 		if !status.IsValid() {
@@ -238,17 +230,11 @@ func (h *ProductHandler) ListMyProducts(w http.ResponseWriter, r *http.Request) 
 // @Failure 403 {object} response.ErrorResponse "Forbidden"
 // @Failure 409 {object} response.ErrorResponse "Product slug already exists"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/merchant/products [post]
+// @Router /merchant/products [post]
 func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.GetUserID(r.Context())
+	merchant, ok := middleware.GetMerchantProfile(r.Context())
 	if !ok {
-		response.Error(w, unauthorized("authentication required"))
-		return
-	}
-
-	merchant, err := h.merchantService.GetByUserID(r.Context(), userID)
-	if err != nil {
-		response.Error(w, err)
+		response.Error(w, forbidden("merchant profile required"))
 		return
 	}
 
@@ -315,7 +301,7 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 // @Failure 403 {object} response.ErrorResponse "Forbidden"
 // @Failure 404 {object} response.ErrorResponse "Product not found"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/merchant/products/{id} [put]
+// @Router /merchant/products/{id} [put]
 func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	productID, err := parseUUIDParam(r, "id")
 	if err != nil {
@@ -323,15 +309,9 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, ok := middleware.GetUserID(r.Context())
+	merchant, ok := middleware.GetMerchantProfile(r.Context())
 	if !ok {
-		response.Error(w, unauthorized("authentication required"))
-		return
-	}
-
-	merchant, err := h.merchantService.GetByUserID(r.Context(), userID)
-	if err != nil {
-		response.Error(w, err)
+		response.Error(w, forbidden("merchant profile required"))
 		return
 	}
 
@@ -412,7 +392,7 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 // @Failure 403 {object} response.ErrorResponse "Forbidden"
 // @Failure 404 {object} response.ErrorResponse "Product not found"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/merchant/products/{id} [delete]
+// @Router /merchant/products/{id} [delete]
 func (h *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	productID, err := parseUUIDParam(r, "id")
 	if err != nil {
@@ -420,15 +400,9 @@ func (h *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, ok := middleware.GetUserID(r.Context())
+	merchant, ok := middleware.GetMerchantProfile(r.Context())
 	if !ok {
-		response.Error(w, unauthorized("authentication required"))
-		return
-	}
-
-	merchant, err := h.merchantService.GetByUserID(r.Context(), userID)
-	if err != nil {
-		response.Error(w, err)
+		response.Error(w, forbidden("merchant profile required"))
 		return
 	}
 
@@ -467,7 +441,7 @@ func (h *ProductHandler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {object} response.ErrorResponse "Product not found"
 // @Failure 409 {object} response.ErrorResponse "SKU already exists"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/merchant/products/{id}/variants [post]
+// @Router /merchant/products/{id}/variants [post]
 func (h *ProductHandler) AddVariant(w http.ResponseWriter, r *http.Request) {
 	productID, err := parseUUIDParam(r, "id")
 	if err != nil {
@@ -475,15 +449,9 @@ func (h *ProductHandler) AddVariant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, ok := middleware.GetUserID(r.Context())
+	merchant, ok := middleware.GetMerchantProfile(r.Context())
 	if !ok {
-		response.Error(w, unauthorized("authentication required"))
-		return
-	}
-
-	merchant, err := h.merchantService.GetByUserID(r.Context(), userID)
-	if err != nil {
-		response.Error(w, err)
+		response.Error(w, forbidden("merchant profile required"))
 		return
 	}
 

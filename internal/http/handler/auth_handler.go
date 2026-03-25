@@ -50,7 +50,7 @@ type AuthResponse struct {
 // @Failure 400 {object} response.ErrorResponse "Invalid request body or validation error"
 // @Failure 409 {object} response.ErrorResponse "Email or phone already registered"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/register [post]
+// @Router /register [post]
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -103,7 +103,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 // @Failure 400 {object} response.ErrorResponse "Invalid request body or validation error"
 // @Failure 401 {object} response.ErrorResponse "Invalid credentials"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/login [post]
+// @Router /login [post]
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -142,7 +142,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 // @Failure 400 {object} response.ErrorResponse "Invalid request body or validation error"
 // @Failure 401 {object} response.ErrorResponse "Invalid or expired refresh token"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/refresh [post]
+// @Router /refresh [post]
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	var req RefreshRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -175,7 +175,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 // @Failure 400 {object} response.ErrorResponse "Invalid request body or validation error"
 // @Failure 401 {object} response.ErrorResponse "Invalid refresh token"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/logout [post]
+// @Router /logout [post]
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	var req RefreshRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -206,7 +206,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 // @Success 204 "Logged out from all sessions successfully"
 // @Failure 401 {object} response.ErrorResponse "Authentication required"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/logout-all [post]
+// @Router /logout-all [post]
 func (h *AuthHandler) LogoutAll(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {

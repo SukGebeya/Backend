@@ -5,17 +5,16 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	apperrors "github.com/SukGebeya/Backend/internal/errors"
 	"github.com/SukGebeya/Backend/pkg/jwt"
 	"github.com/SukGebeya/Backend/pkg/response"
+	"github.com/google/uuid"
 )
 
 type contextKey string
 
 const (
 	UserIDKey contextKey = "userID"
-	EmailKey  contextKey = "email"
 	RoleKey   contextKey = "role"
 )
 
@@ -42,7 +41,6 @@ func Auth(jwtManager *jwt.Manager) func(http.Handler) http.Handler {
 
 			ctx := r.Context()
 			ctx = context.WithValue(ctx, UserIDKey, claims.UserID)
-			ctx = context.WithValue(ctx, EmailKey, claims.Email)
 			ctx = context.WithValue(ctx, RoleKey, claims.Role)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
@@ -53,11 +51,6 @@ func Auth(jwtManager *jwt.Manager) func(http.Handler) http.Handler {
 func GetUserID(ctx context.Context) (uuid.UUID, bool) {
 	userID, ok := ctx.Value(UserIDKey).(uuid.UUID)
 	return userID, ok
-}
-
-func GetEmail(ctx context.Context) (string, bool) {
-	email, ok := ctx.Value(EmailKey).(string)
-	return email, ok
 }
 
 func GetRole(ctx context.Context) (string, bool) {

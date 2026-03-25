@@ -55,7 +55,7 @@ type CategoryResponse struct {
 // @Produce json
 // @Success 200 {array} CategoryResponse "List of categories"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/categories [get]
+// @Router /categories [get]
 func (h *CategoryHandler) ListCategories(w http.ResponseWriter, r *http.Request) {
 	categories, err := h.categoryService.List(r.Context())
 	if err != nil {
@@ -81,7 +81,7 @@ func (h *CategoryHandler) ListCategories(w http.ResponseWriter, r *http.Request)
 // @Success 200 {object} CategoryResponse "Category details"
 // @Failure 404 {object} response.ErrorResponse "Category not found"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/categories/{id} [get]
+// @Router /categories/{id} [get]
 func (h *CategoryHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
 	categoryID, err := parseUUIDParam(r, "id")
 	if err != nil {
@@ -108,7 +108,7 @@ func (h *CategoryHandler) GetCategory(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} CategoryResponse "Category details"
 // @Failure 404 {object} response.ErrorResponse "Category not found"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/categories/slug/{slug} [get]
+// @Router /categories/slug/{slug} [get]
 func (h *CategoryHandler) GetCategoryBySlug(w http.ResponseWriter, r *http.Request) {
 	slug, err := parseStringParam(r, "slug")
 	if err != nil {
@@ -139,7 +139,7 @@ func (h *CategoryHandler) GetCategoryBySlug(w http.ResponseWriter, r *http.Reque
 // @Failure 403 {object} response.ErrorResponse "Forbidden"
 // @Failure 409 {object} response.ErrorResponse "Category slug already exists"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/admin/categories [post]
+// @Router /admin/categories [post]
 func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request) {
 	var req CreateCategoryRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -194,7 +194,7 @@ func (h *CategoryHandler) CreateCategory(w http.ResponseWriter, r *http.Request)
 // @Failure 404 {object} response.ErrorResponse "Category not found"
 // @Failure 409 {object} response.ErrorResponse "Category slug already exists"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/admin/categories/{id} [put]
+// @Router /admin/categories/{id} [put]
 func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request) {
 	categoryID, err := parseUUIDParam(r, "id")
 	if err != nil {
@@ -262,7 +262,7 @@ func (h *CategoryHandler) UpdateCategory(w http.ResponseWriter, r *http.Request)
 // @Failure 403 {object} response.ErrorResponse "Forbidden"
 // @Failure 404 {object} response.ErrorResponse "Category not found"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
-// @Router /api/v1/admin/categories/{id} [delete]
+// @Router /admin/categories/{id} [delete]
 func (h *CategoryHandler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 	categoryID, err := parseUUIDParam(r, "id")
 	if err != nil {

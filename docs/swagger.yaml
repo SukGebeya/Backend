@@ -1,6 +1,6 @@
 basePath: /api/v1
 definitions:
-  github_com_nate_sukgebeya_pkg_response.ErrorResponse:
+  github_com_SukGebeya_Backend_pkg_response.ErrorResponse:
     properties:
       code:
         type: string
@@ -9,6 +9,22 @@ definitions:
       message:
         type: string
     type: object
+  github_com_SukGebeya_Backend_pkg_response.PaginatedResponse:
+    properties:
+      items: {}
+      page:
+        example: 1
+        type: integer
+      per_page:
+        example: 20
+        type: integer
+      total:
+        example: 42
+        type: integer
+      total_pages:
+        example: 3
+        type: integer
+    type: object
   internal_http_handler.AuthResponse:
     properties:
       token:
@@ -16,18 +32,116 @@ definitions:
       user:
         $ref: '#/definitions/internal_http_handler.UserResponse'
     type: object
-  internal_http_handler.CreateNoteRequest:
+  internal_http_handler.CategoryResponse:
     properties:
-      content:
-        example: This is the content of my new note
-        maxLength: 10000
+      created_at:
         type: string
-      title:
-        example: My New Note
-        maxLength: 255
-        minLength: 1
+      icon_url:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      parent_id:
+        type: string
+      slug:
+        type: string
+      sort_order:
+        type: integer
+    type: object
+  internal_http_handler.CreateCategoryRequest:
+    properties:
+      icon_url:
+        example: https://example.com/icons/clothing.svg
+        type: string
+      is_active:
+        type: boolean
+      name:
+        example: Clothing & Fashion
+        maxLength: 100
+        minLength: 2
+        type: string
+      parent_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      slug:
+        example: clothing-fashion
+        maxLength: 100
+        minLength: 2
+        type: string
+      sort_order:
+        example: 1
+        type: integer
+    required:
+    - name
+    - slug
+    type: object
+  internal_http_handler.CreateProductRequest:
+    properties:
+      category_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      description:
+        example: Premium Ethiopian coffee from Yirgacheffe region
+        maxLength: 2000
+        type: string
+      is_digital:
+        type: boolean
+      name:
+        example: Traditional Ethiopian Coffee
+        maxLength: 200
+        minLength: 2
+        type: string
+      slug:
+        example: traditional-ethiopian-coffee
+        maxLength: 200
+        minLength: 2
+        type: string
+      status:
+        enum:
+        - draft
+        - active
+        - archived
+        example: draft
         type: string
     required:
+    - name
+    - slug
+    type: object
+  internal_http_handler.CreateVariantRequest:
+    properties:
+      attributes:
+        additionalProperties: {}
+        type: object
+      compare_price_cents:
+        example: 30000
+        minimum: 1
+        type: integer
+      currency:
+        example: ETB
+        type: string
+      is_active:
+        type: boolean
+      price_cents:
+        example: 25000
+        minimum: 1
+        type: integer
+      sku:
+        example: COFFEE-YIRG-500G
+        maxLength: 100
+        minLength: 2
+        type: string
+      title:
+        example: 500g Ground Coffee
+        maxLength: 200
+        minLength: 2
+        type: string
+    required:
+    - currency
+    - price_cents
+    - sku
     - title
     type: object
   internal_http_handler.HealthResponse:
@@ -52,47 +166,119 @@ definitions:
     - identifier
     - password
     type: object
-  internal_http_handler.NoteListResponse:
+  internal_http_handler.MerchantProfileResponse:
     properties:
-      notes:
-        items:
-          $ref: '#/definitions/internal_http_handler.NoteResponse'
-        type: array
-      page:
-        example: 1
-        type: integer
-      per_page:
-        example: 20
-        type: integer
-      total:
-        example: 42
-        type: integer
-      total_pages:
-        example: 3
-        type: integer
-    type: object
-  internal_http_handler.NoteResponse:
-    properties:
-      content:
-        example: This is the content of my note
+      address:
+        type: string
+      city:
+        type: string
+      contact_email:
+        type: string
+      contact_phone:
         type: string
       created_at:
-        example: "2024-01-15T10:30:00Z"
-        type: string
-      deleted_at:
-        example: "2024-01-15T10:30:00Z"
         type: string
       id:
-        example: 550e8400-e29b-41d4-a716-446655440000
         type: string
-      title:
-        example: My Note
+      is_verified:
+        type: boolean
+      shop_banner_url:
         type: string
+      shop_description:
+        type: string
+      shop_logo_url:
+        type: string
+      shop_name:
+        type: string
+      shop_slug:
+        type: string
+      total_sales_cents:
+        type: integer
       updated_at:
-        example: "2024-01-15T10:30:00Z"
         type: string
       user_id:
-        example: 550e8400-e29b-41d4-a716-446655440001
+        type: string
+    type: object
+  internal_http_handler.OnboardRequest:
+    properties:
+      address:
+        example: Bole, Addis Ababa
+        maxLength: 200
+        type: string
+      city:
+        example: Addis Ababa
+        maxLength: 100
+        type: string
+      contact_email:
+        example: tigist@example.com
+        type: string
+      contact_phone:
+        example: "+251911234567"
+        type: string
+      shop_description:
+        example: Traditional Ethiopian clothing handmade in Addis
+        maxLength: 500
+        type: string
+      shop_name:
+        example: Tigist Habesha Designs
+        maxLength: 100
+        minLength: 2
+        type: string
+      shop_slug:
+        example: tigist-habesha
+        maxLength: 100
+        minLength: 2
+        type: string
+    required:
+    - city
+    - contact_phone
+    - shop_name
+    type: object
+  internal_http_handler.OnboardResponse:
+    properties:
+      merchant_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      message:
+        example: Merchant profile created. KYC verification pending.
+        type: string
+      shop_name:
+        example: Tigist Habesha Designs
+        type: string
+      shop_slug:
+        example: tigist-habesha
+        type: string
+    type: object
+  internal_http_handler.ProductDetailResponse:
+    properties:
+      product:
+        $ref: '#/definitions/internal_http_handler.ProductResponse'
+      variants:
+        items:
+          $ref: '#/definitions/internal_http_handler.VariantResponse'
+        type: array
+    type: object
+  internal_http_handler.ProductResponse:
+    properties:
+      category_id:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_digital:
+        type: boolean
+      merchant_id:
+        type: string
+      name:
+        type: string
+      slug:
+        type: string
+      status:
+        type: string
+      updated_at:
         type: string
     type: object
   internal_http_handler.RefreshRequest:
@@ -115,8 +301,35 @@ definitions:
       phone:
         example: "+1234567890"
         type: string
+      role:
+        enum:
+        - buyer
+        - merchant
+        example: buyer
+        type: string
     required:
     - password
+    type: object
+  internal_http_handler.ShopResponse:
+    properties:
+      banner_url:
+        type: string
+      city:
+        type: string
+      contact_email:
+        type: string
+      contact_phone:
+        type: string
+      description:
+        type: string
+      is_verified:
+        type: boolean
+      logo_url:
+        type: string
+      shop_name:
+        type: string
+      shop_slug:
+        type: string
     type: object
   internal_http_handler.TokenResponse:
     properties:
@@ -130,19 +343,74 @@ definitions:
         example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwidG9rZW5fdHlwZSI6InJlZnJlc2giLCJpYXQiOjE1MTYyMzkwMjJ9...
         type: string
     type: object
-  internal_http_handler.UpdateNoteRequest:
+  internal_http_handler.UpdateCategoryRequest:
     properties:
-      content:
-        example: This is the updated content
-        maxLength: 10000
+      icon_url:
+        example: https://example.com/icons/clothing.svg
         type: string
-      title:
-        example: Updated Note Title
-        maxLength: 255
-        minLength: 1
+      is_active:
+        type: boolean
+      name:
+        example: Clothing & Fashion
+        maxLength: 100
+        minLength: 2
         type: string
-    required:
-    - title
+      slug:
+        example: clothing-fashion
+        maxLength: 100
+        minLength: 2
+        type: string
+      sort_order:
+        example: 1
+        type: integer
+    type: object
+  internal_http_handler.UpdateMerchantRequest:
+    properties:
+      address:
+        maxLength: 200
+        type: string
+      city:
+        maxLength: 100
+        type: string
+      contact_email:
+        type: string
+      contact_phone:
+        type: string
+      shop_banner_url:
+        type: string
+      shop_description:
+        maxLength: 500
+        type: string
+      shop_logo_url:
+        type: string
+      shop_name:
+        maxLength: 100
+        minLength: 2
+        type: string
+    type: object
+  internal_http_handler.UpdateProductRequest:
+    properties:
+      category_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      description:
+        example: Premium Ethiopian coffee from Yirgacheffe region
+        maxLength: 2000
+        type: string
+      is_digital:
+        type: boolean
+      name:
+        example: Traditional Ethiopian Coffee
+        maxLength: 200
+        minLength: 2
+        type: string
+      status:
+        enum:
+        - draft
+        - active
+        - archived
+        example: active
+        type: string
     type: object
   internal_http_handler.UpdateProfileRequest:
     properties:
@@ -193,12 +461,38 @@ definitions:
         example: "2024-01-15T10:30:00Z"
         type: string
     type: object
+  internal_http_handler.VariantResponse:
+    properties:
+      attributes:
+        additionalProperties: {}
+        type: object
+      compare_price_cents:
+        type: integer
+      created_at:
+        type: string
+      currency:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      price_cents:
+        type: integer
+      product_id:
+        type: string
+      sku:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact:
     email: support@example.com
     name: API Support
-    url: https://github.com/nate/sukgebeya
+    url: https://github.com/natnael-alemayehu/sukgebeya
   description: |-
     A production-ready Go REST API boilerplate with authentication, notes, and user management.
     Features include JWT authentication, rate limiting, soft deletes, and Redis-based token storage.
@@ -208,7 +502,238 @@ info:
   title: Go Boilerplate API
   version: "1.0"
 paths:
-  /api/v1/login:
+  /admin/categories:
+    post:
+      consumes:
+      - application/json
+      description: Create a new category (admin only)
+      parameters:
+      - description: Category details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handler.CreateCategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created category
+          schema:
+            $ref: '#/definitions/internal_http_handler.CategoryResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "409":
+          description: Category slug already exists
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new category
+      tags:
+      - categories
+  /admin/categories/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a category (admin only)
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "404":
+          description: Category not found
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a category
+      tags:
+      - categories
+    put:
+      consumes:
+      - application/json
+      description: Update an existing category (admin only)
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Category update details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handler.UpdateCategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated category
+          schema:
+            $ref: '#/definitions/internal_http_handler.CategoryResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "404":
+          description: Category not found
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "409":
+          description: Category slug already exists
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a category
+      tags:
+      - categories
+  /categories:
+    get:
+      consumes:
+      - application/json
+      description: Get a list of all active categories
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of categories
+          schema:
+            items:
+              $ref: '#/definitions/internal_http_handler.CategoryResponse'
+            type: array
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      summary: List all active categories
+      tags:
+      - categories
+  /categories/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get a single category by its ID
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Category details
+          schema:
+            $ref: '#/definitions/internal_http_handler.CategoryResponse'
+        "404":
+          description: Category not found
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      summary: Get category by ID
+      tags:
+      - categories
+  /categories/slug/{slug}:
+    get:
+      consumes:
+      - application/json
+      description: Get a single category by its slug
+      parameters:
+      - description: Category slug
+        in: path
+        name: slug
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Category details
+          schema:
+            $ref: '#/definitions/internal_http_handler.CategoryResponse'
+        "404":
+          description: Category not found
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      summary: Get category by slug
+      tags:
+      - categories
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: Check the health status of the API and its dependencies
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Service is healthy
+          schema:
+            $ref: '#/definitions/internal_http_handler.HealthResponse'
+        "503":
+          description: Service is unhealthy
+          schema:
+            $ref: '#/definitions/internal_http_handler.HealthResponse'
+      summary: Health check
+      tags:
+      - health
+  /login:
     post:
       consumes:
       - application/json
@@ -231,19 +756,19 @@ paths:
         "400":
           description: Invalid request body or validation error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "401":
           description: Invalid credentials
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
       summary: Login to user account
       tags:
       - auth
-  /api/v1/logout:
+  /logout:
     post:
       consumes:
       - application/json
@@ -264,19 +789,19 @@ paths:
         "400":
           description: Invalid request body or validation error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "401":
           description: Invalid refresh token
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
       summary: Logout from current session
       tags:
       - auth
-  /api/v1/logout-all:
+  /logout-all:
     post:
       consumes:
       - application/json
@@ -290,104 +815,151 @@ paths:
         "401":
           description: Authentication required
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Logout from all sessions
       tags:
       - auth
-  /api/v1/notes:
+  /merchant/onboard:
+    post:
+      consumes:
+      - application/json
+      description: Create a merchant profile for the authenticated user. Any authenticated
+        user can onboard to become a merchant.
+      parameters:
+      - description: Merchant onboarding details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handler.OnboardRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Merchant profile created
+          schema:
+            $ref: '#/definitions/internal_http_handler.OnboardResponse'
+        "400":
+          description: Invalid request body or validation error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "409":
+          description: User already has a merchant profile
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Onboard a new merchant
+      tags:
+      - merchant
+  /merchant/products:
     get:
       consumes:
       - application/json
-      description: Get a paginated list of notes belonging to the authenticated user.
-        Supports soft-deleted notes with with_deleted parameter.
+      description: Get a paginated list of products for the authenticated merchant
       parameters:
       - default: 1
         description: Page number
         in: query
-        minimum: 1
         name: page
         type: integer
       - default: 20
         description: Items per page
         in: query
-        maximum: 100
-        minimum: 1
         name: per_page
         type: integer
-      - default: false
-        description: Include soft-deleted notes
+      - description: Filter by status (draft, active, archived)
         in: query
-        name: with_deleted
-        type: boolean
+        name: status
+        type: string
       produces:
       - application/json
       responses:
         "200":
-          description: List of notes
+          description: List of products
           schema:
-            $ref: '#/definitions/internal_http_handler.NoteListResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.PaginatedResponse'
         "401":
-          description: Authentication required
+          description: Unauthorized
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List user's notes
+      summary: List merchant's products
       tags:
-      - notes
+      - merchant
     post:
       consumes:
       - application/json
-      description: Create a new note for the authenticated user.
+      description: Create a new product for the authenticated merchant
       parameters:
-      - description: Note details
+      - description: Product details
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_http_handler.CreateNoteRequest'
+          $ref: '#/definitions/internal_http_handler.CreateProductRequest'
       produces:
       - application/json
       responses:
         "201":
-          description: Note created successfully
+          description: Created product
           schema:
-            $ref: '#/definitions/internal_http_handler.NoteResponse'
+            $ref: '#/definitions/internal_http_handler.ProductResponse'
         "400":
-          description: Invalid request body or validation error
+          description: Invalid request
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "401":
-          description: Authentication required
+          description: Unauthorized
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "409":
+          description: Product slug already exists
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Create a new note
+      summary: Create a new product
       tags:
-      - notes
-  /api/v1/notes/{id}:
+      - merchant
+  /merchant/products/{id}:
     delete:
       consumes:
       - application/json
-      description: Soft delete a note (move to trash). User must own the note.
+      description: Delete a product and all its variants
       parameters:
-      - description: Note ID
-        format: uuid
+      - description: Product ID
         in: path
         name: id
         required: true
@@ -396,151 +968,261 @@ paths:
       - application/json
       responses:
         "204":
-          description: Note deleted successfully
-        "400":
-          description: Invalid note ID format
-          schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+          description: No content
         "401":
-          description: Authentication required
+          description: Unauthorized
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "404":
-          description: Note not found
+          description: Product not found
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Soft delete a note
+      summary: Delete a product
       tags:
-      - notes
-    get:
-      consumes:
-      - application/json
-      description: Retrieve a specific note by its ID. User must own the note.
-      parameters:
-      - description: Note ID
-        format: uuid
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Note details
-          schema:
-            $ref: '#/definitions/internal_http_handler.NoteResponse'
-        "400":
-          description: Invalid note ID format
-          schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
-        "401":
-          description: Authentication required
-          schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
-        "404":
-          description: Note not found
-          schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get a note by ID
-      tags:
-      - notes
+      - merchant
     put:
       consumes:
       - application/json
-      description: Update an existing note. User must own the note.
+      description: Update an existing product
       parameters:
-      - description: Note ID
-        format: uuid
+      - description: Product ID
         in: path
         name: id
         required: true
         type: string
-      - description: Updated note details
+      - description: Product update details
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_http_handler.UpdateNoteRequest'
+          $ref: '#/definitions/internal_http_handler.UpdateProductRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: Note updated successfully
+          description: Updated product
           schema:
-            $ref: '#/definitions/internal_http_handler.NoteResponse'
+            $ref: '#/definitions/internal_http_handler.ProductResponse'
         "400":
-          description: Invalid request body, note ID, or validation error
+          description: Invalid request
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "401":
-          description: Authentication required
+          description: Unauthorized
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "404":
-          description: Note not found
+          description: Product not found
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Update a note
+      summary: Update a product
       tags:
-      - notes
-  /api/v1/notes/{id}/restore:
+      - merchant
+  /merchant/products/{id}/variants:
     post:
       consumes:
       - application/json
-      description: Restore a soft-deleted note from trash. User must own the note.
+      description: Add a new variant to an existing product
       parameters:
-      - description: Note ID
-        format: uuid
+      - description: Product ID
         in: path
         name: id
+        required: true
+        type: string
+      - description: Variant details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handler.CreateVariantRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created variant
+          schema:
+            $ref: '#/definitions/internal_http_handler.VariantResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "404":
+          description: Product not found
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "409":
+          description: SKU already exists
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Add a variant to a product
+      tags:
+      - merchant
+  /merchant/profile:
+    get:
+      consumes:
+      - application/json
+      description: Get the merchant profile for the authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Merchant profile
+          schema:
+            $ref: '#/definitions/internal_http_handler.MerchantProfileResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "403":
+          description: Merchant profile required
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get merchant profile
+      tags:
+      - merchant
+    put:
+      consumes:
+      - application/json
+      description: Update the merchant profile for the authenticated user.
+      parameters:
+      - description: Merchant profile update
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handler.UpdateMerchantRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated merchant profile
+          schema:
+            $ref: '#/definitions/internal_http_handler.MerchantProfileResponse'
+        "400":
+          description: Invalid request body or validation error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "401":
+          description: Authentication required
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "403":
+          description: Merchant profile required
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update merchant profile
+      tags:
+      - merchant
+  /products:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of all active products
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        name: per_page
+        type: integer
+      - description: Filter by category ID
+        in: query
+        name: category_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of products
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.PaginatedResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      summary: List all active products
+      tags:
+      - products
+  /products/{slug}:
+    get:
+      consumes:
+      - application/json
+      description: Get a single product by its slug
+      parameters:
+      - description: Product slug
+        in: path
+        name: slug
         required: true
         type: string
       produces:
       - application/json
       responses:
-        "204":
-          description: Note restored successfully
-        "400":
-          description: Invalid note ID format
+        "200":
+          description: Product details with variants
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
-        "401":
-          description: Authentication required
-          schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/internal_http_handler.ProductDetailResponse'
         "404":
-          description: Note not found or not deleted
+          description: Product not found
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Restore a soft-deleted note
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      summary: Get product by slug
       tags:
-      - notes
-  /api/v1/refresh:
+      - products
+  /refresh:
     post:
       consumes:
       - application/json
@@ -562,19 +1244,19 @@ paths:
         "400":
           description: Invalid request body or validation error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "401":
           description: Invalid or expired refresh token
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
       summary: Refresh access token
       tags:
       - auth
-  /api/v1/register:
+  /register:
     post:
       consumes:
       - application/json
@@ -597,19 +1279,48 @@ paths:
         "400":
           description: Invalid request body or validation error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "409":
           description: Email or phone already registered
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
       summary: Register a new user
       tags:
       - auth
-  /api/v1/users:
+  /shops/{shop_slug}:
+    get:
+      consumes:
+      - application/json
+      description: Get public shop information by shop slug.
+      parameters:
+      - description: Shop slug
+        in: path
+        name: shop_slug
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Shop information
+          schema:
+            $ref: '#/definitions/internal_http_handler.ShopResponse'
+        "404":
+          description: Shop not found
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      summary: Get public shop information
+      tags:
+      - shops
+  /users:
     get:
       consumes:
       - application/json
@@ -638,21 +1349,21 @@ paths:
         "401":
           description: Authentication required
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "403":
           description: Admin access required
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List all users
       tags:
       - users
-  /api/v1/users/{id}:
+  /users/{id}:
     delete:
       consumes:
       - application/json
@@ -672,23 +1383,23 @@ paths:
         "400":
           description: Invalid user ID format
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "401":
           description: Authentication required
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "403":
           description: Admin access required
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "404":
           description: User not found
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Delete a user
@@ -715,29 +1426,29 @@ paths:
         "400":
           description: Invalid user ID format
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "401":
           description: Authentication required
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "403":
           description: Admin access required
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "404":
           description: User not found
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get a user by ID
       tags:
       - users
-  /api/v1/users/me:
+  /users/me:
     get:
       consumes:
       - application/json
@@ -752,15 +1463,15 @@ paths:
         "401":
           description: Authentication required
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "404":
           description: User not found
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get current user profile
@@ -788,43 +1499,24 @@ paths:
         "400":
           description: Invalid request body or validation error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "401":
           description: Authentication required
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "409":
           description: Email or phone already in use
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/github_com_nate_sukgebeya_pkg_response.ErrorResponse'
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Update current user profile
       tags:
       - users
-  /health:
-    get:
-      consumes:
-      - application/json
-      description: Check the health status of the API and its dependencies
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Service is healthy
-          schema:
-            $ref: '#/definitions/internal_http_handler.HealthResponse'
-        "503":
-          description: Service is unhealthy
-          schema:
-            $ref: '#/definitions/internal_http_handler.HealthResponse'
-      summary: Health check
-      tags:
-      - health
 securityDefinitions:
   BearerAuth:
     description: Type "Bearer" followed by a space and JWT token.

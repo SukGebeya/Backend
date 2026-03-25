@@ -8,9 +8,15 @@ import (
 
 var validate *validator.Validate
 
+var (
+	phoneRegex = regexp.MustCompile(`^\+?[1-9]\d{1,14}$`)
+	slugRegex  = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
+)
+
 func Init() {
 	validate = validator.New()
 	validate.RegisterValidation("phone", validatePhone)
+	validate.RegisterValidation("slug", validateSlug)
 }
 
 func Get() *validator.Validate {
@@ -25,9 +31,15 @@ func validatePhone(fl validator.FieldLevel) bool {
 	if phone == "" {
 		return true
 	}
-	pattern := `^\+?[1-9]\d{1,14}$`
-	matched, _ := regexp.MatchString(pattern, phone)
-	return matched
+	return phoneRegex.MatchString(phone)
+}
+
+func validateSlug(fl validator.FieldLevel) bool {
+	slug := fl.Field().String()
+	if slug == "" {
+		return true
+	}
+	return slugRegex.MatchString(slug)
 }
 
 type FieldError struct {
@@ -69,6 +81,12 @@ func FormatErrors(err error) ValidationErrors {
 			message = field + " must be at most " + err.Param() + " characters"
 		case "e164":
 			message = field + " must be a valid E.164 phone number"
+		case "slug":
+			message = field + " must be a valid slug (lowercase letters, numbers, and hyphens only)"
+		case "uuid":
+			message = field + " must be a valid UUID"
+		case "oneof":
+			message = field + " must be one of: " + err.Param()
 		default:
 			message = field + " is invalid"
 		}

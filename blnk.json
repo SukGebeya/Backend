@@ -1,0 +1,15 @@
+{
+  "project_name": "SukGebeya",
+  "data_source": {
+    "dns": "postgres://postgres:postgres@blnk-postgres:5432/blnk?sslmode=disable"
+  },
+  "redis": {
+    "dns": "redis:6379"
+  },
+  "server": {
+    "domain": "localhost",
+    "ssl": false,
+    "ssl_email": "",
+    "port": "5001"
+  }
+}

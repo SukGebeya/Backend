@@ -56,7 +56,7 @@ func NewRouter(
 	userHandler := handler.NewUserHandler(userService)
 	merchantHandler := handler.NewMerchantHandler(merchantService)
 	categoryHandler := handler.NewCategoryHandler(categoryService)
-	productHandler := handler.NewProductHandler(productService, variantService, merchantService)
+	productHandler := handler.NewProductHandler(productService, variantService)
 	healthHandler := handler.NewHealthHandler(db, redisClient)
 
 	r.Route("/api/v1", func(r chi.Router) {
@@ -98,12 +98,17 @@ func NewRouter(
 
 		r.Get("/shops/{shop_slug}", merchantHandler.GetShop)
 
-		// Merchant routes
+		// Merchant onboarding - any authenticated user can onboard
 		r.Group(func(r chi.Router) {
 			r.Use(httpmiddleware.Auth(jwtManager))
-			r.Use(httpmiddleware.Authorize("merchant"))
-
 			r.Post("/merchant/onboard", merchantHandler.Onboard)
+		})
+
+		// Merchant management routes - requires merchant profile
+		r.Group(func(r chi.Router) {
+			r.Use(httpmiddleware.Auth(jwtManager))
+			r.Use(httpmiddleware.RequireMerchantProfile(merchantService))
+
 			r.Get("/merchant/profile", merchantHandler.GetProfile)
 			r.Put("/merchant/profile", merchantHandler.UpdateProfile)
 

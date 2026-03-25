@@ -4,12 +4,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/SukGebeya/Backend/internal/domain"
 	domainerrors "github.com/SukGebeya/Backend/internal/errors"
 	"github.com/SukGebeya/Backend/internal/repository"
 	"github.com/SukGebeya/Backend/pkg/jwt"
 	"github.com/SukGebeya/Backend/pkg/password"
+	"github.com/google/uuid"
 )
 
 var _ Authenticator = (*AuthService)(nil)
@@ -179,9 +179,7 @@ func (s *AuthService) LogoutAll(ctx context.Context, userID uuid.UUID) error {
 }
 
 func (s *AuthService) generateTokens(ctx context.Context, user *domain.User) (*AuthTokens, error) {
-	identifier := user.DisplayName()
-
-	accessToken, err := s.jwtManager.GenerateAccessToken(user.ID, identifier, string(user.Role))
+	accessToken, err := s.jwtManager.GenerateAccessToken(user.ID, string(user.Role))
 	if err != nil {
 		return nil, domainerrors.Internal("failed to generate access token", err)
 	}

@@ -4,7 +4,8 @@
 	docker-dev-up docker-dev-down docker-dev-logs docker-dev-build \
 	docker-prod-up docker-prod-down docker-prod-logs docker-prod-build \
 	redis-cli psql air dev local all \
-	mocks test-unit test-integration
+	mocks test-unit test-integration \
+	seed seed-dev seed-reset seed-blnk
 
 BINARY_NAME=api
 MAIN_PATH=./cmd/api
@@ -68,6 +69,42 @@ migrate-status:
 migrate-create:
 	@read -p "Enter migration name: " name; \
 	goose -dir migrations create $$name sql
+
+# ==================== Database Seeding ====================
+
+seed: ## Seed database with full test data (destructive - clears existing data)
+	@echo "⚠️  WARNING: This will clear all existing data!"
+	@read -p "Are you sure? (y/N) " confirm; \
+	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
+		eval $$(grep -v '^#' .env | grep -v '^$$' | sed 's/^/export /') && \
+		psql "$$DATABASE_URL" -f scripts/seed.sql; \
+		echo "✅ Database seeded with full test data"; \
+	else \
+		echo "Aborted."; \
+	fi
+
+seed-dev: ## Seed database with minimal dev data (admin + categories only)
+	@eval $$(grep -v '^#' .env | grep -v '^$$' | sed 's/^/export /') && \
+	psql "$$DATABASE_URL" -f scripts/seed-dev.sql && \
+	echo "✅ Database seeded with minimal dev data"
+
+seed-reset: ## Reset database: migrate down, up, then seed
+	@echo "⚠️  WARNING: This will destroy all data!"
+	@read -p "Are you sure? (y/N) " confirm; \
+	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
+		$(MAKE) migrate-down && \
+		$(MAKE) migrate-up && \
+		$(MAKE) seed-dev; \
+	else \
+		echo "Aborted."; \
+	fi
+
+seed-blnk: ## Setup Blnk ledger and balances (updates .env.example)
+	@echo "🚀 Setting up Blnk..."
+	@if [ -z "$$BLNK_SECRET_KEY" ]; then \
+		eval $$(grep -v '^#' .env | grep -v '^$$' | sed 's/^/export /'); \
+	fi; \
+	go run ./scripts/setup-blnk.go
 
 # ==================== Code Generation ====================
 

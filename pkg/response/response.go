@@ -13,6 +13,14 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
+type PaginatedResponse struct {
+	Items      any   `json:"items"`
+	Total      int64 `json:"total" example:"42"`
+	Page       int   `json:"page" example:"1"`
+	PerPage    int   `json:"per_page" example:"20"`
+	TotalPages int   `json:"total_pages" example:"3"`
+}
+
 func JSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

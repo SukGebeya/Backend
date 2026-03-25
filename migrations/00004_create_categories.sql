@@ -16,16 +16,6 @@ CREATE INDEX idx_categories_parent_id ON categories(parent_id);
 CREATE INDEX idx_categories_slug ON categories(slug);
 CREATE INDEX idx_categories_is_active ON categories(is_active);
 
-INSERT INTO categories (name, slug, sort_order) VALUES
-  ('Clothing & Fashion', 'clothing-fashion', 1),
-  ('Food & Beverages', 'food-beverages', 2),
-  ('Electronics', 'electronics', 3),
-  ('Crafts & Handmade', 'crafts-handmade', 4),
-  ('Beauty & Personal Care', 'beauty-personal-care', 5),
-  ('Home & Living', 'home-living', 6),
-  ('Services', 'services', 7),
-  ('Other', 'other', 8);
-
 -- +goose StatementEnd
 
 -- +goose Down

@@ -29,6 +29,44 @@ services:
       timeout: 5s
       retries: 5
 
+  blnk:
+    image: jerryenebeli/blnk:latest
+    container_name: sukgebeya-blnk-dev
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./blnk.json:/blnk.json
+    command: >
+      sh -c "blnk migrate up && blnk start"
+    depends_on:
+      blnk-postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:5001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  blnk-postgres:
+    image: postgres:16-alpine
+    container_name: sukgebeya-blnk-postgres-dev
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: blnk
+    ports:
+      - "5433:5432"
+    volumes:
+      - blnk_postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d blnk"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   app:
     build:
       context: .
@@ -47,6 +85,11 @@ services:
       JWT_ACCESS_TTL: 15m
       JWT_REFRESH_TTL: 168h
       ENVIRONMENT: development
+      BLNK_BASE_URL: http://blnk:5001
+      BLNK_SECRET_KEY: dev-secret-key
+      BLNK_ETB_LEDGER_ID: ldg_6d841a71-7fe0-4c63-9eb0-4a8d3b323f25
+      BLNK_ESCROW_BALANCE_ID: bln_86f13b37-e6e2-4a2c-8165-c5f7dd971507
+      BLNK_REVENUE_BALANCE_ID: bln_8dacf06d-d8b9-42a5-9684-d22452aecd69
     volumes:
       - .:/app
       - go_mod_cache:/go/pkg/mod
@@ -55,8 +98,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      blnk:
+        condition: service_healthy
 
 volumes:
   postgres_dev_data:
   redis_dev_data:
+  blnk_postgres_dev_data:
   go_mod_cache:
