@@ -77,11 +77,11 @@ INSERT INTO merchant_profiles (id, user_id, shop_name, shop_slug, shop_descripti
 
 INSERT INTO products (id, merchant_id, category_id, name, slug, description, status, is_digital, created_at, updated_at) VALUES
 -- Products for Merchant 1 (Fashion)
-('30000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Traditional Habesha Kemis', 'traditional-habesha-kemis', 'Beautiful hand-woven traditional Ethiopian dress with intricate embroidery', 'published', false, NOW(), NOW()),
-('30000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Modern Ethiopian Netela', 'modern-ethiopian-netela', 'Elegant hand-spun cotton shawl with modern patterns', 'published', false, NOW(), NOW()),
+('30000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Traditional Habesha Kemis', 'traditional-habesha-kemis', 'Beautiful hand-woven traditional Ethiopian dress with intricate embroidery', 'active', false, NOW(), NOW()),
+('30000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Modern Ethiopian Netela', 'modern-ethiopian-netela', 'Elegant hand-spun cotton shawl with modern patterns', 'active', false, NOW(), NOW()),
 
 -- Products for Merchant 2 (Coffee)
-('30000000-0000-0000-0000-000000000003', '20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000002', 'Yirgacheffe Coffee Beans', 'yirgacheffe-coffee-beans', 'Single-origin Arabica coffee beans from Yirgacheffe region', 'published', false, NOW(), NOW()),
+('30000000-0000-0000-0000-000000000003', '20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000002', 'Yirgacheffe Coffee Beans', 'yirgacheffe-coffee-beans', 'Single-origin Arabica coffee beans from Yirgacheffe region', 'active', false, NOW(), NOW()),
 ('30000000-0000-0000-0000-000000000004', '20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000002', 'Sidamo Ground Coffee', 'sidamo-ground-coffee', 'Freshly ground coffee from Sidamo region, 250g pack', 'draft', false, NOW(), NOW());
 
 -- =============================================================================
@@ -152,7 +152,7 @@ COMMIT;
 -- Users: 4 (1 admin, 1 buyer, 2 merchants)
 -- Categories: 8
 -- Merchant Profiles: 2
--- Products: 4 (3 published, 1 draft)
+-- Products: 4 (3 active, 1 draft)
 -- Product Images: 5
 -- Product Variants: 8
 -- Inventory: 8 records
