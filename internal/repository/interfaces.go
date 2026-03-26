@@ -97,3 +97,73 @@ type RateLimitRepository interface {
 	GetTTL(ctx context.Context, key string) (int64, error)
 	Reset(ctx context.Context, key string) error
 }
+
+type AddressRepository interface {
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.Address, error)
+	ListByUserID(ctx context.Context, userID uuid.UUID) ([]domain.Address, error)
+	GetDefault(ctx context.Context, userID uuid.UUID) (*domain.Address, error)
+	Create(ctx context.Context, address *domain.Address) (*domain.Address, error)
+	Update(ctx context.Context, address *domain.Address) (*domain.Address, error)
+	SetDefault(ctx context.Context, userID, addressID uuid.UUID) (*domain.Address, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+	CountByUserID(ctx context.Context, userID uuid.UUID) (int64, error)
+}
+
+type CartRepository interface {
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.Cart, error)
+	GetByUserID(ctx context.Context, userID uuid.UUID) (*domain.Cart, error)
+	GetBySessionID(ctx context.Context, sessionID string) (*domain.Cart, error)
+	Create(ctx context.Context, cart *domain.Cart) (*domain.Cart, error)
+	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.CartStatus) (*domain.Cart, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+	DeleteBySessionID(ctx context.Context, sessionID string) error
+}
+
+type CartItemRepository interface {
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.CartItem, error)
+	GetByCartAndVariant(ctx context.Context, cartID, variantID uuid.UUID) (*domain.CartItem, error)
+	ListByCart(ctx context.Context, cartID uuid.UUID) ([]domain.CartItem, error)
+	Create(ctx context.Context, item *domain.CartItem) (*domain.CartItem, error)
+	Upsert(ctx context.Context, item *domain.CartItem) (*domain.CartItem, error)
+	UpdateQuantity(ctx context.Context, id uuid.UUID, quantity int) (*domain.CartItem, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+	DeleteByCartAndVariant(ctx context.Context, cartID, variantID uuid.UUID) error
+	ClearCart(ctx context.Context, cartID uuid.UUID) error
+	CountByCart(ctx context.Context, cartID uuid.UUID) (int64, error)
+	CountDistinctVariants(ctx context.Context, cartID uuid.UUID) (int, error)
+	MergeItems(ctx context.Context, sourceCartID, targetCartID uuid.UUID) error
+}
+
+type SessionRepository interface {
+	Create(ctx context.Context, sessionID string, ttl int64) error
+	Get(ctx context.Context, sessionID string) (bool, error)
+	Delete(ctx context.Context, sessionID string) error
+	AssociateUser(ctx context.Context, sessionID string, userID uuid.UUID) error
+}
+
+type OrderRepository interface {
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.Order, error)
+	GetByChapaTxRef(ctx context.Context, chapaTxRef string) (*domain.Order, error)
+	ListByBuyerID(ctx context.Context, buyerID uuid.UUID, page, pageSize int) ([]domain.Order, error)
+	ListByMerchantID(ctx context.Context, merchantID uuid.UUID, page, pageSize int) ([]domain.Order, error)
+	ListByStatus(ctx context.Context, status domain.OrderStatus, page, pageSize int) ([]domain.Order, error)
+	Create(ctx context.Context, order *domain.Order) (*domain.Order, error)
+	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.OrderStatus) (*domain.Order, error)
+	UpdateBlnkTransaction(ctx context.Context, id uuid.UUID, blnkTxID string) (*domain.Order, error)
+	CountByBuyerID(ctx context.Context, buyerID uuid.UUID) (int64, error)
+	CountByMerchantID(ctx context.Context, merchantID uuid.UUID) (int64, error)
+	GetItemByID(ctx context.Context, id uuid.UUID) (*domain.OrderItem, error)
+	ListItemsByOrderID(ctx context.Context, orderID uuid.UUID) ([]domain.OrderItem, error)
+	CreateItem(ctx context.Context, item *domain.OrderItem) (*domain.OrderItem, error)
+}
+
+type PaymentRepository interface {
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.Payment, error)
+	GetByOrderID(ctx context.Context, orderID uuid.UUID) (*domain.Payment, error)
+	GetByProviderTxRef(ctx context.Context, providerTxRef string) (*domain.Payment, error)
+	ListByStatus(ctx context.Context, status domain.PaymentStatus, page, pageSize int) ([]domain.Payment, error)
+	Create(ctx context.Context, payment *domain.Payment) (*domain.Payment, error)
+	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.PaymentStatus) (*domain.Payment, error)
+	UpdateProviderResponse(ctx context.Context, id uuid.UUID, providerResponse map[string]any) (*domain.Payment, error)
+	UpdateBlnkTransaction(ctx context.Context, id uuid.UUID, blnkTxID string) (*domain.Payment, error)
+}

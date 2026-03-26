@@ -5,9 +5,135 @@
 package db
 
 import (
+	"database/sql/driver"
+	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type CartStatus string
+
+const (
+	CartStatusActive    CartStatus = "active"
+	CartStatusAbandoned CartStatus = "abandoned"
+	CartStatusConverted CartStatus = "converted"
+)
+
+func (e *CartStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = CartStatus(s)
+	case string:
+		*e = CartStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for CartStatus: %T", src)
+	}
+	return nil
+}
+
+type NullCartStatus struct {
+	CartStatus CartStatus `json:"cart_status"`
+	Valid      bool       `json:"valid"` // Valid is true if CartStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullCartStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.CartStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.CartStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullCartStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.CartStatus), nil
+}
+
+type OrderStatus string
+
+const (
+	OrderStatusPendingPayment OrderStatus = "pending_payment"
+	OrderStatusPaid           OrderStatus = "paid"
+	OrderStatusProcessing     OrderStatus = "processing"
+	OrderStatusShipped        OrderStatus = "shipped"
+	OrderStatusDelivered      OrderStatus = "delivered"
+	OrderStatusCancelled      OrderStatus = "cancelled"
+	OrderStatusRefunded       OrderStatus = "refunded"
+)
+
+func (e *OrderStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = OrderStatus(s)
+	case string:
+		*e = OrderStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for OrderStatus: %T", src)
+	}
+	return nil
+}
+
+type NullOrderStatus struct {
+	OrderStatus OrderStatus `json:"order_status"`
+	Valid       bool        `json:"valid"` // Valid is true if OrderStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullOrderStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.OrderStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.OrderStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullOrderStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.OrderStatus), nil
+}
+
+type Address struct {
+	ID        uuid.UUID          `json:"id"`
+	UserID    uuid.UUID          `json:"user_id"`
+	FullName  string             `json:"full_name"`
+	Phone     string             `json:"phone"`
+	Line1     string             `json:"line1"`
+	Line2     *string            `json:"line2"`
+	City      string             `json:"city"`
+	Subcity   *string            `json:"subcity"`
+	Woreda    *string            `json:"woreda"`
+	IsDefault bool               `json:"is_default"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type Cart struct {
+	ID        uuid.UUID          `json:"id"`
+	UserID    pgtype.UUID        `json:"user_id"`
+	SessionID *string            `json:"session_id"`
+	Status    CartStatus         `json:"status"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type CartItem struct {
+	ID                 uuid.UUID          `json:"id"`
+	CartID             uuid.UUID          `json:"cart_id"`
+	VariantID          uuid.UUID          `json:"variant_id"`
+	Quantity           int32              `json:"quantity"`
+	PriceSnapshotCents int64              `json:"price_snapshot_cents"`
+	AddedAt            pgtype.Timestamptz `json:"added_at"`
+}
 
 type Category struct {
 	ID        uuid.UUID          `json:"id"`
@@ -46,6 +172,48 @@ type MerchantProfile struct {
 	TotalSalesCents int64              `json:"total_sales_cents"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type Order struct {
+	ID                uuid.UUID          `json:"id"`
+	BuyerID           uuid.UUID          `json:"buyer_id"`
+	MerchantID        uuid.UUID          `json:"merchant_id"`
+	ShippingAddressID pgtype.UUID        `json:"shipping_address_id"`
+	Status            OrderStatus        `json:"status"`
+	SubtotalCents     int64              `json:"subtotal_cents"`
+	PlatformFeeCents  int64              `json:"platform_fee_cents"`
+	TotalCents        int64              `json:"total_cents"`
+	Currency          string             `json:"currency"`
+	Notes             *string            `json:"notes"`
+	BlnkTransactionID *string            `json:"blnk_transaction_id"`
+	ChapaTxRef        *string            `json:"chapa_tx_ref"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+type OrderItem struct {
+	ID              uuid.UUID `json:"id"`
+	OrderID         uuid.UUID `json:"order_id"`
+	VariantID       uuid.UUID `json:"variant_id"`
+	ProductName     string    `json:"product_name"`
+	VariantTitle    string    `json:"variant_title"`
+	Quantity        int32     `json:"quantity"`
+	UnitPriceCents  int64     `json:"unit_price_cents"`
+	TotalPriceCents int64     `json:"total_price_cents"`
+}
+
+type Payment struct {
+	ID                uuid.UUID          `json:"id"`
+	OrderID           uuid.UUID          `json:"order_id"`
+	Provider          string             `json:"provider"`
+	Status            string             `json:"status"`
+	AmountCents       int64              `json:"amount_cents"`
+	Currency          string             `json:"currency"`
+	ProviderTxRef     *string            `json:"provider_tx_ref"`
+	ProviderResponse  []byte             `json:"provider_response"`
+	BlnkTransactionID *string            `json:"blnk_transaction_id"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Product struct {

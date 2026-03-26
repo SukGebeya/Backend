@@ -19,6 +19,7 @@ type Config struct {
 	RateLimit   RateLimitConfig
 	Logger      LoggerConfig
 	Blnk        BlnkConfig
+	Chapa       ChapaConfig
 }
 
 type JWTConfig struct {
@@ -54,6 +55,12 @@ type BlnkConfig struct {
 	ETBLedgerID      string
 	EscrowBalanceID  string
 	RevenueBalanceID string
+}
+
+type ChapaConfig struct {
+	SecretKey   string
+	CallbackURL string
+	ReturnURL   string
 }
 
 func Load() (*Config, error) {
@@ -95,6 +102,11 @@ func Load() (*Config, error) {
 			ETBLedgerID:      os.Getenv("BLNK_ETB_LEDGER_ID"),
 			EscrowBalanceID:  os.Getenv("BLNK_ESCROW_BALANCE_ID"),
 			RevenueBalanceID: os.Getenv("BLNK_REVENUE_BALANCE_ID"),
+		},
+		Chapa: ChapaConfig{
+			SecretKey:   os.Getenv("CHAPA_SECRET_KEY"),
+			CallbackURL: getEnv("CHAPA_CALLBACK_URL", ""),
+			ReturnURL:   getEnv("CHAPA_RETURN_URL", ""),
 		},
 	}
 

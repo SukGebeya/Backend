@@ -161,3 +161,11 @@ func VariantExists(message string) *AppError {
 func InsufficientInventory(message string) *AppError {
 	return NewError(Code("INSUFFICIENT_INVENTORY"), message, http.StatusBadRequest, nil)
 }
+
+func IsNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	appErr, ok := err.(*AppError)
+	return ok && appErr.Code == CodeNotFound
+}

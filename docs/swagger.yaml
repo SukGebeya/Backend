@@ -25,12 +25,66 @@ definitions:
         example: 3
         type: integer
     type: object
+  internal_http_handler.AddToCartRequest:
+    properties:
+      quantity:
+        example: 2
+        maximum: 100
+        minimum: 1
+        type: integer
+      variant_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    required:
+    - quantity
+    - variant_id
+    type: object
   internal_http_handler.AuthResponse:
     properties:
       token:
         $ref: '#/definitions/internal_http_handler.TokenResponse'
       user:
         $ref: '#/definitions/internal_http_handler.UserResponse'
+    type: object
+  internal_http_handler.CartItemResponse:
+    properties:
+      cart_id:
+        type: string
+      currency:
+        type: string
+      id:
+        type: string
+      price_snapshot_cents:
+        type: integer
+      product_name:
+        type: string
+      quantity:
+        type: integer
+      subtotal_cents:
+        type: integer
+      variant_id:
+        type: string
+      variant_title:
+        type: string
+    type: object
+  internal_http_handler.CartResponse:
+    properties:
+      currency:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      item_count:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/internal_http_handler.CartItemResponse'
+        type: array
+      status:
+        type: string
+      total_cents:
+        type: integer
     type: object
   internal_http_handler.CategoryResponse:
     properties:
@@ -343,6 +397,16 @@ definitions:
         example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwidG9rZW5fdHlwZSI6InJlZnJlc2giLCJpYXQiOjE1MTYyMzkwMjJ9...
         type: string
     type: object
+  internal_http_handler.UpdateCartItemRequest:
+    properties:
+      quantity:
+        example: 3
+        maximum: 100
+        minimum: 0
+        type: integer
+    required:
+    - quantity
+    type: object
   internal_http_handler.UpdateCategoryRequest:
     properties:
       icon_url:
@@ -635,6 +699,198 @@ paths:
       summary: Update a category
       tags:
       - categories
+  /cart:
+    delete:
+      consumes:
+      - application/json
+      description: Remove all items from the cart
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Clear cart
+      tags:
+      - cart
+    get:
+      consumes:
+      - application/json
+      description: Get the current user's or session's cart with items
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_http_handler.CartResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current cart
+      tags:
+      - cart
+  /cart/items:
+    post:
+      consumes:
+      - application/json
+      description: Add an item to the cart
+      parameters:
+      - description: Add to cart request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handler.AddToCartRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_http_handler.CartItemResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Add item to cart
+      tags:
+      - cart
+  /cart/items/{variantId}:
+    delete:
+      consumes:
+      - application/json
+      description: Remove an item from the cart
+      parameters:
+      - description: Variant ID
+        in: path
+        name: variantId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove item from cart
+      tags:
+      - cart
+    put:
+      consumes:
+      - application/json
+      description: Update the quantity of an item in the cart
+      parameters:
+      - description: Variant ID
+        in: path
+        name: variantId
+        required: true
+        type: string
+      - description: Update quantity request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_http_handler.UpdateCartItemRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_http_handler.CartItemResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update cart item quantity
+      tags:
+      - cart
+  /cart/merge:
+    post:
+      consumes:
+      - application/json
+      description: Merge the guest cart associated with the session into the authenticated
+        user's cart
+      parameters:
+      - description: Session ID
+        in: header
+        name: X-Session-ID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_http_handler.CartResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Merge guest cart into user cart
+      tags:
+      - cart
   /categories:
     get:
       consumes:

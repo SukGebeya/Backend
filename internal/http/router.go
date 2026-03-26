@@ -5,8 +5,10 @@ import (
 	"time"
 
 	_ "github.com/SukGebeya/Backend/docs"
+	"github.com/SukGebeya/Backend/internal/chapa"
 	"github.com/SukGebeya/Backend/internal/http/handler"
 	httpmiddleware "github.com/SukGebeya/Backend/internal/http/middleware"
+	"github.com/SukGebeya/Backend/internal/repository"
 	"github.com/SukGebeya/Backend/internal/service"
 	"github.com/SukGebeya/Backend/pkg/jwt"
 	"github.com/SukGebeya/Backend/pkg/logger"
@@ -14,7 +16,9 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/go-redis/redis/v8"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
@@ -29,11 +33,19 @@ func NewRouter(
 	categoryService *service.CategoryService,
 	productService *service.ProductService,
 	variantService *service.ProductVariantService,
+	variantRepo repository.ProductVariantRepository,
+	addressService *service.AddressService,
+	cartService *service.CartService,
+	orderService *service.OrderService,
+	checkoutService *service.CheckoutService,
 	jwtManager *jwt.Manager,
 	rateLimiter *httpmiddleware.RateLimiter,
 	db *pgxpool.Pool,
 	redisClient redis.Cmdable,
 	appLogger *logger.Logger,
+	sessionRepo repository.SessionRepository,
+	chapaClient *chapa.Client,
+	riverClient *river.Client[pgx.Tx],
 ) *Router {
 	r := chi.NewRouter()
 
@@ -45,8 +57,8 @@ func NewRouter(
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
-		ExposedHeaders:   []string{"X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Session-ID"},
+		ExposedHeaders:   []string{"X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "X-Session-ID"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
@@ -57,7 +69,12 @@ func NewRouter(
 	merchantHandler := handler.NewMerchantHandler(merchantService)
 	categoryHandler := handler.NewCategoryHandler(categoryService)
 	productHandler := handler.NewProductHandler(productService, variantService)
+	addressHandler := handler.NewAddressHandler(addressService)
 	healthHandler := handler.NewHealthHandler(db, redisClient)
+	cartHandler := handler.NewCartHandler(cartService, variantRepo)
+	orderHandler := handler.NewOrderHandler(orderService)
+	checkoutHandler := handler.NewCheckoutHandler(checkoutService)
+	webhookHandler := handler.NewWebhookHandler(chapaClient, riverClient)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
@@ -117,6 +134,8 @@ func NewRouter(
 			r.Put("/merchant/products/{id}", productHandler.UpdateProduct)
 			r.Delete("/merchant/products/{id}", productHandler.DeleteProduct)
 			r.Post("/merchant/products/{id}/variants", productHandler.AddVariant)
+			r.Put("/merchant/products/{id}/variants/{variantId}", productHandler.UpdateVariant)
+			r.Delete("/merchant/products/{id}/variants/{variantId}", productHandler.DeleteVariant)
 		})
 
 		// Admin routes
@@ -128,7 +147,59 @@ func NewRouter(
 			r.Put("/admin/categories/{id}", categoryHandler.UpdateCategory)
 			r.Delete("/admin/categories/{id}", categoryHandler.DeleteCategory)
 		})
+
+		// Address routes - authenticated users
+		r.Group(func(r chi.Router) {
+			r.Use(httpmiddleware.Auth(jwtManager))
+
+			r.Get("/addresses", addressHandler.ListAddresses)
+			r.Post("/addresses", addressHandler.CreateAddress)
+			r.Get("/addresses/{id}", addressHandler.GetAddress)
+			r.Put("/addresses/{id}", addressHandler.UpdateAddress)
+			r.Delete("/addresses/{id}", addressHandler.DeleteAddress)
+			r.Put("/addresses/{id}/default", addressHandler.SetDefaultAddress)
+		})
+
+		// Cart routes (works for both authenticated and guest sessions)
+		r.Group(func(r chi.Router) {
+			r.Use(httpmiddleware.Session(sessionRepo))
+			r.Get("/cart", cartHandler.GetCart)
+			r.Post("/cart/items", cartHandler.AddItem)
+			r.Put("/cart/items/{variantId}", cartHandler.UpdateItem)
+			r.Delete("/cart/items/{variantId}", cartHandler.RemoveItem)
+			r.Delete("/cart", cartHandler.ClearCart)
+		})
+
+		// Merge guest cart on login (requires authentication)
+		r.Group(func(r chi.Router) {
+			r.Use(httpmiddleware.Auth(jwtManager))
+			r.Use(httpmiddleware.Session(sessionRepo))
+			r.Post("/cart/merge", cartHandler.MergeCart)
+		})
+
+		// Order routes - authenticated users
+		r.Group(func(r chi.Router) {
+			r.Use(httpmiddleware.Auth(jwtManager))
+			r.Use(httpmiddleware.Session(sessionRepo))
+
+			r.Get("/orders", orderHandler.ListMyOrders)
+			r.Get("/orders/{id}", orderHandler.GetOrder)
+			r.Post("/orders/checkout", checkoutHandler.Checkout)
+			r.Post("/orders/{id}/confirm-delivery", orderHandler.ConfirmDelivery)
+		})
+
+		// Merchant order management - requires merchant profile
+		r.Group(func(r chi.Router) {
+			r.Use(httpmiddleware.Auth(jwtManager))
+			r.Use(httpmiddleware.RequireMerchantProfile(merchantService))
+
+			r.Get("/merchant/orders", orderHandler.ListMerchantOrders)
+			r.Put("/merchant/orders/{id}/status", orderHandler.UpdateOrderStatus)
+		})
 	})
+
+	// Webhook routes - public, no auth required
+	r.Post("/webhooks/chapa", webhookHandler.HandleChapa)
 
 	r.Get("/health", healthHandler.Health)
 

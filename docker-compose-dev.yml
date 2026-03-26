@@ -74,22 +74,17 @@ services:
     container_name: sukgebeya-app-dev
     ports:
       - "8080:8080"
+    env_file:
+      - .env
     environment:
+      # Override for Docker networking (service names instead of localhost)
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/app?sslmode=disable
       REDIS_URL: redis:6379
-      PORT: "8080"
+      BLNK_BASE_URL: http://blnk:5001
       JWT_ACCESS_PRIVATE_KEY_PATH: /app/keys/access_private.pem
       JWT_ACCESS_PUBLIC_KEY_PATH: /app/keys/access_public.pem
       JWT_REFRESH_PRIVATE_KEY_PATH: /app/keys/refresh_private.pem
       JWT_REFRESH_PUBLIC_KEY_PATH: /app/keys/refresh_public.pem
-      JWT_ACCESS_TTL: 15m
-      JWT_REFRESH_TTL: 168h
-      ENVIRONMENT: development
-      BLNK_BASE_URL: http://blnk:5001
-      BLNK_SECRET_KEY: dev-secret-key
-      BLNK_ETB_LEDGER_ID: ldg_6d841a71-7fe0-4c63-9eb0-4a8d3b323f25
-      BLNK_ESCROW_BALANCE_ID: bln_86f13b37-e6e2-4a2c-8165-c5f7dd971507
-      BLNK_REVENUE_BALANCE_ID: bln_8dacf06d-d8b9-42a5-9684-d22452aecd69
     volumes:
       - .:/app
       - go_mod_cache:/go/pkg/mod

@@ -35,9 +35,11 @@ import (
 	"time"
 
 	"github.com/SukGebeya/Backend/internal/blnk"
+	"github.com/SukGebeya/Backend/internal/chapa"
 	"github.com/SukGebeya/Backend/internal/config"
 	apphttp "github.com/SukGebeya/Backend/internal/http"
 	httpmiddleware "github.com/SukGebeya/Backend/internal/http/middleware"
+	"github.com/SukGebeya/Backend/internal/jobs"
 	"github.com/SukGebeya/Backend/internal/repository"
 	"github.com/SukGebeya/Backend/internal/service"
 	"github.com/SukGebeya/Backend/pkg/jwt"
@@ -48,6 +50,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
+	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/riverqueue/river/rivermigrate"
 )
 
 // @title Go Boilerplate API
@@ -123,6 +128,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := runRiverMigrations(ctx, pool); err != nil {
+		appLogger.Error("Failed to run River migrations", "error", err)
+		os.Exit(1)
+	}
+
 	redisClient := redis.NewClient(&redis.Options{
 		Addr: cfg.RedisURL,
 	})
@@ -141,8 +151,15 @@ func main() {
 	productRepo := repository.NewProductRepository(pool)
 	variantRepo := repository.NewProductVariantRepository(pool)
 	imageRepo := repository.NewProductImageRepository(pool)
+	inventoryRepo := repository.NewInventoryRepository(pool)
+	addressRepo := repository.NewAddressRepository(pool)
+	orderRepo := repository.NewOrderRepository(pool)
+	paymentRepo := repository.NewPaymentRepository(pool)
 	refreshTokenRepo := repository.NewCircuitBreakerRefreshTokenRepository(redisClient)
 	rateLimitRepo := repository.NewCircuitBreakerRateLimitRepository(redisClient)
+	sessionRepo := repository.NewSessionRepository(redisClient)
+	cartRepo := repository.NewCartRepository(pool)
+	cartItemRepo := repository.NewCartItemRepository(pool)
 
 	appLogger.Info("Circuit breakers enabled for Redis repositories")
 
@@ -157,6 +174,12 @@ func main() {
 		appLogger.Error("Failed to initialize Blnk client", "error", err)
 		os.Exit(1)
 	}
+
+	chapaClient := chapa.NewClient(chapa.Config{
+		SecretKey:   cfg.Chapa.SecretKey,
+		CallbackURL: cfg.Chapa.CallbackURL,
+		ReturnURL:   cfg.Chapa.ReturnURL,
+	})
 
 	jwtManager, err := jwt.NewManagerFromFiles(
 		cfg.JWT.AccessPrivateKeyPath,
@@ -179,16 +202,52 @@ func main() {
 		KeyLength:   cfg.Argon2.KeyLength,
 	})
 
+	workers := river.NewWorkers()
+	jobs.AddWorkers(workers, cartRepo, cartItemRepo, orderRepo, paymentRepo, inventoryRepo, blnkClient)
+
+	jobErrorHandler := jobs.NewJobErrorHandler()
+
+	riverClient, err := river.NewClient(riverpgxv5.New(pool), &river.Config{
+		Queues: map[string]river.QueueConfig{
+			river.QueueDefault: {MaxWorkers: 10},
+		},
+		Workers:      workers,
+		ErrorHandler: jobErrorHandler,
+	})
+	if err != nil {
+		appLogger.Error("Failed to initialize River client", "error", err)
+		os.Exit(1)
+	}
+
+	if err := riverClient.Start(ctx); err != nil {
+		appLogger.Error("Failed to start River client", "error", err)
+		os.Exit(1)
+	}
+	appLogger.Info("River job queue started")
+
+	jobScheduler := jobs.NewRiverJobScheduler(riverClient)
+
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, jwtManager, passwordHasher, cfg.JWT.RefreshTTL)
 	userService := service.NewUserService(userRepo)
 	merchantService := service.NewMerchantService(merchantRepo, blnkClient)
 	categoryService := service.NewCategoryService(categoryRepo)
 	productService := service.NewProductService(productRepo, variantRepo, imageRepo)
 	variantService := service.NewProductVariantService(variantRepo)
+	addressService := service.NewAddressService(addressRepo)
+	cartService := service.NewCartService(cartRepo, cartItemRepo, sessionRepo, variantRepo, inventoryRepo, jobScheduler)
+	orderService := service.NewOrderService(orderRepo, merchantRepo, blnkClient)
+	checkoutService := service.NewCheckoutService(cartRepo, cartItemRepo, orderRepo, paymentRepo, addressRepo, inventoryRepo, merchantRepo, productRepo, variantRepo, blnkClient, chapaClient)
+
+	appLogger.Info("Circuit breakers enabled for Redis repositories")
 
 	rateLimiter := httpmiddleware.NewRateLimiter(rateLimitRepo, cfg.RateLimit.Requests, int64(cfg.RateLimit.Window.Seconds()))
 
-	router := apphttp.NewRouter(authService, userService, merchantService, categoryService, productService, variantService, jwtManager, rateLimiter, pool, redisClient, appLogger)
+	router := apphttp.NewRouter(
+		authService, userService, merchantService, categoryService, productService, variantService, variantRepo,
+		addressService, cartService, orderService, checkoutService,
+		jwtManager, rateLimiter, pool, redisClient, appLogger, sessionRepo,
+		chapaClient, riverClient,
+	)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
@@ -217,7 +276,11 @@ func main() {
 
 	if err := srv.Shutdown(ctx); err != nil {
 		appLogger.Error("Server forced to shutdown", "error", err)
-		os.Exit(1)
+	}
+
+	appLogger.Info("Stopping River job queue...")
+	if err := riverClient.Stop(ctx); err != nil {
+		appLogger.Error("River client shutdown error", "error", err)
 	}
 
 	appLogger.Info("Server exited")
@@ -236,6 +299,20 @@ func runMigrations(databaseURL string) error {
 
 	if err := goose.Up(db, "migrations"); err != nil {
 		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	return nil
+}
+
+func runRiverMigrations(ctx context.Context, pool *pgxpool.Pool) error {
+	migrator, err := rivermigrate.New(riverpgxv5.New(pool), nil)
+	if err != nil {
+		return fmt.Errorf("failed to create River migrator: %w", err)
+	}
+
+	_, err = migrator.Migrate(ctx, rivermigrate.DirectionUp, nil)
+	if err != nil {
+		return fmt.Errorf("failed to run River migrations: %w", err)
 	}
 
 	return nil

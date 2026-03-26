@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/SukGebeya/Backend/internal/domain"
 	"github.com/google/uuid"
@@ -131,4 +132,115 @@ type CreateInventoryInput struct {
 	VariantID uuid.UUID
 	Quantity  int
 	Reserved  int
+}
+
+type AddressManager interface {
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.Address, error)
+	ListByUserID(ctx context.Context, userID uuid.UUID) ([]domain.Address, error)
+	GetDefault(ctx context.Context, userID uuid.UUID) (*domain.Address, error)
+	Create(ctx context.Context, input CreateAddressInput) (*domain.Address, error)
+	Update(ctx context.Context, id uuid.UUID, input UpdateAddressInput) (*domain.Address, error)
+	SetDefault(ctx context.Context, userID, addressID uuid.UUID) (*domain.Address, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+}
+
+type CreateAddressInput struct {
+	UserID    uuid.UUID
+	FullName  string
+	Phone     string
+	Line1     string
+	Line2     *string
+	City      string
+	Subcity   *string
+	Woreda    *string
+	IsDefault bool
+}
+
+type UpdateAddressInput struct {
+	FullName  *string
+	Phone     *string
+	Line1     *string
+	Line2     *string
+	City      *string
+	Subcity   *string
+	Woreda    *string
+	IsDefault *bool
+}
+
+type CartManager interface {
+	GetOrCreateCart(ctx context.Context, userID *uuid.UUID, sessionID *string) (*domain.Cart, error)
+	GetCart(ctx context.Context, cartID uuid.UUID) (*domain.Cart, error)
+	AddItem(ctx context.Context, cartID uuid.UUID, variantID uuid.UUID, quantity int, priceCents int64) (*domain.CartItem, error)
+	UpdateItemQuantity(ctx context.Context, cartID, itemID uuid.UUID, quantity int) (*domain.CartItem, error)
+	UpdateItemQuantityByVariant(ctx context.Context, cartID, variantID uuid.UUID, quantity int) (*domain.CartItem, error)
+	RemoveItem(ctx context.Context, cartID, itemID uuid.UUID) error
+	RemoveItemByVariant(ctx context.Context, cartID, variantID uuid.UUID) error
+	ClearCart(ctx context.Context, cartID uuid.UUID) error
+	MergeCart(ctx context.Context, userID uuid.UUID, sessionID string) (*domain.Cart, error)
+	GetCartWithItems(ctx context.Context, cartID uuid.UUID) (*domain.CartWithDetails, error)
+}
+
+type SessionManager interface {
+	CreateSession(ctx context.Context) (string, error)
+	ValidateSession(ctx context.Context, sessionID string) (bool, error)
+	DeleteSession(ctx context.Context, sessionID string) error
+}
+
+type JobScheduler interface {
+	ScheduleCartExpiry(ctx context.Context, cartID uuid.UUID, expiresAt time.Time) error
+}
+
+type OrderManager interface {
+	GetByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, error)
+	GetByChapaTxRef(ctx context.Context, chapaTxRef string) (*domain.Order, error)
+	ListByBuyerID(ctx context.Context, buyerID uuid.UUID, page, pageSize int) (*domain.PaginatedResult[domain.Order], error)
+	ListByMerchantID(ctx context.Context, merchantID uuid.UUID, page, pageSize int) (*domain.PaginatedResult[domain.Order], error)
+	ListByStatus(ctx context.Context, status domain.OrderStatus, page, pageSize int) (*domain.PaginatedResult[domain.Order], error)
+	Create(ctx context.Context, input CreateOrderInput) (*domain.Order, error)
+	UpdateStatus(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) (*domain.Order, error)
+	UpdateBlnkTransaction(ctx context.Context, orderID uuid.UUID, blnkTxID string) (*domain.Order, error)
+	GetOrderWithItems(ctx context.Context, orderID uuid.UUID) (*domain.OrderWithItems, error)
+	ConfirmDelivery(ctx context.Context, orderID uuid.UUID) (*domain.Order, error)
+}
+
+type CheckoutManager interface {
+	Checkout(ctx context.Context, input CheckoutInput) (*CheckoutResult, error)
+	ProcessSuccessfulPayment(ctx context.Context, chapaTxRef string) error
+	ProcessFailedPayment(ctx context.Context, chapaTxRef string) error
+}
+
+type CreateOrderInput struct {
+	BuyerID           uuid.UUID
+	MerchantID        uuid.UUID
+	ShippingAddressID *uuid.UUID
+	Items             []CreateOrderItemInput
+	SubtotalCents     int64
+	PlatformFeeCents  int64
+	TotalCents        int64
+	Currency          string
+	Notes             *string
+	ChapaTxRef        string
+}
+
+type CreateOrderItemInput struct {
+	VariantID       uuid.UUID
+	ProductName     string
+	VariantTitle    string
+	Quantity        int
+	UnitPriceCents  int64
+	TotalPriceCents int64
+}
+
+type CheckoutInput struct {
+	UserID            uuid.UUID
+	ShippingAddressID *uuid.UUID
+	Notes             *string
+}
+
+type CheckoutResult struct {
+	OrderID    uuid.UUID
+	TotalCents int64
+	Currency   string
+	PaymentURL string
+	ChapaTxRef string
 }

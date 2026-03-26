@@ -12,16 +12,33 @@ import (
 )
 
 type Querier interface {
+	ClearCartItems(ctx context.Context, cartID uuid.UUID) error
 	CommitInventory(ctx context.Context, arg CommitInventoryParams) error
+	CountAddressesByUser(ctx context.Context, userID uuid.UUID) (int64, error)
+	CountCartItems(ctx context.Context, cartID uuid.UUID) (int64, error)
+	CountDistinctVariantsInCart(ctx context.Context, cartID uuid.UUID) (int32, error)
+	CountOrdersByBuyerID(ctx context.Context, buyerID uuid.UUID) (int64, error)
+	CountOrdersByMerchantID(ctx context.Context, merchantID uuid.UUID) (int64, error)
 	CountProductsByMerchant(ctx context.Context, merchantID uuid.UUID) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
+	CreateAddress(ctx context.Context, arg CreateAddressParams) (Address, error)
+	CreateCart(ctx context.Context, arg CreateCartParams) (Cart, error)
+	CreateCartItem(ctx context.Context, arg CreateCartItemParams) (CartItem, error)
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error)
 	CreateInventory(ctx context.Context, arg CreateInventoryParams) (Inventory, error)
 	CreateMerchantProfile(ctx context.Context, arg CreateMerchantProfileParams) (MerchantProfile, error)
+	CreateOrder(ctx context.Context, arg CreateOrderParams) (Order, error)
+	CreateOrderItem(ctx context.Context, arg CreateOrderItemParams) (OrderItem, error)
+	CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error)
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
 	CreateProductImage(ctx context.Context, arg CreateProductImageParams) (ProductImage, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateVariant(ctx context.Context, arg CreateVariantParams) (ProductVariant, error)
+	DeleteAddress(ctx context.Context, id uuid.UUID) error
+	DeleteCart(ctx context.Context, id uuid.UUID) error
+	DeleteCartBySessionID(ctx context.Context, sessionID *string) error
+	DeleteCartItem(ctx context.Context, id uuid.UUID) error
+	DeleteCartItemByCartAndVariant(ctx context.Context, arg DeleteCartItemByCartAndVariantParams) error
 	DeleteCategory(ctx context.Context, id uuid.UUID) error
 	DeleteProduct(ctx context.Context, id uuid.UUID) error
 	DeleteProductImage(ctx context.Context, id uuid.UUID) error
@@ -30,14 +47,27 @@ type Querier interface {
 	DeleteVariant(ctx context.Context, id uuid.UUID) error
 	DeleteVariantsByProduct(ctx context.Context, productID uuid.UUID) error
 	GetActiveVariantsByProduct(ctx context.Context, productID uuid.UUID) ([]ProductVariant, error)
+	GetAddressByID(ctx context.Context, id uuid.UUID) (Address, error)
+	GetCartByID(ctx context.Context, id uuid.UUID) (Cart, error)
+	GetCartBySessionID(ctx context.Context, sessionID *string) (Cart, error)
+	GetCartByUserID(ctx context.Context, userID pgtype.UUID) (Cart, error)
+	GetCartItemByCartAndVariant(ctx context.Context, arg GetCartItemByCartAndVariantParams) (CartItem, error)
+	GetCartItemByID(ctx context.Context, id uuid.UUID) (CartItem, error)
 	GetCategoryByID(ctx context.Context, id uuid.UUID) (Category, error)
 	GetCategoryBySlug(ctx context.Context, slug string) (Category, error)
+	GetDefaultAddress(ctx context.Context, userID uuid.UUID) (Address, error)
 	GetInventoryByID(ctx context.Context, id uuid.UUID) (Inventory, error)
 	GetInventoryByProductID(ctx context.Context, productID uuid.UUID) ([]Inventory, error)
 	GetInventoryByVariantID(ctx context.Context, variantID uuid.UUID) (Inventory, error)
 	GetMerchantProfileByID(ctx context.Context, id uuid.UUID) (MerchantProfile, error)
 	GetMerchantProfileBySlug(ctx context.Context, shopSlug string) (MerchantProfile, error)
 	GetMerchantProfileByUserID(ctx context.Context, userID uuid.UUID) (MerchantProfile, error)
+	GetOrderByChapaTxRef(ctx context.Context, chapaTxRef *string) (Order, error)
+	GetOrderByID(ctx context.Context, id uuid.UUID) (Order, error)
+	GetOrderItemByID(ctx context.Context, id uuid.UUID) (OrderItem, error)
+	GetPaymentByID(ctx context.Context, id uuid.UUID) (Payment, error)
+	GetPaymentByOrderID(ctx context.Context, orderID uuid.UUID) (Payment, error)
+	GetPaymentByProviderTxRef(ctx context.Context, providerTxRef *string) (Payment, error)
 	GetProductByID(ctx context.Context, id uuid.UUID) (Product, error)
 	GetProductBySlug(ctx context.Context, slug string) (Product, error)
 	GetProductBySlugAndMerchant(ctx context.Context, arg GetProductBySlugAndMerchantParams) (Product, error)
@@ -52,9 +82,16 @@ type Querier interface {
 	GetVariantByID(ctx context.Context, id uuid.UUID) (ProductVariant, error)
 	GetVariantBySKU(ctx context.Context, sku string) (ProductVariant, error)
 	GetVariantsByProduct(ctx context.Context, productID uuid.UUID) ([]ProductVariant, error)
+	ListAddressesByUserID(ctx context.Context, userID uuid.UUID) ([]Address, error)
+	ListCartItems(ctx context.Context, cartID uuid.UUID) ([]CartItem, error)
 	ListCategories(ctx context.Context) ([]Category, error)
 	ListCategoriesByParent(ctx context.Context, parentID pgtype.UUID) ([]Category, error)
 	ListMerchantProfiles(ctx context.Context, arg ListMerchantProfilesParams) ([]MerchantProfile, error)
+	ListOrderItemsByOrderID(ctx context.Context, orderID uuid.UUID) ([]OrderItem, error)
+	ListOrdersByBuyerID(ctx context.Context, arg ListOrdersByBuyerIDParams) ([]Order, error)
+	ListOrdersByMerchantID(ctx context.Context, arg ListOrdersByMerchantIDParams) ([]Order, error)
+	ListOrdersByStatus(ctx context.Context, arg ListOrdersByStatusParams) ([]Order, error)
+	ListPaymentsByStatus(ctx context.Context, arg ListPaymentsByStatusParams) ([]Payment, error)
 	ListProducts(ctx context.Context, arg ListProductsParams) ([]Product, error)
 	ListProductsByCategory(ctx context.Context, arg ListProductsByCategoryParams) ([]Product, error)
 	ListProductsByMerchant(ctx context.Context, arg ListProductsByMerchantParams) ([]Product, error)
@@ -62,17 +99,30 @@ type Querier interface {
 	ListTopLevelCategories(ctx context.Context) ([]Category, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	ListVerifiedMerchants(ctx context.Context, arg ListVerifiedMerchantsParams) ([]MerchantProfile, error)
+	MergeCartItems(ctx context.Context, arg MergeCartItemsParams) error
 	ReleaseInventory(ctx context.Context, arg ReleaseInventoryParams) error
 	ReserveInventory(ctx context.Context, arg ReserveInventoryParams) error
+	SetAddressAsDefault(ctx context.Context, id uuid.UUID) (Address, error)
+	SetDefaultAddress(ctx context.Context, userID uuid.UUID) error
+	UpdateAddress(ctx context.Context, arg UpdateAddressParams) (Address, error)
+	UpdateCartExpiresAt(ctx context.Context, arg UpdateCartExpiresAtParams) (Cart, error)
+	UpdateCartItemQuantity(ctx context.Context, arg UpdateCartItemQuantityParams) (CartItem, error)
+	UpdateCartStatus(ctx context.Context, arg UpdateCartStatusParams) (Cart, error)
 	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (Category, error)
 	UpdateInventoryQuantity(ctx context.Context, arg UpdateInventoryQuantityParams) (Inventory, error)
 	UpdateMerchantBlnkWallet(ctx context.Context, arg UpdateMerchantBlnkWalletParams) (MerchantProfile, error)
 	UpdateMerchantProfile(ctx context.Context, arg UpdateMerchantProfileParams) (MerchantProfile, error)
 	UpdateMerchantTotalSales(ctx context.Context, arg UpdateMerchantTotalSalesParams) error
+	UpdateOrderBlnkTransaction(ctx context.Context, arg UpdateOrderBlnkTransactionParams) (Order, error)
+	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (Order, error)
+	UpdatePaymentBlnkTransaction(ctx context.Context, arg UpdatePaymentBlnkTransactionParams) (Payment, error)
+	UpdatePaymentProviderResponse(ctx context.Context, arg UpdatePaymentProviderResponseParams) (Payment, error)
+	UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStatusParams) (Payment, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)
 	UpdateProductImage(ctx context.Context, arg UpdateProductImageParams) (ProductImage, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateVariant(ctx context.Context, arg UpdateVariantParams) (ProductVariant, error)
+	UpsertCartItem(ctx context.Context, arg UpsertCartItemParams) (CartItem, error)
 }
 
 var _ Querier = (*Queries)(nil)

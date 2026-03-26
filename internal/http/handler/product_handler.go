@@ -500,6 +500,132 @@ func (h *ProductHandler) AddVariant(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, http.StatusCreated, toVariantResponse(variant))
 }
 
+// UpdateVariant godoc
+// @Summary Update a variant
+// @Description Update an existing product variant
+// @Tags merchant
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Product ID"
+// @Param variantId path string true "Variant ID"
+// @Param request body UpdateVariantRequest true "Variant update details"
+// @Success 200 {object} VariantResponse "Updated variant"
+// @Failure 400 {object} response.ErrorResponse "Invalid request"
+// @Failure 401 {object} response.ErrorResponse "Unauthorized"
+// @Failure 403 {object} response.ErrorResponse "Forbidden"
+// @Failure 404 {object} response.ErrorResponse "Product or variant not found"
+// @Failure 500 {object} response.ErrorResponse "Internal server error"
+// @Router /merchant/products/{id}/variants/{variantId} [put]
+func (h *ProductHandler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
+	productID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	variantID, err := parseUUIDParam(r, "variantId")
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	merchant, ok := middleware.GetMerchantProfile(r.Context())
+	if !ok {
+		response.Error(w, forbidden("merchant profile required"))
+		return
+	}
+
+	product, err := h.productService.GetByID(r.Context(), productID)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	if product.MerchantID != merchant.ID {
+		response.Error(w, forbidden("not authorized to modify this product"))
+		return
+	}
+
+	var req UpdateVariantRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	if errs := validation.Validate(req); len(errs) > 0 {
+		response.JSON(w, http.StatusBadRequest, errs)
+		return
+	}
+
+	updated, err := h.variantService.Update(r.Context(), variantID, service.UpdateVariantInput{
+		Title:             &req.Title,
+		PriceCents:        req.PriceCents,
+		ComparePriceCents: req.ComparePriceCents,
+		Attributes:        req.Attributes,
+		IsActive:          req.IsActive,
+	})
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, toVariantResponse(updated))
+}
+
+// DeleteVariant godoc
+// @Summary Delete a variant
+// @Description Delete a product variant
+// @Tags merchant
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Product ID"
+// @Param variantId path string true "Variant ID"
+// @Success 204 "No content"
+// @Failure 401 {object} response.ErrorResponse "Unauthorized"
+// @Failure 403 {object} response.ErrorResponse "Forbidden"
+// @Failure 404 {object} response.ErrorResponse "Product or variant not found"
+// @Failure 500 {object} response.ErrorResponse "Internal server error"
+// @Router /merchant/products/{id}/variants/{variantId} [delete]
+func (h *ProductHandler) DeleteVariant(w http.ResponseWriter, r *http.Request) {
+	productID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	variantID, err := parseUUIDParam(r, "variantId")
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	merchant, ok := middleware.GetMerchantProfile(r.Context())
+	if !ok {
+		response.Error(w, forbidden("merchant profile required"))
+		return
+	}
+
+	product, err := h.productService.GetByID(r.Context(), productID)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	if product.MerchantID != merchant.ID {
+		response.Error(w, forbidden("not authorized to modify this product"))
+		return
+	}
+
+	if err := h.variantService.Delete(r.Context(), variantID); err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func toProductResponse(p *domain.Product) ProductResponse {
 	var categoryID string
 	if p.CategoryID != nil {

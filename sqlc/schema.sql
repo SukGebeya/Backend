@@ -130,3 +130,116 @@ CREATE TABLE inventory (
 );
 
 CREATE INDEX idx_inventory_variant_id ON inventory(variant_id);
+
+-- Addresses (from 00009)
+CREATE TABLE addresses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    full_name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    line1 TEXT NOT NULL,
+    line2 TEXT,
+    city TEXT NOT NULL DEFAULT 'Addis Ababa',
+    subcity TEXT,
+    woreda TEXT,
+    is_default BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_addresses_user_id ON addresses(user_id);
+
+-- Carts (from 00010)
+CREATE TYPE cart_status AS ENUM ('active', 'abandoned', 'converted');
+
+CREATE TABLE carts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    session_id TEXT UNIQUE,
+    status cart_status NOT NULL DEFAULT 'active',
+    expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '7 days',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_carts_user_id ON carts(user_id);
+CREATE INDEX idx_carts_session_id ON carts(session_id);
+CREATE INDEX idx_carts_expires_at ON carts(expires_at);
+
+-- Cart Items (from 00011)
+CREATE TABLE cart_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    cart_id UUID NOT NULL REFERENCES carts(id) ON DELETE CASCADE,
+    variant_id UUID NOT NULL REFERENCES product_variants(id) ON DELETE CASCADE,
+    quantity INT NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    price_snapshot_cents BIGINT NOT NULL,
+    added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(cart_id, variant_id)
+);
+
+CREATE INDEX idx_cart_items_cart_id ON cart_items(cart_id);
+CREATE INDEX idx_cart_items_variant_id ON cart_items(variant_id);
+
+-- Orders (from 00012)
+CREATE TYPE order_status AS ENUM (
+    'pending_payment',
+    'paid',
+    'processing',
+    'shipped',
+    'delivered',
+    'cancelled',
+    'refunded'
+);
+
+CREATE TABLE orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    buyer_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    merchant_id UUID NOT NULL REFERENCES merchant_profiles(id) ON DELETE RESTRICT,
+    shipping_address_id UUID REFERENCES addresses(id) ON DELETE SET NULL,
+    status order_status NOT NULL DEFAULT 'pending_payment',
+    subtotal_cents BIGINT NOT NULL,
+    platform_fee_cents BIGINT NOT NULL,
+    total_cents BIGINT NOT NULL,
+    currency VARCHAR(10) NOT NULL DEFAULT 'ETB',
+    notes TEXT,
+    blnk_transaction_id TEXT,
+    chapa_tx_ref TEXT UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE order_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    variant_id UUID NOT NULL REFERENCES product_variants(id) ON DELETE RESTRICT,
+    product_name TEXT NOT NULL,
+    variant_title TEXT NOT NULL,
+    quantity INT NOT NULL CHECK (quantity > 0),
+    unit_price_cents BIGINT NOT NULL,
+    total_price_cents BIGINT NOT NULL
+);
+
+CREATE INDEX idx_orders_buyer_id ON orders(buyer_id);
+CREATE INDEX idx_orders_merchant_id ON orders(merchant_id);
+CREATE INDEX idx_orders_status ON orders(status);
+CREATE INDEX idx_orders_chapa_tx_ref ON orders(chapa_tx_ref);
+CREATE INDEX idx_order_items_order_id ON order_items(order_id);
+CREATE INDEX idx_order_items_variant_id ON order_items(variant_id);
+
+-- Payments (from 00013)
+CREATE TABLE payments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID NOT NULL REFERENCES orders(id) ON DELETE RESTRICT,
+    provider VARCHAR(50) NOT NULL DEFAULT 'chapa',
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    amount_cents BIGINT NOT NULL,
+    currency VARCHAR(10) NOT NULL DEFAULT 'ETB',
+    provider_tx_ref TEXT UNIQUE,
+    provider_response JSONB,
+    blnk_transaction_id TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_payments_order_id ON payments(order_id);
+CREATE INDEX idx_payments_provider_tx_ref ON payments(provider_tx_ref);
+CREATE INDEX idx_payments_status ON payments(status);
