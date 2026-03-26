@@ -180,3 +180,14 @@ func generateSlug(name string) string {
 
 	return slug
 }
+
+func (s *MerchantService) Verify(ctx context.Context, merchantID uuid.UUID, isVerified bool) (*domain.MerchantProfile, error) {
+	merchant, err := s.merchantRepo.GetByID(ctx, merchantID)
+	if err != nil {
+		return nil, err
+	}
+
+	merchant.IsVerified = isVerified
+
+	return s.merchantRepo.Update(ctx, merchant)
+}

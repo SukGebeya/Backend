@@ -38,6 +38,7 @@ func NewRouter(
 	cartService *service.CartService,
 	orderService *service.OrderService,
 	checkoutService *service.CheckoutService,
+	walletService *service.WalletService,
 	jwtManager *jwt.Manager,
 	rateLimiter *httpmiddleware.RateLimiter,
 	db *pgxpool.Pool,
@@ -46,8 +47,11 @@ func NewRouter(
 	sessionRepo repository.SessionRepository,
 	chapaClient *chapa.Client,
 	riverClient *river.Client[pgx.Tx],
+	adminHandler *handler.AdminHandler,
 ) *Router {
 	r := chi.NewRouter()
+
+	idempotencyRepo := repository.NewIdempotencyRepository(redisClient)
 
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -57,8 +61,8 @@ func NewRouter(
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Session-ID"},
-		ExposedHeaders:   []string{"X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "X-Session-ID"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Session-ID", "Idempotency-Key"},
+		ExposedHeaders:   []string{"X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "X-Session-ID", "X-Idempotent-Replayed"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
@@ -75,6 +79,7 @@ func NewRouter(
 	orderHandler := handler.NewOrderHandler(orderService)
 	checkoutHandler := handler.NewCheckoutHandler(checkoutService)
 	webhookHandler := handler.NewWebhookHandler(chapaClient, riverClient)
+	walletHandler := handler.NewWalletHandler(walletService, merchantService)
 
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
@@ -138,16 +143,6 @@ func NewRouter(
 			r.Delete("/merchant/products/{id}/variants/{variantId}", productHandler.DeleteVariant)
 		})
 
-		// Admin routes
-		r.Group(func(r chi.Router) {
-			r.Use(httpmiddleware.Auth(jwtManager))
-			r.Use(httpmiddleware.Authorize("admin"))
-
-			r.Post("/admin/categories", categoryHandler.CreateCategory)
-			r.Put("/admin/categories/{id}", categoryHandler.UpdateCategory)
-			r.Delete("/admin/categories/{id}", categoryHandler.DeleteCategory)
-		})
-
 		// Address routes - authenticated users
 		r.Group(func(r chi.Router) {
 			r.Use(httpmiddleware.Auth(jwtManager))
@@ -184,8 +179,18 @@ func NewRouter(
 
 			r.Get("/orders", orderHandler.ListMyOrders)
 			r.Get("/orders/{id}", orderHandler.GetOrder)
-			r.Post("/orders/checkout", checkoutHandler.Checkout)
 			r.Post("/orders/{id}/confirm-delivery", orderHandler.ConfirmDelivery)
+			r.Post("/orders/{id}/cancel", orderHandler.CancelOrder)
+		})
+
+		// Checkout - requires idempotency key for payment safety
+		r.Group(func(r chi.Router) {
+			r.Use(httpmiddleware.Auth(jwtManager))
+			r.Use(httpmiddleware.Session(sessionRepo))
+			r.Use(httpmiddleware.IdempotencyRequired)
+			r.Use(httpmiddleware.Idempotency(idempotencyRepo))
+
+			r.Post("/orders/checkout", checkoutHandler.Checkout)
 		})
 
 		// Merchant order management - requires merchant profile
@@ -194,7 +199,53 @@ func NewRouter(
 			r.Use(httpmiddleware.RequireMerchantProfile(merchantService))
 
 			r.Get("/merchant/orders", orderHandler.ListMerchantOrders)
+			r.Get("/merchant/orders/{id}", orderHandler.GetMerchantOrder)
 			r.Put("/merchant/orders/{id}/status", orderHandler.UpdateOrderStatus)
+			r.Put("/merchant/orders/{id}/ship", orderHandler.MarkOrderShipped)
+		})
+
+		// Merchant wallet routes - requires merchant profile
+		r.Group(func(r chi.Router) {
+			r.Use(httpmiddleware.Auth(jwtManager))
+			r.Use(httpmiddleware.RequireMerchantProfile(merchantService))
+
+			r.Get("/merchant/wallet", walletHandler.GetWallet)
+			r.Get("/merchant/wallet/transactions", walletHandler.ListTransactions)
+		})
+
+		// Merchant payout - requires idempotency key
+		r.Group(func(r chi.Router) {
+			r.Use(httpmiddleware.Auth(jwtManager))
+			r.Use(httpmiddleware.RequireMerchantProfile(merchantService))
+			r.Use(httpmiddleware.IdempotencyRequired)
+			r.Use(httpmiddleware.Idempotency(idempotencyRepo))
+
+			r.Post("/merchant/wallet/payout", walletHandler.RequestPayout)
+		})
+
+		// Extended admin routes
+		r.Group(func(r chi.Router) {
+			r.Use(httpmiddleware.Auth(jwtManager))
+			r.Use(httpmiddleware.Authorize("admin"))
+
+			r.Post("/admin/categories", categoryHandler.CreateCategory)
+			r.Put("/admin/categories/{id}", categoryHandler.UpdateCategory)
+			r.Delete("/admin/categories/{id}", categoryHandler.DeleteCategory)
+
+			r.Get("/admin/payouts", adminHandler.ListPayouts)
+			r.Get("/admin/users", adminHandler.ListUsers)
+			r.Put("/admin/users/{id}/kyc", adminHandler.UpdateKYC)
+			r.Get("/admin/merchants", adminHandler.ListMerchants)
+			r.Put("/admin/merchants/{id}/verify", adminHandler.VerifyMerchant)
+		})
+
+		// Admin payout processing - idempotency optional but recommended
+		r.Group(func(r chi.Router) {
+			r.Use(httpmiddleware.Auth(jwtManager))
+			r.Use(httpmiddleware.Authorize("admin"))
+			r.Use(httpmiddleware.Idempotency(idempotencyRepo))
+
+			r.Post("/admin/payouts/{id}/process", adminHandler.ProcessPayout)
 		})
 	})
 

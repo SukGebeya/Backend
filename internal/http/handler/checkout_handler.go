@@ -36,14 +36,15 @@ type CheckoutResponse struct {
 
 // Checkout godoc
 // @Summary Process checkout
-// @Description Create an order from cart and initiate payment
+// @Description Create an order from cart and initiate payment. Requires Idempotency-Key header to prevent duplicate payments.
 // @Tags orders
 // @Accept json
 // @Produce json
 // @Security BearerAuth
+// @Param Idempotency-Key header string true "Unique idempotency key to prevent duplicate payments"
 // @Param request body CheckoutRequest true "Checkout details"
 // @Success 201 {object} CheckoutResponse "Checkout result with payment URL"
-// @Failure 400 {object} response.ErrorResponse "Invalid request or empty cart"
+// @Failure 400 {object} response.ErrorResponse "Invalid request, empty cart, or missing Idempotency-Key"
 // @Failure 401 {object} response.ErrorResponse "Unauthorized"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
 // @Router /orders/checkout [post]

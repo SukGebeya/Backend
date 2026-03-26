@@ -102,6 +102,51 @@ func (ns NullOrderStatus) Value() (driver.Value, error) {
 	return string(ns.OrderStatus), nil
 }
 
+type ShipmentStatus string
+
+const (
+	ShipmentStatusPreparing      ShipmentStatus = "preparing"
+	ShipmentStatusShipped        ShipmentStatus = "shipped"
+	ShipmentStatusOutForDelivery ShipmentStatus = "out_for_delivery"
+	ShipmentStatusDelivered      ShipmentStatus = "delivered"
+	ShipmentStatusFailed         ShipmentStatus = "failed"
+)
+
+func (e *ShipmentStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ShipmentStatus(s)
+	case string:
+		*e = ShipmentStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ShipmentStatus: %T", src)
+	}
+	return nil
+}
+
+type NullShipmentStatus struct {
+	ShipmentStatus ShipmentStatus `json:"shipment_status"`
+	Valid          bool           `json:"valid"` // Valid is true if ShipmentStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullShipmentStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.ShipmentStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ShipmentStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullShipmentStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ShipmentStatus), nil
+}
+
 type Address struct {
 	ID        uuid.UUID          `json:"id"`
 	UserID    uuid.UUID          `json:"user_id"`
@@ -216,6 +261,20 @@ type Payment struct {
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
+type Payout struct {
+	ID                uuid.UUID          `json:"id"`
+	MerchantID        uuid.UUID          `json:"merchant_id"`
+	AmountCents       int64              `json:"amount_cents"`
+	Currency          string             `json:"currency"`
+	Method            string             `json:"method"`
+	Destination       string             `json:"destination"`
+	Status            string             `json:"status"`
+	BlnkTransactionID *string            `json:"blnk_transaction_id"`
+	FailureReason     *string            `json:"failure_reason"`
+	RequestedAt       pgtype.Timestamptz `json:"requested_at"`
+	ProcessedAt       pgtype.Timestamptz `json:"processed_at"`
+}
+
 type Product struct {
 	ID          uuid.UUID          `json:"id"`
 	MerchantID  uuid.UUID          `json:"merchant_id"`
@@ -252,6 +311,19 @@ type ProductVariant struct {
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
+type Shipment struct {
+	ID                uuid.UUID          `json:"id"`
+	OrderID           uuid.UUID          `json:"order_id"`
+	Status            ShipmentStatus     `json:"status"`
+	Carrier           *string            `json:"carrier"`
+	TrackingNumber    *string            `json:"tracking_number"`
+	EstimatedDelivery pgtype.Date        `json:"estimated_delivery"`
+	ShippedAt         pgtype.Timestamptz `json:"shipped_at"`
+	DeliveredAt       pgtype.Timestamptz `json:"delivered_at"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
 type User struct {
 	ID           uuid.UUID          `json:"id"`
 	Email        *string            `json:"email"`
@@ -265,4 +337,17 @@ type User struct {
 	IsActive     bool               `json:"is_active"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
+type WalletTransaction struct {
+	ID                uuid.UUID          `json:"id"`
+	MerchantID        uuid.UUID          `json:"merchant_id"`
+	OrderID           pgtype.UUID        `json:"order_id"`
+	Type              string             `json:"type"`
+	AmountCents       int64              `json:"amount_cents"`
+	Currency          string             `json:"currency"`
+	BlnkTransactionID string             `json:"blnk_transaction_id"`
+	Status            string             `json:"status"`
+	Description       *string            `json:"description"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 }

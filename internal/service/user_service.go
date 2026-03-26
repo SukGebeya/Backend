@@ -3,10 +3,10 @@ package service
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/SukGebeya/Backend/internal/domain"
 	domainerrors "github.com/SukGebeya/Backend/internal/errors"
 	"github.com/SukGebeya/Backend/internal/repository"
+	"github.com/google/uuid"
 )
 
 var _ UserManager = (*UserService)(nil)
@@ -69,6 +69,21 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID uuid.UUID, input
 	if user.Email == nil && user.Phone == nil {
 		return nil, domainerrors.Validation("email or phone is required")
 	}
+
+	return s.userRepo.Update(ctx, user)
+}
+
+func (s *UserService) UpdateKYCStatus(ctx context.Context, userID uuid.UUID, kycStatus domain.KYCStatus) (*domain.User, error) {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !kycStatus.IsValid() {
+		return nil, domainerrors.BadRequest("invalid KYC status")
+	}
+
+	user.KYCStatus = kycStatus
 
 	return s.userRepo.Update(ctx, user)
 }

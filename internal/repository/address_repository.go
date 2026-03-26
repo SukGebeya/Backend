@@ -109,6 +109,13 @@ func (r *addressRepository) SetDefault(ctx context.Context, userID, addressID uu
 	return dbAddressToDomain(addr), nil
 }
 
+func (r *addressRepository) ClearDefaults(ctx context.Context, userID uuid.UUID) error {
+	if err := r.queries.SetDefaultAddress(ctx, userID); err != nil {
+		return domainerrors.Internal("failed to clear default addresses", err)
+	}
+	return nil
+}
+
 func (r *addressRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	if err := r.queries.DeleteAddress(ctx, id); err != nil {
 		return domainerrors.Internal("failed to delete address", err)

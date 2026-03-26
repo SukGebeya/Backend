@@ -22,6 +22,7 @@ type UserManager interface {
 	List(ctx context.Context, opts domain.ListOptions) (*domain.PaginatedResult[domain.User], error)
 	Delete(ctx context.Context, id uuid.UUID) error
 	UpdateProfile(ctx context.Context, userID uuid.UUID, input UpdateProfileInput) (*domain.User, error)
+	UpdateKYCStatus(ctx context.Context, userID uuid.UUID, kycStatus domain.KYCStatus) (*domain.User, error)
 }
 
 type MerchantOnboarder interface {
@@ -29,6 +30,7 @@ type MerchantOnboarder interface {
 	GetByUserID(ctx context.Context, userID uuid.UUID) (*domain.MerchantProfile, error)
 	GetBySlug(ctx context.Context, slug string) (*domain.MerchantProfile, error)
 	Update(ctx context.Context, merchantID uuid.UUID, input UpdateMerchantInput) (*domain.MerchantProfile, error)
+	Verify(ctx context.Context, merchantID uuid.UUID, isVerified bool) (*domain.MerchantProfile, error)
 }
 
 type CategoryManager interface {
@@ -200,7 +202,10 @@ type OrderManager interface {
 	UpdateStatus(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) (*domain.Order, error)
 	UpdateBlnkTransaction(ctx context.Context, orderID uuid.UUID, blnkTxID string) (*domain.Order, error)
 	GetOrderWithItems(ctx context.Context, orderID uuid.UUID) (*domain.OrderWithItems, error)
+	GetOrderWithDetails(ctx context.Context, orderID uuid.UUID) (*OrderWithDetails, error)
 	ConfirmDelivery(ctx context.Context, orderID uuid.UUID) (*domain.Order, error)
+	MarkOrderShipped(ctx context.Context, input MarkOrderShippedInput) (*domain.Order, error)
+	CancelOrder(ctx context.Context, orderID uuid.UUID, cancelledBy string) (*domain.Order, error)
 }
 
 type CheckoutManager interface {
@@ -243,4 +248,34 @@ type CheckoutResult struct {
 	Currency   string
 	PaymentURL string
 	ChapaTxRef string
+}
+
+type MarkOrderShippedInput struct {
+	OrderID           uuid.UUID
+	Carrier           *string
+	TrackingNumber    *string
+	EstimatedDelivery *time.Time
+}
+
+type OrderWithDetails struct {
+	Order    domain.Order
+	Items    []domain.OrderItem
+	Shipment *domain.Shipment
+}
+
+type WalletManager interface {
+	GetBalance(ctx context.Context, merchantID uuid.UUID) (*WalletBalanceResponse, error)
+	GetTransactionHistory(ctx context.Context, merchantID uuid.UUID, page, pageSize int) (*domain.PaginatedResult[domain.WalletTransaction], error)
+	RequestPayout(ctx context.Context, merchantID uuid.UUID, input domain.RequestPayoutInput) (*domain.Payout, error)
+	ListPayoutsByMerchant(ctx context.Context, merchantID uuid.UUID, page, pageSize int) (*domain.PaginatedResult[domain.Payout], error)
+}
+
+type WalletBalanceResponse struct {
+	BalanceCents int64  `json:"balance_cents"`
+	Currency     string `json:"currency"`
+}
+
+type AdminPayoutManager interface {
+	ListPayouts(ctx context.Context, status *domain.PayoutStatus, page, pageSize int) (*domain.PaginatedResult[domain.Payout], error)
+	ProcessPayout(ctx context.Context, payoutID uuid.UUID) (*domain.Payout, error)
 }

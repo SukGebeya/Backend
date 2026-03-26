@@ -154,7 +154,14 @@ func (s *CheckoutService) Checkout(ctx context.Context, input CheckoutInput) (*C
 	}
 
 	if _, err := s.orderRepo.UpdateBlnkTransaction(ctx, order.ID, escrowTxID); err != nil {
-		slog.Warn("failed to update order with escrow transaction", "order_id", order.ID, "error", err)
+		if voidErr := s.blnkClient.VoidEscrow(ctx, escrowTxID); voidErr != nil {
+			slog.Error("CRITICAL: failed to void escrow after order update failure",
+				"order_id", order.ID,
+				"escrow_id", escrowTxID,
+				"error", voidErr)
+		}
+		s.releaseInventory(ctx, cartItems)
+		return nil, domainerrors.Internal("failed to associate escrow with order", err)
 	}
 
 	chapaResp, err := s.chapaClient.InitializePayment(ctx, chapa.InitializePaymentRequest{
@@ -166,6 +173,11 @@ func (s *CheckoutService) Checkout(ctx context.Context, input CheckoutInput) (*C
 		Description: fmt.Sprintf("Order %s", order.ID.String()),
 	})
 	if err != nil {
+		if voidErr := s.blnkClient.VoidEscrow(ctx, escrowTxID); voidErr != nil {
+			slog.Error("CRITICAL: failed to void escrow after payment init failure",
+				"escrow_id", escrowTxID,
+				"error", voidErr)
+		}
 		s.releaseInventory(ctx, cartItems)
 		return nil, domainerrors.Internal("failed to initialize payment", err)
 	}
@@ -267,6 +279,21 @@ func (s *CheckoutService) ReleaseOrderInventory(ctx context.Context, orderID uui
 	return nil
 }
 
+func (s *CheckoutService) commitOrderInventory(ctx context.Context, orderID uuid.UUID) error {
+	items, err := s.orderRepo.ListItemsByOrderID(ctx, orderID)
+	if err != nil {
+		return fmt.Errorf("failed to get order items: %w", err)
+	}
+
+	for _, item := range items {
+		if err := s.inventoryRepo.Commit(ctx, item.VariantID, item.Quantity); err != nil {
+			return fmt.Errorf("failed to commit inventory for variant %s: %w", item.VariantID, err)
+		}
+	}
+
+	return nil
+}
+
 func (s *CheckoutService) ProcessSuccessfulPayment(ctx context.Context, chapaTxRef string) error {
 	order, err := s.orderRepo.GetByChapaTxRef(ctx, chapaTxRef)
 	if err != nil {
@@ -279,6 +306,11 @@ func (s *CheckoutService) ProcessSuccessfulPayment(ctx context.Context, chapaTxR
 
 	if _, err := s.orderRepo.UpdateStatus(ctx, order.ID, domain.OrderStatusPaid); err != nil {
 		return fmt.Errorf("failed to update order status: %w", err)
+	}
+
+	if err := s.commitOrderInventory(ctx, order.ID); err != nil {
+		slog.Error("failed to commit inventory for order", "order_id", order.ID, "error", err)
+		return fmt.Errorf("failed to commit inventory: %w", err)
 	}
 
 	return nil
@@ -300,12 +332,14 @@ func (s *CheckoutService) ProcessFailedPayment(ctx context.Context, chapaTxRef s
 
 	if order.BlnkTransactionID != nil && *order.BlnkTransactionID != "" {
 		if err := s.blnkClient.VoidEscrow(ctx, *order.BlnkTransactionID); err != nil {
-			slog.Warn("failed to void escrow on payment failure", "order_id", order.ID, "error", err)
+			slog.Error("failed to void escrow on payment failure", "order_id", order.ID, "error", err)
+			return fmt.Errorf("failed to void escrow: %w", err)
 		}
 	}
 
 	if err := s.ReleaseOrderInventory(ctx, order.ID); err != nil {
-		slog.Warn("failed to release inventory on payment failure", "order_id", order.ID, "error", err)
+		slog.Error("failed to release inventory on payment failure", "order_id", order.ID, "error", err)
+		return fmt.Errorf("failed to release inventory: %w", err)
 	}
 
 	return nil

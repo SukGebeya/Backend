@@ -31,6 +31,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -38,6 +39,7 @@ import (
 	"github.com/SukGebeya/Backend/internal/chapa"
 	"github.com/SukGebeya/Backend/internal/config"
 	apphttp "github.com/SukGebeya/Backend/internal/http"
+	"github.com/SukGebeya/Backend/internal/http/handler"
 	httpmiddleware "github.com/SukGebeya/Backend/internal/http/middleware"
 	"github.com/SukGebeya/Backend/internal/jobs"
 	"github.com/SukGebeya/Backend/internal/repository"
@@ -155,6 +157,9 @@ func main() {
 	addressRepo := repository.NewAddressRepository(pool)
 	orderRepo := repository.NewOrderRepository(pool)
 	paymentRepo := repository.NewPaymentRepository(pool)
+	shipmentRepo := repository.NewShipmentRepository(pool)
+	walletRepo := repository.NewWalletTransactionRepository(pool)
+	payoutRepo := repository.NewPayoutRepository(pool)
 	refreshTokenRepo := repository.NewCircuitBreakerRefreshTokenRepository(redisClient)
 	rateLimitRepo := repository.NewCircuitBreakerRateLimitRepository(redisClient)
 	sessionRepo := repository.NewSessionRepository(redisClient)
@@ -203,7 +208,7 @@ func main() {
 	})
 
 	workers := river.NewWorkers()
-	jobs.AddWorkers(workers, cartRepo, cartItemRepo, orderRepo, paymentRepo, inventoryRepo, blnkClient)
+	jobs.AddWorkers(workers, cartRepo, cartItemRepo, orderRepo, paymentRepo, inventoryRepo, blnkClient, payoutRepo, merchantRepo)
 
 	jobErrorHandler := jobs.NewJobErrorHandler()
 
@@ -235,18 +240,21 @@ func main() {
 	variantService := service.NewProductVariantService(variantRepo)
 	addressService := service.NewAddressService(addressRepo)
 	cartService := service.NewCartService(cartRepo, cartItemRepo, sessionRepo, variantRepo, inventoryRepo, jobScheduler)
-	orderService := service.NewOrderService(orderRepo, merchantRepo, blnkClient)
+	orderService := service.NewOrderService(orderRepo, merchantRepo, shipmentRepo, walletRepo, blnkClient)
 	checkoutService := service.NewCheckoutService(cartRepo, cartItemRepo, orderRepo, paymentRepo, addressRepo, inventoryRepo, merchantRepo, productRepo, variantRepo, blnkClient, chapaClient)
+	walletService := service.NewWalletService(merchantRepo, walletRepo, payoutRepo, blnkClient)
 
 	appLogger.Info("Circuit breakers enabled for Redis repositories")
 
 	rateLimiter := httpmiddleware.NewRateLimiter(rateLimitRepo, cfg.RateLimit.Requests, int64(cfg.RateLimit.Window.Seconds()))
 
+	adminHandler := handler.NewAdminHandler(payoutRepo, userService, merchantRepo, merchantService)
+
 	router := apphttp.NewRouter(
 		authService, userService, merchantService, categoryService, productService, variantService, variantRepo,
-		addressService, cartService, orderService, checkoutService,
+		addressService, cartService, orderService, checkoutService, walletService,
 		jwtManager, rateLimiter, pool, redisClient, appLogger, sessionRepo,
-		chapaClient, riverClient,
+		chapaClient, riverClient, adminHandler,
 	)
 
 	srv := &http.Server{
@@ -312,6 +320,10 @@ func runRiverMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 
 	_, err = migrator.Migrate(ctx, rivermigrate.DirectionUp, nil)
 	if err != nil {
+		if strings.Contains(err.Error(), "already exists") {
+			slog.Warn("River table already exists, this may indicate a previous partial migration. Consider resetting River tables if issues persist.")
+			return nil
+		}
 		return fmt.Errorf("failed to run River migrations: %w", err)
 	}
 

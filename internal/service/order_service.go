@@ -16,13 +16,23 @@ var _ OrderManager = (*OrderService)(nil)
 type OrderService struct {
 	orderRepo    repository.OrderRepository
 	merchantRepo repository.MerchantRepository
+	shipmentRepo repository.ShipmentRepository
+	walletRepo   repository.WalletTransactionRepository
 	blnkClient   *blnk.Client
 }
 
-func NewOrderService(orderRepo repository.OrderRepository, merchantRepo repository.MerchantRepository, blnkClient *blnk.Client) *OrderService {
+func NewOrderService(
+	orderRepo repository.OrderRepository,
+	merchantRepo repository.MerchantRepository,
+	shipmentRepo repository.ShipmentRepository,
+	walletRepo repository.WalletTransactionRepository,
+	blnkClient *blnk.Client,
+) *OrderService {
 	return &OrderService{
 		orderRepo:    orderRepo,
 		merchantRepo: merchantRepo,
+		shipmentRepo: shipmentRepo,
+		walletRepo:   walletRepo,
 		blnkClient:   blnkClient,
 	}
 }
@@ -128,7 +138,55 @@ func (s *OrderService) Create(ctx context.Context, input CreateOrderInput) (*dom
 }
 
 func (s *OrderService) UpdateStatus(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) (*domain.Order, error) {
-	return s.orderRepo.UpdateStatus(ctx, orderID, status)
+	order, err := s.orderRepo.GetByID(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !s.isValidStatusTransition(order.Status, status) {
+		return nil, domainerrors.BadRequest(fmt.Sprintf("cannot transition from %s to %s", order.Status, status))
+	}
+
+	updated, err := s.orderRepo.UpdateStatus(ctx, orderID, status)
+	if err != nil {
+		return nil, err
+	}
+
+	if status == domain.OrderStatusProcessing {
+		if _, err := s.shipmentRepo.Create(ctx, &domain.Shipment{
+			ID:      uuid.New(),
+			OrderID: orderID,
+			Status:  domain.ShipmentStatusPreparing,
+		}); err != nil {
+			return nil, fmt.Errorf("failed to create shipment: %w", err)
+		}
+	}
+
+	return updated, nil
+}
+
+func (s *OrderService) isValidStatusTransition(from, to domain.OrderStatus) bool {
+	validTransitions := map[domain.OrderStatus][]domain.OrderStatus{
+		domain.OrderStatusPendingPayment: {domain.OrderStatusPaid, domain.OrderStatusCancelled},
+		domain.OrderStatusPaid:           {domain.OrderStatusProcessing, domain.OrderStatusCancelled},
+		domain.OrderStatusProcessing:     {domain.OrderStatusShipped, domain.OrderStatusCancelled},
+		domain.OrderStatusShipped:        {domain.OrderStatusDelivered, domain.OrderStatusCancelled},
+		domain.OrderStatusDelivered:      {},
+		domain.OrderStatusCancelled:      {domain.OrderStatusRefunded},
+		domain.OrderStatusRefunded:       {},
+	}
+
+	allowed, exists := validTransitions[from]
+	if !exists {
+		return false
+	}
+
+	for _, s := range allowed {
+		if s == to {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *OrderService) UpdateBlnkTransaction(ctx context.Context, orderID uuid.UUID, blnkTxID string) (*domain.Order, error) {
@@ -149,6 +207,31 @@ func (s *OrderService) GetOrderWithItems(ctx context.Context, orderID uuid.UUID)
 	return &domain.OrderWithItems{
 		Order: *order,
 		Items: items,
+	}, nil
+}
+
+func (s *OrderService) GetOrderWithDetails(ctx context.Context, orderID uuid.UUID) (*OrderWithDetails, error) {
+	order, err := s.orderRepo.GetByID(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	items, err := s.orderRepo.ListItemsByOrderID(ctx, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get order items: %w", err)
+	}
+
+	var shipment *domain.Shipment
+	if order.Status == domain.OrderStatusProcessing ||
+		order.Status == domain.OrderStatusShipped ||
+		order.Status == domain.OrderStatusDelivered {
+		shipment, _ = s.shipmentRepo.GetByOrderID(ctx, orderID)
+	}
+
+	return &OrderWithDetails{
+		Order:    *order,
+		Items:    items,
+		Shipment: shipment,
 	}, nil
 }
 
@@ -187,11 +270,90 @@ func (s *OrderService) ConfirmDelivery(ctx context.Context, orderID uuid.UUID) (
 		MerchantBlnkID: *merchant.BlnkBalanceID,
 	}
 
-	if _, err := s.blnkClient.CreditMerchant(ctx, merchantCreditReq); err != nil {
+	blnkTxnID, err := s.blnkClient.CreditMerchant(ctx, merchantCreditReq)
+	if err != nil {
 		return nil, fmt.Errorf("failed to credit merchant: %w", err)
 	}
 
+	netAmountCents := order.SubtotalCents - order.PlatformFeeCents
+	description := fmt.Sprintf("Sale credit for order %s", order.ID.String())
+
+	walletTxn := &domain.WalletTransaction{
+		ID:                uuid.New(),
+		MerchantID:        order.MerchantID,
+		OrderID:           &order.ID,
+		Type:              domain.WalletTransactionTypeSaleCredit,
+		AmountCents:       netAmountCents,
+		Currency:          order.Currency,
+		BlnkTransactionID: blnkTxnID,
+		Status:            domain.WalletTransactionStatusApplied,
+		Description:       &description,
+	}
+
+	if _, err := s.walletRepo.Create(ctx, walletTxn); err != nil {
+		return nil, fmt.Errorf("failed to create wallet transaction: %w", err)
+	}
+
+	shipment, err := s.shipmentRepo.GetByOrderID(ctx, orderID)
+	if err == nil && shipment != nil {
+		if _, err := s.shipmentRepo.UpdateDelivered(ctx, shipment.ID); err != nil {
+			return nil, fmt.Errorf("failed to update shipment status: %w", err)
+		}
+	}
+
 	updated, err := s.orderRepo.UpdateStatus(ctx, orderID, domain.OrderStatusDelivered)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update order status: %w", err)
+	}
+
+	return updated, nil
+}
+
+func (s *OrderService) MarkOrderShipped(ctx context.Context, input MarkOrderShippedInput) (*domain.Order, error) {
+	order, err := s.orderRepo.GetByID(ctx, input.OrderID)
+	if err != nil {
+		return nil, err
+	}
+
+	if order.Status != domain.OrderStatusProcessing {
+		return nil, domainerrors.BadRequest("order must be in processing status to ship")
+	}
+
+	shipment, err := s.shipmentRepo.GetByOrderID(ctx, input.OrderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get shipment: %w", err)
+	}
+
+	if _, err := s.shipmentRepo.UpdateShipped(ctx, shipment.ID, input.Carrier, input.TrackingNumber, input.EstimatedDelivery); err != nil {
+		return nil, fmt.Errorf("failed to update shipment: %w", err)
+	}
+
+	return s.orderRepo.UpdateStatus(ctx, input.OrderID, domain.OrderStatusShipped)
+}
+
+func (s *OrderService) CancelOrder(ctx context.Context, orderID uuid.UUID, cancelledBy string) (*domain.Order, error) {
+	order, err := s.orderRepo.GetByID(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	cancellableStatuses := map[domain.OrderStatus]bool{
+		domain.OrderStatusPendingPayment: true,
+		domain.OrderStatusPaid:           true,
+		domain.OrderStatusProcessing:     true,
+	}
+
+	if !cancellableStatuses[order.Status] {
+		return nil, domainerrors.BadRequest(fmt.Sprintf("cannot cancel order in %s status", order.Status))
+	}
+
+	if order.BlnkTransactionID != nil && *order.BlnkTransactionID != "" {
+		if err := s.blnkClient.VoidEscrow(ctx, *order.BlnkTransactionID); err != nil {
+			return nil, fmt.Errorf("failed to void escrow: %w", err)
+		}
+	}
+
+	updated, err := s.orderRepo.UpdateStatus(ctx, orderID, domain.OrderStatusCancelled)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update order status: %w", err)
 	}

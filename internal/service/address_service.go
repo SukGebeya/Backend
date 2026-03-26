@@ -42,8 +42,7 @@ func (s *AddressService) Create(ctx context.Context, input CreateAddressInput) (
 	}
 
 	if input.IsDefault {
-		_, err := s.repo.SetDefault(ctx, input.UserID, uuid.Nil)
-		if err != nil {
+		if err := s.repo.ClearDefaults(ctx, input.UserID); err != nil {
 			return nil, domainerrors.Internal("failed to clear default address", err)
 		}
 	}

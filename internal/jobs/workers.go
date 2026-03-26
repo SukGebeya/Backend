@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -148,10 +149,10 @@ type ProcessPaymentWebhookWorker struct {
 	orderRepo     repository.OrderRepository
 	paymentRepo   repository.PaymentRepository
 	inventoryRepo repository.InventoryRepository
-	blnkClient    *blnk.Client
+	blnkClient    blnk.BlnkClient
 }
 
-func NewProcessPaymentWebhookWorker(orderRepo repository.OrderRepository, paymentRepo repository.PaymentRepository, inventoryRepo repository.InventoryRepository, blnkClient *blnk.Client) *ProcessPaymentWebhookWorker {
+func NewProcessPaymentWebhookWorker(orderRepo repository.OrderRepository, paymentRepo repository.PaymentRepository, inventoryRepo repository.InventoryRepository, blnkClient blnk.BlnkClient) *ProcessPaymentWebhookWorker {
 	return &ProcessPaymentWebhookWorker{
 		orderRepo:     orderRepo,
 		paymentRepo:   paymentRepo,
@@ -208,6 +209,11 @@ func (w *ProcessPaymentWebhookWorker) Work(ctx context.Context, job *river.Job[P
 			return err
 		}
 
+		if err := w.commitOrderInventory(ctx, order.ID); err != nil {
+			slog.Error("failed to commit inventory", "order_id", order.ID, "error", err)
+			return err
+		}
+
 		slog.Info("payment webhook processed successfully", "tx_ref", txRef, "order_id", order.ID)
 	} else {
 		if _, err := w.paymentRepo.UpdateStatus(ctx, payment.ID, domain.PaymentStatusFailed); err != nil {
@@ -223,11 +229,13 @@ func (w *ProcessPaymentWebhookWorker) Work(ctx context.Context, job *river.Job[P
 		if order.BlnkTransactionID != nil && *order.BlnkTransactionID != "" {
 			if err := w.blnkClient.VoidEscrow(ctx, *order.BlnkTransactionID); err != nil {
 				slog.Error("failed to void escrow", "order_id", order.ID, "blnk_txn_id", *order.BlnkTransactionID, "error", err)
+				return err
 			}
 		}
 
 		if err := w.releaseOrderInventory(ctx, order.ID); err != nil {
 			slog.Error("failed to release order inventory", "order_id", order.ID, "error", err)
+			return err
 		}
 
 		slog.Info("payment webhook processed as failed", "tx_ref", txRef, "order_id", order.ID)
@@ -262,8 +270,153 @@ func (w *ProcessPaymentWebhookWorker) releaseOrderInventory(ctx context.Context,
 	return nil
 }
 
-func AddWorkers(workers *river.Workers, cartRepo repository.CartRepository, cartItemRepo repository.CartItemRepository, orderRepo repository.OrderRepository, paymentRepo repository.PaymentRepository, inventoryRepo repository.InventoryRepository, blnkClient *blnk.Client) {
+func (w *ProcessPaymentWebhookWorker) commitOrderInventory(ctx context.Context, orderID uuid.UUID) error {
+	items, err := w.orderRepo.ListItemsByOrderID(ctx, orderID)
+	if err != nil {
+		return fmt.Errorf("failed to list order items: %w", err)
+	}
+
+	for _, item := range items {
+		if err := w.inventoryRepo.Commit(ctx, item.VariantID, item.Quantity); err != nil {
+			slog.Error("failed to commit inventory for order item",
+				"order_id", orderID,
+				"variant_id", item.VariantID,
+				"quantity", item.Quantity,
+				"error", err,
+			)
+			return fmt.Errorf("failed to commit inventory for variant %s: %w", item.VariantID, err)
+		}
+		slog.Info("committed inventory for order",
+			"order_id", orderID,
+			"variant_id", item.VariantID,
+			"quantity", item.Quantity,
+		)
+	}
+
+	return nil
+}
+
+func AddWorkers(workers *river.Workers, cartRepo repository.CartRepository, cartItemRepo repository.CartItemRepository, orderRepo repository.OrderRepository, paymentRepo repository.PaymentRepository, inventoryRepo repository.InventoryRepository, blnkClient blnk.BlnkClient, payoutRepo repository.PayoutRepository, merchantRepo repository.MerchantRepository) {
 	river.AddWorker(workers, NewReleaseCartReservationWorker(cartRepo, cartItemRepo, inventoryRepo))
 	river.AddWorker(workers, NewMarkCartExpiredWorker(cartRepo, cartItemRepo))
 	river.AddWorker(workers, NewProcessPaymentWebhookWorker(orderRepo, paymentRepo, inventoryRepo, blnkClient))
+	river.AddWorker(workers, NewSendOrderNotificationWorker())
+	river.AddWorker(workers, NewProcessPayoutWorker(payoutRepo, merchantRepo, blnkClient))
+}
+
+type ProcessPayoutWorker struct {
+	river.WorkerDefaults[ProcessPayoutArgs]
+	payoutRepo   repository.PayoutRepository
+	merchantRepo repository.MerchantRepository
+	blnkClient   blnk.BlnkClient
+}
+
+func NewProcessPayoutWorker(payoutRepo repository.PayoutRepository, merchantRepo repository.MerchantRepository, blnkClient blnk.BlnkClient) *ProcessPayoutWorker {
+	return &ProcessPayoutWorker{
+		payoutRepo:   payoutRepo,
+		merchantRepo: merchantRepo,
+		blnkClient:   blnkClient,
+	}
+}
+
+func (w *ProcessPayoutWorker) Timeout(job *river.Job[ProcessPayoutArgs]) time.Duration {
+	return defaultJobTimeout
+}
+
+func (w *ProcessPayoutWorker) Work(ctx context.Context, job *river.Job[ProcessPayoutArgs]) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	payoutID := job.Args.PayoutID
+
+	slog.Info("processing payout", "payout_id", payoutID, "attempt", job.Attempt)
+
+	payout, err := w.payoutRepo.GetByID(ctx, payoutID)
+	if err != nil {
+		if domainerrors.IsNotFound(err) {
+			slog.Warn("payout not found", "payout_id", payoutID)
+			return nil
+		}
+		slog.Error("failed to get payout", "payout_id", payoutID, "error", err)
+		return err
+	}
+
+	if payout.Status != domain.PayoutStatusProcessing {
+		slog.Info("payout is not in processing status, skipping", "payout_id", payoutID, "status", payout.Status)
+		return nil
+	}
+
+	merchant, err := w.merchantRepo.GetByID(ctx, payout.MerchantID)
+	if err != nil {
+		slog.Error("failed to get merchant for payout", "payout_id", payoutID, "merchant_id", payout.MerchantID, "error", err)
+		return err
+	}
+
+	if merchant.BlnkBalanceID == nil || *merchant.BlnkBalanceID == "" {
+		slog.Error("merchant has no Blnk wallet", "payout_id", payoutID, "merchant_id", payout.MerchantID)
+		failureReason := "Merchant has no Blnk wallet"
+		_, _ = w.payoutRepo.UpdateStatus(ctx, payoutID, domain.PayoutStatusFailed, nil, &failureReason)
+		return nil
+	}
+
+	balanceCents, err := w.blnkClient.GetBalance(ctx, *merchant.BlnkBalanceID)
+	if err != nil {
+		slog.Error("failed to get merchant balance", "payout_id", payoutID, "merchant_id", payout.MerchantID, "error", err)
+		failureReason := "Failed to verify merchant balance"
+		_, _ = w.payoutRepo.UpdateStatus(ctx, payoutID, domain.PayoutStatusFailed, nil, &failureReason)
+		return nil
+	}
+
+	if balanceCents < payout.AmountCents {
+		slog.Error("insufficient balance for payout",
+			"payout_id", payoutID,
+			"merchant_id", payout.MerchantID,
+			"balance_cents", balanceCents,
+			"amount_cents", payout.AmountCents,
+		)
+		failureReason := "Insufficient balance"
+		_, _ = w.payoutRepo.UpdateStatus(ctx, payoutID, domain.PayoutStatusFailed, nil, &failureReason)
+		return nil
+	}
+
+	blnkTxID, err := w.blnkClient.DebitMerchantForPayout(ctx, blnk.PayoutRequest{
+		PayoutID:       payout.ID,
+		MerchantID:     payout.MerchantID,
+		AmountCents:    payout.AmountCents,
+		Method:         string(payout.Method),
+		Destination:    payout.Destination,
+		MerchantBlnkID: *merchant.BlnkBalanceID,
+	})
+	if err != nil {
+		slog.Error("failed to debit merchant wallet",
+			"payout_id", payoutID,
+			"merchant_id", payout.MerchantID,
+			"error", err,
+		)
+		failureReason := "Failed to process payout with Blnk"
+		_, _ = w.payoutRepo.UpdateStatus(ctx, payoutID, domain.PayoutStatusFailed, nil, &failureReason)
+		return err
+	}
+
+	_, err = w.payoutRepo.UpdateStatus(ctx, payoutID, domain.PayoutStatusCompleted, &blnkTxID, nil)
+	if err != nil {
+		slog.Error("failed to update payout status to completed",
+			"payout_id", payoutID,
+			"blnk_tx_id", blnkTxID,
+			"error", err,
+		)
+		return err
+	}
+
+	slog.Info("payout processed successfully",
+		"payout_id", payoutID,
+		"merchant_id", payout.MerchantID,
+		"amount_cents", payout.AmountCents,
+		"blnk_tx_id", blnkTxID,
+	)
+
+	return nil
 }

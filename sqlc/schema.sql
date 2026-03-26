@@ -243,3 +243,66 @@ CREATE TABLE payments (
 CREATE INDEX idx_payments_order_id ON payments(order_id);
 CREATE INDEX idx_payments_provider_tx_ref ON payments(provider_tx_ref);
 CREATE INDEX idx_payments_status ON payments(status);
+
+-- Shipments (from 00014)
+CREATE TYPE shipment_status AS ENUM (
+    'preparing',
+    'shipped',
+    'out_for_delivery',
+    'delivered',
+    'failed'
+);
+
+CREATE TABLE shipments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID NOT NULL REFERENCES orders(id) ON DELETE RESTRICT,
+    status shipment_status NOT NULL DEFAULT 'preparing',
+    carrier TEXT,
+    tracking_number TEXT,
+    estimated_delivery DATE,
+    shipped_at TIMESTAMPTZ,
+    delivered_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_shipments_order_id ON shipments(order_id);
+CREATE INDEX idx_shipments_status ON shipments(status);
+
+-- Wallet Transactions (from 00015)
+CREATE TABLE wallet_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    merchant_id UUID NOT NULL REFERENCES merchant_profiles(id) ON DELETE RESTRICT,
+    order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
+    type TEXT NOT NULL,
+    amount_cents BIGINT NOT NULL,
+    currency VARCHAR(10) NOT NULL DEFAULT 'ETB',
+    blnk_transaction_id TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'applied',
+    description TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_wallet_transactions_merchant_id ON wallet_transactions(merchant_id);
+CREATE INDEX idx_wallet_transactions_order_id ON wallet_transactions(order_id);
+CREATE INDEX idx_wallet_transactions_type ON wallet_transactions(type);
+CREATE INDEX idx_wallet_transactions_created_at ON wallet_transactions(created_at DESC);
+
+-- Payouts (from 00016)
+CREATE TABLE payouts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    merchant_id UUID NOT NULL REFERENCES merchant_profiles(id) ON DELETE CASCADE,
+    amount_cents BIGINT NOT NULL,
+    currency VARCHAR(10) NOT NULL DEFAULT 'ETB',
+    method VARCHAR(50) NOT NULL,
+    destination TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    blnk_transaction_id TEXT,
+    failure_reason TEXT,
+    requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    processed_at TIMESTAMPTZ
+);
+
+CREATE INDEX idx_payouts_merchant_id ON payouts(merchant_id);
+CREATE INDEX idx_payouts_status ON payouts(status);
+CREATE INDEX idx_payouts_requested_at ON payouts(requested_at DESC);

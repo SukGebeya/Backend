@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/SukGebeya/Backend/internal/domain"
 	"github.com/google/uuid"
@@ -105,6 +106,7 @@ type AddressRepository interface {
 	Create(ctx context.Context, address *domain.Address) (*domain.Address, error)
 	Update(ctx context.Context, address *domain.Address) (*domain.Address, error)
 	SetDefault(ctx context.Context, userID, addressID uuid.UUID) (*domain.Address, error)
+	ClearDefaults(ctx context.Context, userID uuid.UUID) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	CountByUserID(ctx context.Context, userID uuid.UUID) (int64, error)
 }
@@ -166,4 +168,38 @@ type PaymentRepository interface {
 	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.PaymentStatus) (*domain.Payment, error)
 	UpdateProviderResponse(ctx context.Context, id uuid.UUID, providerResponse map[string]any) (*domain.Payment, error)
 	UpdateBlnkTransaction(ctx context.Context, id uuid.UUID, blnkTxID string) (*domain.Payment, error)
+}
+
+type ShipmentRepository interface {
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.Shipment, error)
+	GetByOrderID(ctx context.Context, orderID uuid.UUID) (*domain.Shipment, error)
+	Create(ctx context.Context, shipment *domain.Shipment) (*domain.Shipment, error)
+	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.ShipmentStatus) (*domain.Shipment, error)
+	UpdateShipped(ctx context.Context, id uuid.UUID, carrier, trackingNumber *string, estimatedDelivery *time.Time) (*domain.Shipment, error)
+	UpdateDelivered(ctx context.Context, id uuid.UUID) (*domain.Shipment, error)
+}
+
+type WalletTransactionRepository interface {
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.WalletTransaction, error)
+	GetByOrderID(ctx context.Context, orderID uuid.UUID) (*domain.WalletTransaction, error)
+	ListByMerchantID(ctx context.Context, merchantID uuid.UUID, page, pageSize int) ([]domain.WalletTransaction, error)
+	Create(ctx context.Context, txn *domain.WalletTransaction) (*domain.WalletTransaction, error)
+	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.WalletTransactionStatus) (*domain.WalletTransaction, error)
+	CountByMerchantID(ctx context.Context, merchantID uuid.UUID) (int64, error)
+}
+
+type PayoutRepository interface {
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.Payout, error)
+	ListByMerchantID(ctx context.Context, merchantID uuid.UUID, page, pageSize int) ([]domain.Payout, error)
+	ListByStatus(ctx context.Context, status domain.PayoutStatus, page, pageSize int) ([]domain.Payout, error)
+	ListAll(ctx context.Context, page, pageSize int) ([]domain.Payout, error)
+	Create(ctx context.Context, payout *domain.Payout) (*domain.Payout, error)
+	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.PayoutStatus, blnkTxID *string, failureReason *string) (*domain.Payout, error)
+	CountByMerchantID(ctx context.Context, merchantID uuid.UUID) (int64, error)
+	CountByStatus(ctx context.Context, status domain.PayoutStatus) (int64, error)
+}
+
+type IdempotencyRepository interface {
+	Get(ctx context.Context, key string) (string, error)
+	Set(ctx context.Context, key string, value string, ttl int64) error
 }
