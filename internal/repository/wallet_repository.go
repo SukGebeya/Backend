@@ -14,14 +14,25 @@ import (
 )
 
 type walletTransactionRepository struct {
+	pool    *pgxpool.Pool
 	queries *db.Queries
 }
 
 func NewWalletTransactionRepository(pool *pgxpool.Pool) WalletTransactionRepository {
-	return &walletTransactionRepository{queries: db.New(pool)}
+	return &walletTransactionRepository{
+		pool:    pool,
+		queries: db.New(pool),
+	}
 }
 
 var _ WalletTransactionRepository = (*walletTransactionRepository)(nil)
+
+func (r *walletTransactionRepository) WithTx(tx pgx.Tx) WalletTransactionRepository {
+	return &walletTransactionRepository{
+		pool:    r.pool,
+		queries: r.queries.WithTx(tx),
+	}
+}
 
 func (r *walletTransactionRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.WalletTransaction, error) {
 	txn, err := r.queries.GetWalletTransactionByID(ctx, id)

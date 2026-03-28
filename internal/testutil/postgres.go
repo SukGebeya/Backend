@@ -3,6 +3,8 @@ package testutil
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -51,6 +53,10 @@ func SetupPostgres(t *testing.T) *PostgresContainer {
 func RunMigrations(t *testing.T, connStr string) {
 	t.Helper()
 
+	_, filename, _, _ := runtime.Caller(0)
+	projectRoot := filepath.Join(filepath.Dir(filename), "..", "..")
+	migrationsDir := filepath.Join(projectRoot, "migrations")
+
 	db, err := goose.OpenDBWithDriver("postgres", connStr)
 	if err != nil {
 		t.Fatalf("failed to open DB: %v", err)
@@ -61,7 +67,7 @@ func RunMigrations(t *testing.T, connStr string) {
 		t.Fatalf("failed to set dialect: %v", err)
 	}
 
-	if err := goose.Up(db, "migrations"); err != nil {
+	if err := goose.Up(db, migrationsDir); err != nil {
 		t.Fatalf("failed to run migrations: %v", err)
 	}
 }

@@ -1,17 +1,21 @@
 package handler
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/SukGebeya/Backend/internal/domain"
 	apperrors "github.com/SukGebeya/Backend/internal/errors"
+	"github.com/SukGebeya/Backend/internal/jobs"
 	"github.com/SukGebeya/Backend/internal/repository"
 	"github.com/SukGebeya/Backend/internal/service"
 	"github.com/SukGebeya/Backend/pkg/response"
 	"github.com/SukGebeya/Backend/pkg/validation"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/riverqueue/river"
 )
 
 type AdminHandler struct {
@@ -19,6 +23,7 @@ type AdminHandler struct {
 	userService  *service.UserService
 	merchantRepo repository.MerchantRepository
 	merchantSvc  *service.MerchantService
+	riverClient  *river.Client[pgx.Tx]
 }
 
 func NewAdminHandler(
@@ -26,12 +31,14 @@ func NewAdminHandler(
 	userService *service.UserService,
 	merchantRepo repository.MerchantRepository,
 	merchantSvc *service.MerchantService,
+	riverClient *river.Client[pgx.Tx],
 ) *AdminHandler {
 	return &AdminHandler{
 		payoutRepo:   payoutRepo,
 		userService:  userService,
 		merchantRepo: merchantRepo,
 		merchantSvc:  merchantSvc,
+		riverClient:  riverClient,
 	}
 }
 
@@ -183,6 +190,11 @@ func (h *AdminHandler) ProcessPayout(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		response.Error(w, err)
 		return
+	}
+
+	_, err = h.riverClient.Insert(ctx, jobs.ProcessPayoutArgs{PayoutID: payoutID}, nil)
+	if err != nil {
+		slog.Error("failed to enqueue payout job", "payout_id", payoutID, "error", err)
 	}
 
 	response.JSON(w, http.StatusOK, map[string]string{

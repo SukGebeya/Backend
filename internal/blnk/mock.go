@@ -12,6 +12,7 @@ type MockClient struct {
 	CommitEscrowFunc           func(ctx context.Context, inflightTxnID string) error
 	VoidEscrowFunc             func(ctx context.Context, inflightTxnID string) error
 	CreditMerchantFunc         func(ctx context.Context, req MerchantCreditRequest) (string, error)
+	CreditPlatformFeeFunc      func(ctx context.Context, req PlatformFeeRequest) (string, error)
 	DebitMerchantForPayoutFunc func(ctx context.Context, req PayoutRequest) (string, error)
 	GetBalanceFunc             func(ctx context.Context, balanceID string) (int64, error)
 	GetTransactionHistoryFunc  func(ctx context.Context, balanceID string, limit int) ([]TransactionResponse, error)
@@ -22,6 +23,7 @@ type MockClient struct {
 	CommitEscrowCalled           bool
 	VoidEscrowCalled             bool
 	CreditMerchantCalled         bool
+	CreditPlatformFeeCalled      bool
 	DebitMerchantForPayoutCalled bool
 	GetBalanceCalled             bool
 	GetTransactionHistoryCalled  bool
@@ -74,6 +76,14 @@ func (m *MockClient) CreditMerchant(ctx context.Context, req MerchantCreditReque
 		return m.CreditMerchantFunc(ctx, req)
 	}
 	return "txn_credit_" + req.OrderID.String()[:8], nil
+}
+
+func (m *MockClient) CreditPlatformFee(ctx context.Context, req PlatformFeeRequest) (string, error) {
+	m.CreditPlatformFeeCalled = true
+	if m.CreditPlatformFeeFunc != nil {
+		return m.CreditPlatformFeeFunc(ctx, req)
+	}
+	return "txn_fee_" + req.OrderID.String()[:8], nil
 }
 
 func (m *MockClient) DebitMerchantForPayout(ctx context.Context, req PayoutRequest) (string, error) {

@@ -929,7 +929,7 @@ internal/http/handler/
 
 ## Known Issues / Future Work
 
-1. **Inventory Release on Cancellation** - Currently, cancelling an order does not release reserved inventory. This requires coordination with the inventory service.
+1. **Inventory Release on Cancellation** - ✅ FIXED. Reserved inventory is now released when an order is cancelled.
 
 2. **Refund Flow** - Not implemented. Orders can be cancelled but refunds to buyers are not handled.
 

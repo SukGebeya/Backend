@@ -208,7 +208,7 @@ func main() {
 	})
 
 	workers := river.NewWorkers()
-	jobs.AddWorkers(workers, cartRepo, cartItemRepo, orderRepo, paymentRepo, inventoryRepo, blnkClient, payoutRepo, merchantRepo)
+	jobs.AddWorkers(workers, cartRepo, cartItemRepo, orderRepo, paymentRepo, inventoryRepo, blnkClient, payoutRepo, merchantRepo, userRepo)
 
 	jobErrorHandler := jobs.NewJobErrorHandler()
 
@@ -223,6 +223,8 @@ func main() {
 		appLogger.Error("Failed to initialize River client", "error", err)
 		os.Exit(1)
 	}
+
+	jobs.SetRiverClient(riverClient)
 
 	if err := riverClient.Start(ctx); err != nil {
 		appLogger.Error("Failed to start River client", "error", err)
@@ -240,21 +242,23 @@ func main() {
 	variantService := service.NewProductVariantService(variantRepo)
 	addressService := service.NewAddressService(addressRepo)
 	cartService := service.NewCartService(cartRepo, cartItemRepo, sessionRepo, variantRepo, inventoryRepo, jobScheduler)
-	orderService := service.NewOrderService(orderRepo, merchantRepo, shipmentRepo, walletRepo, blnkClient)
-	checkoutService := service.NewCheckoutService(cartRepo, cartItemRepo, orderRepo, paymentRepo, addressRepo, inventoryRepo, merchantRepo, productRepo, variantRepo, blnkClient, chapaClient)
+
+	txManager := repository.NewTransactionManager(pool)
+	orderService := service.NewOrderService(orderRepo, merchantRepo, shipmentRepo, walletRepo, blnkClient, inventoryRepo, userRepo, txManager)
+	checkoutService := service.NewCheckoutService(cartRepo, cartItemRepo, orderRepo, paymentRepo, addressRepo, inventoryRepo, merchantRepo, productRepo, variantRepo, blnkClient, chapaClient, txManager)
 	walletService := service.NewWalletService(merchantRepo, walletRepo, payoutRepo, blnkClient)
 
 	appLogger.Info("Circuit breakers enabled for Redis repositories")
 
 	rateLimiter := httpmiddleware.NewRateLimiter(rateLimitRepo, cfg.RateLimit.Requests, int64(cfg.RateLimit.Window.Seconds()))
 
-	adminHandler := handler.NewAdminHandler(payoutRepo, userService, merchantRepo, merchantService)
+	adminHandler := handler.NewAdminHandler(payoutRepo, userService, merchantRepo, merchantService, riverClient)
 
 	router := apphttp.NewRouter(
 		authService, userService, merchantService, categoryService, productService, variantService, variantRepo,
 		addressService, cartService, orderService, checkoutService, walletService,
 		jwtManager, rateLimiter, pool, redisClient, appLogger, sessionRepo,
-		chapaClient, riverClient, adminHandler,
+		chapaClient, riverClient, adminHandler, cfg.CORS,
 	)
 
 	srv := &http.Server{

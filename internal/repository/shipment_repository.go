@@ -15,14 +15,25 @@ import (
 )
 
 type shipmentRepository struct {
+	pool    *pgxpool.Pool
 	queries *db.Queries
 }
 
 func NewShipmentRepository(pool *pgxpool.Pool) ShipmentRepository {
-	return &shipmentRepository{queries: db.New(pool)}
+	return &shipmentRepository{
+		pool:    pool,
+		queries: db.New(pool),
+	}
 }
 
 var _ ShipmentRepository = (*shipmentRepository)(nil)
+
+func (r *shipmentRepository) WithTx(tx pgx.Tx) ShipmentRepository {
+	return &shipmentRepository{
+		pool:    r.pool,
+		queries: r.queries.WithTx(tx),
+	}
+}
 
 func (r *shipmentRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Shipment, error) {
 	shipment, err := r.queries.GetShipmentByID(ctx, id)

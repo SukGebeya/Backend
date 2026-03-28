@@ -11,12 +11,54 @@ import (
 	domainerrors "github.com/SukGebeya/Backend/internal/errors"
 	"github.com/SukGebeya/Backend/internal/repository"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 )
 
 const (
 	defaultJobTimeout = 30 * time.Second
 )
+
+var globalRiverClient *river.Client[pgx.Tx]
+
+func SetRiverClient(client *river.Client[pgx.Tx]) {
+	globalRiverClient = client
+}
+
+func EnqueueOrderNotification(ctx context.Context, orderID, buyerID uuid.UUID, event string, userRepo repository.UserRepository) {
+	if globalRiverClient == nil {
+		slog.Error("cannot enqueue notification: river client not initialized")
+		return
+	}
+
+	user, err := userRepo.GetByID(ctx, buyerID)
+	if err != nil {
+		slog.Error("failed to get buyer for notification", "buyer_id", buyerID, "error", err)
+		return
+	}
+
+	phone := ""
+	if user.Phone != nil {
+		phone = *user.Phone
+	}
+
+	if phone == "" {
+		slog.Info("skipping notification: buyer has no phone", "order_id", orderID, "buyer_id", buyerID)
+		return
+	}
+
+	_, err = globalRiverClient.Insert(ctx, SendOrderNotificationArgs{
+		OrderID: orderID,
+		Event:   event,
+		Phone:   phone,
+	}, nil)
+	if err != nil {
+		slog.Error("failed to enqueue notification job", "order_id", orderID, "event", event, "error", err)
+		return
+	}
+
+	slog.Info("enqueued notification job", "order_id", orderID, "event", event)
+}
 
 type ReleaseCartReservationWorker struct {
 	river.WorkerDefaults[ReleaseCartReservationArgs]
@@ -150,14 +192,22 @@ type ProcessPaymentWebhookWorker struct {
 	paymentRepo   repository.PaymentRepository
 	inventoryRepo repository.InventoryRepository
 	blnkClient    blnk.BlnkClient
+	userRepo      repository.UserRepository
 }
 
-func NewProcessPaymentWebhookWorker(orderRepo repository.OrderRepository, paymentRepo repository.PaymentRepository, inventoryRepo repository.InventoryRepository, blnkClient blnk.BlnkClient) *ProcessPaymentWebhookWorker {
+func NewProcessPaymentWebhookWorker(
+	orderRepo repository.OrderRepository,
+	paymentRepo repository.PaymentRepository,
+	inventoryRepo repository.InventoryRepository,
+	blnkClient blnk.BlnkClient,
+	userRepo repository.UserRepository,
+) *ProcessPaymentWebhookWorker {
 	return &ProcessPaymentWebhookWorker{
 		orderRepo:     orderRepo,
 		paymentRepo:   paymentRepo,
 		inventoryRepo: inventoryRepo,
 		blnkClient:    blnkClient,
+		userRepo:      userRepo,
 	}
 }
 
@@ -213,6 +263,8 @@ func (w *ProcessPaymentWebhookWorker) Work(ctx context.Context, job *river.Job[P
 			slog.Error("failed to commit inventory", "order_id", order.ID, "error", err)
 			return err
 		}
+
+		EnqueueOrderNotification(ctx, order.ID, order.BuyerID, "payment_confirmed", w.userRepo)
 
 		slog.Info("payment webhook processed successfully", "tx_ref", txRef, "order_id", order.ID)
 	} else {
@@ -296,10 +348,10 @@ func (w *ProcessPaymentWebhookWorker) commitOrderInventory(ctx context.Context, 
 	return nil
 }
 
-func AddWorkers(workers *river.Workers, cartRepo repository.CartRepository, cartItemRepo repository.CartItemRepository, orderRepo repository.OrderRepository, paymentRepo repository.PaymentRepository, inventoryRepo repository.InventoryRepository, blnkClient blnk.BlnkClient, payoutRepo repository.PayoutRepository, merchantRepo repository.MerchantRepository) {
+func AddWorkers(workers *river.Workers, cartRepo repository.CartRepository, cartItemRepo repository.CartItemRepository, orderRepo repository.OrderRepository, paymentRepo repository.PaymentRepository, inventoryRepo repository.InventoryRepository, blnkClient blnk.BlnkClient, payoutRepo repository.PayoutRepository, merchantRepo repository.MerchantRepository, userRepo repository.UserRepository) {
 	river.AddWorker(workers, NewReleaseCartReservationWorker(cartRepo, cartItemRepo, inventoryRepo))
 	river.AddWorker(workers, NewMarkCartExpiredWorker(cartRepo, cartItemRepo))
-	river.AddWorker(workers, NewProcessPaymentWebhookWorker(orderRepo, paymentRepo, inventoryRepo, blnkClient))
+	river.AddWorker(workers, NewProcessPaymentWebhookWorker(orderRepo, paymentRepo, inventoryRepo, blnkClient, userRepo))
 	river.AddWorker(workers, NewSendOrderNotificationWorker())
 	river.AddWorker(workers, NewProcessPayoutWorker(payoutRepo, merchantRepo, blnkClient))
 }
@@ -358,26 +410,6 @@ func (w *ProcessPayoutWorker) Work(ctx context.Context, job *river.Job[ProcessPa
 	if merchant.BlnkBalanceID == nil || *merchant.BlnkBalanceID == "" {
 		slog.Error("merchant has no Blnk wallet", "payout_id", payoutID, "merchant_id", payout.MerchantID)
 		failureReason := "Merchant has no Blnk wallet"
-		_, _ = w.payoutRepo.UpdateStatus(ctx, payoutID, domain.PayoutStatusFailed, nil, &failureReason)
-		return nil
-	}
-
-	balanceCents, err := w.blnkClient.GetBalance(ctx, *merchant.BlnkBalanceID)
-	if err != nil {
-		slog.Error("failed to get merchant balance", "payout_id", payoutID, "merchant_id", payout.MerchantID, "error", err)
-		failureReason := "Failed to verify merchant balance"
-		_, _ = w.payoutRepo.UpdateStatus(ctx, payoutID, domain.PayoutStatusFailed, nil, &failureReason)
-		return nil
-	}
-
-	if balanceCents < payout.AmountCents {
-		slog.Error("insufficient balance for payout",
-			"payout_id", payoutID,
-			"merchant_id", payout.MerchantID,
-			"balance_cents", balanceCents,
-			"amount_cents", payout.AmountCents,
-		)
-		failureReason := "Insufficient balance"
 		_, _ = w.payoutRepo.UpdateStatus(ctx, payoutID, domain.PayoutStatusFailed, nil, &failureReason)
 		return nil
 	}

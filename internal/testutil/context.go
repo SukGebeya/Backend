@@ -4,12 +4,15 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/SukGebeya/Backend/internal/http/middleware"
 )
+
+type contextKey string
+
+const userIDKey contextKey = "userID"
 
 func ContextWithUserID(userID uuid.UUID) context.Context {
 	ctx := context.Background()
-	return context.WithValue(ctx, middleware.UserIDKey, userID)
+	return context.WithValue(ctx, userIDKey, userID)
 }
 
 func ContextWithUser() context.Context {

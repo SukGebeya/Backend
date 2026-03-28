@@ -13,14 +13,25 @@ import (
 )
 
 type inventoryRepository struct {
+	pool    *pgxpool.Pool
 	queries *db.Queries
 }
 
 func NewInventoryRepository(pool *pgxpool.Pool) InventoryRepository {
-	return &inventoryRepository{queries: db.New(pool)}
+	return &inventoryRepository{
+		pool:    pool,
+		queries: db.New(pool),
+	}
 }
 
 var _ InventoryRepository = (*inventoryRepository)(nil)
+
+func (r *inventoryRepository) WithTx(tx pgx.Tx) InventoryRepository {
+	return &inventoryRepository{
+		pool:    r.pool,
+		queries: r.queries.WithTx(tx),
+	}
+}
 
 func (r *inventoryRepository) GetByVariantID(ctx context.Context, variantID uuid.UUID) (*domain.Inventory, error) {
 	inventory, err := r.queries.GetInventoryByVariantID(ctx, variantID)

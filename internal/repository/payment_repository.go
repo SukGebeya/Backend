@@ -13,14 +13,25 @@ import (
 )
 
 type paymentRepository struct {
+	pool    *pgxpool.Pool
 	queries *db.Queries
 }
 
 func NewPaymentRepository(pool *pgxpool.Pool) PaymentRepository {
-	return &paymentRepository{queries: db.New(pool)}
+	return &paymentRepository{
+		pool:    pool,
+		queries: db.New(pool),
+	}
 }
 
 var _ PaymentRepository = (*paymentRepository)(nil)
+
+func (r *paymentRepository) WithTx(tx pgx.Tx) PaymentRepository {
+	return &paymentRepository{
+		pool:    r.pool,
+		queries: r.queries.WithTx(tx),
+	}
+}
 
 func (r *paymentRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Payment, error) {
 	payment, err := r.queries.GetPaymentByID(ctx, id)

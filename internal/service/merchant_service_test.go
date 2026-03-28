@@ -115,7 +115,7 @@ func TestMerchantService_Onboard_DuplicateSlug(t *testing.T) {
 		t.Fatalf("first Onboard() failed: %v", err)
 	}
 
-	user2Builder := testutil.NewUserBuilder().WithEmail("user2@example.com")
+	user2Builder := testutil.NewUserBuilder().WithEmail("user2@example.com").WithPhone("+251922222221")
 	user2 := user2Builder.Build()
 	createdUser2, err := userRepo.Create(ctx, user2)
 	if err != nil {

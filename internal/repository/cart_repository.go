@@ -13,14 +13,25 @@ import (
 )
 
 type cartRepository struct {
+	pool    *pgxpool.Pool
 	queries *db.Queries
 }
 
 func NewCartRepository(pool *pgxpool.Pool) CartRepository {
-	return &cartRepository{queries: db.New(pool)}
+	return &cartRepository{
+		pool:    pool,
+		queries: db.New(pool),
+	}
 }
 
 var _ CartRepository = (*cartRepository)(nil)
+
+func (r *cartRepository) WithTx(tx pgx.Tx) CartRepository {
+	return &cartRepository{
+		pool:    r.pool,
+		queries: r.queries.WithTx(tx),
+	}
+}
 
 func (r *cartRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Cart, error) {
 	cart, err := r.queries.GetCartByID(ctx, id)
@@ -126,14 +137,25 @@ func dbCartToDomain(c db.Cart) *domain.Cart {
 }
 
 type cartItemRepository struct {
+	pool    *pgxpool.Pool
 	queries *db.Queries
 }
 
 func NewCartItemRepository(pool *pgxpool.Pool) CartItemRepository {
-	return &cartItemRepository{queries: db.New(pool)}
+	return &cartItemRepository{
+		pool:    pool,
+		queries: db.New(pool),
+	}
 }
 
 var _ CartItemRepository = (*cartItemRepository)(nil)
+
+func (r *cartItemRepository) WithTx(tx pgx.Tx) CartItemRepository {
+	return &cartItemRepository{
+		pool:    r.pool,
+		queries: r.queries.WithTx(tx),
+	}
+}
 
 func (r *cartItemRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.CartItem, error) {
 	item, err := r.queries.GetCartItemByID(ctx, id)

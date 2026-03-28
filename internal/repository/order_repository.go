@@ -13,11 +13,22 @@ import (
 )
 
 type orderRepository struct {
+	pool    *pgxpool.Pool
 	queries *db.Queries
 }
 
 func NewOrderRepository(pool *pgxpool.Pool) OrderRepository {
-	return &orderRepository{queries: db.New(pool)}
+	return &orderRepository{
+		pool:    pool,
+		queries: db.New(pool),
+	}
+}
+
+func (r *orderRepository) WithTx(tx pgx.Tx) OrderRepository {
+	return &orderRepository{
+		pool:    r.pool,
+		queries: r.queries.WithTx(tx),
+	}
 }
 
 var _ OrderRepository = (*orderRepository)(nil)

@@ -6,6 +6,7 @@ import (
 
 	_ "github.com/SukGebeya/Backend/docs"
 	"github.com/SukGebeya/Backend/internal/chapa"
+	"github.com/SukGebeya/Backend/internal/config"
 	"github.com/SukGebeya/Backend/internal/http/handler"
 	httpmiddleware "github.com/SukGebeya/Backend/internal/http/middleware"
 	"github.com/SukGebeya/Backend/internal/repository"
@@ -48,6 +49,7 @@ func NewRouter(
 	chapaClient *chapa.Client,
 	riverClient *river.Client[pgx.Tx],
 	adminHandler *handler.AdminHandler,
+	corsConfig config.CORSConfig,
 ) *Router {
 	r := chi.NewRouter()
 
@@ -59,7 +61,7 @@ func NewRouter(
 	r.Use(logger.RequestLogger(appLogger))
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins:   corsConfig.AllowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Session-ID", "Idempotency-Key"},
 		ExposedHeaders:   []string{"X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "X-Session-ID", "X-Idempotent-Replayed"},

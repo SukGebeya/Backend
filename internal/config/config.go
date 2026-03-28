@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -20,6 +21,7 @@ type Config struct {
 	Logger      LoggerConfig
 	Blnk        BlnkConfig
 	Chapa       ChapaConfig
+	CORS        CORSConfig
 }
 
 type JWTConfig struct {
@@ -61,6 +63,10 @@ type ChapaConfig struct {
 	SecretKey   string
 	CallbackURL string
 	ReturnURL   string
+}
+
+type CORSConfig struct {
+	AllowedOrigins []string
 }
 
 func Load() (*Config, error) {
@@ -107,6 +113,9 @@ func Load() (*Config, error) {
 			SecretKey:   os.Getenv("CHAPA_SECRET_KEY"),
 			CallbackURL: getEnv("CHAPA_CALLBACK_URL", ""),
 			ReturnURL:   getEnv("CHAPA_RETURN_URL", ""),
+		},
+		CORS: CORSConfig{
+			AllowedOrigins: parseStringSlice(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173"), []string{"http://localhost:3000", "http://localhost:5173"}),
 		},
 	}
 
@@ -164,4 +173,21 @@ func parseDuration(s string, defaultValue time.Duration) time.Duration {
 		return d
 	}
 	return defaultValue
+}
+
+func parseStringSlice(s string, defaultValue []string) []string {
+	if s == "" {
+		return defaultValue
+	}
+	parts := strings.Split(s, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if trimmed := strings.TrimSpace(p); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	if len(result) == 0 {
+		return defaultValue
+	}
+	return result
 }

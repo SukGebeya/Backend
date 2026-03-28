@@ -12,6 +12,7 @@ import (
 	domainerrors "github.com/SukGebeya/Backend/internal/errors"
 	"github.com/SukGebeya/Backend/internal/repository"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 var _ CheckoutManager = (*CheckoutService)(nil)
@@ -26,8 +27,9 @@ type CheckoutService struct {
 	merchantRepo  repository.MerchantRepository
 	productRepo   repository.ProductRepository
 	variantRepo   repository.ProductVariantRepository
-	blnkClient    *blnk.Client
-	chapaClient   *chapa.Client
+	blnkClient    blnk.BlnkClient
+	chapaClient   chapa.ChapaClient
+	txManager     repository.TransactionManager
 }
 
 func NewCheckoutService(
@@ -40,8 +42,9 @@ func NewCheckoutService(
 	merchantRepo repository.MerchantRepository,
 	productRepo repository.ProductRepository,
 	variantRepo repository.ProductVariantRepository,
-	blnkClient *blnk.Client,
-	chapaClient *chapa.Client,
+	blnkClient blnk.BlnkClient,
+	chapaClient chapa.ChapaClient,
+	txManager repository.TransactionManager,
 ) *CheckoutService {
 	return &CheckoutService{
 		cartRepo:      cartRepo,
@@ -55,7 +58,18 @@ func NewCheckoutService(
 		variantRepo:   variantRepo,
 		blnkClient:    blnkClient,
 		chapaClient:   chapaClient,
+		txManager:     txManager,
 	}
+}
+
+type checkoutTxResult struct {
+	order      *domain.Order
+	cartItems  []domain.CartItem
+	cartID     uuid.UUID
+	merchantID uuid.UUID
+	totalCents int64
+	chapaTxRef string
+	escrowTxID string
 }
 
 func (s *CheckoutService) Checkout(ctx context.Context, input CheckoutInput) (*CheckoutResult, error) {
@@ -78,99 +92,116 @@ func (s *CheckoutService) Checkout(ctx context.Context, input CheckoutInput) (*C
 		return nil, err
 	}
 
-	if err := s.reserveInventory(ctx, cartItems); err != nil {
+	platformFeeCents := domain.CalculatePlatformFee(subtotalCents)
+	totalCents := subtotalCents
+	chapaTxRef := fmt.Sprintf("GEBEYA-%s-%d", uuid.New().String(), time.Now().Unix())
+
+	var result *checkoutTxResult
+
+	err = s.txManager.Run(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		txOrderRepo := s.orderRepo.WithTx(tx)
+		txPaymentRepo := s.paymentRepo.WithTx(tx)
+		txInventoryRepo := s.inventoryRepo.WithTx(tx)
+
+		if err := s.reserveInventoryWithRepo(ctx, cartItems, txInventoryRepo); err != nil {
+			return err
+		}
+
+		order, err := txOrderRepo.Create(ctx, &domain.Order{
+			ID:                uuid.New(),
+			BuyerID:           input.UserID,
+			MerchantID:        merchantID,
+			ShippingAddressID: input.ShippingAddressID,
+			Status:            domain.OrderStatusPendingPayment,
+			SubtotalCents:     subtotalCents,
+			PlatformFeeCents:  platformFeeCents,
+			TotalCents:        totalCents,
+			Currency:          "ETB",
+			Notes:             input.Notes,
+			ChapaTxRef:        &chapaTxRef,
+		})
+		if err != nil {
+			return domainerrors.Internal("failed to create order", err)
+		}
+
+		for _, item := range cartItems {
+			variant, err := s.variantRepo.GetByID(ctx, item.VariantID)
+			if err != nil {
+				return domainerrors.Internal("failed to get variant", err)
+			}
+
+			_, err = txOrderRepo.CreateItem(ctx, &domain.OrderItem{
+				ID:              uuid.New(),
+				OrderID:         order.ID,
+				VariantID:       item.VariantID,
+				ProductName:     variant.Title,
+				VariantTitle:    variant.Title,
+				Quantity:        item.Quantity,
+				UnitPriceCents:  item.PriceSnapshotCents,
+				TotalPriceCents: item.PriceSnapshotCents * int64(item.Quantity),
+			})
+			if err != nil {
+				return domainerrors.Internal("failed to create order item", err)
+			}
+		}
+
+		_, err = txPaymentRepo.Create(ctx, &domain.Payment{
+			ID:            uuid.New(),
+			OrderID:       order.ID,
+			Provider:      "chapa",
+			Status:        domain.PaymentStatusPending,
+			AmountCents:   totalCents,
+			Currency:      "ETB",
+			ProviderTxRef: &chapaTxRef,
+		})
+		if err != nil {
+			return domainerrors.Internal("failed to create payment", err)
+		}
+
+		result = &checkoutTxResult{
+			order:      order,
+			cartItems:  cartItems,
+			cartID:     cart.ID,
+			merchantID: merchantID,
+			totalCents: totalCents,
+			chapaTxRef: chapaTxRef,
+		}
+
+		return nil
+	})
+
+	if err != nil {
 		return nil, err
 	}
 
-	platformFeeCents := domain.CalculatePlatformFee(subtotalCents)
-	totalCents := subtotalCents
-
-	chapaTxRef := fmt.Sprintf("GEBEYA-%s-%d", uuid.New().String(), time.Now().Unix())
-
-	order, err := s.orderRepo.Create(ctx, &domain.Order{
-		ID:                uuid.New(),
-		BuyerID:           input.UserID,
-		MerchantID:        merchantID,
-		ShippingAddressID: input.ShippingAddressID,
-		Status:            domain.OrderStatusPendingPayment,
-		SubtotalCents:     subtotalCents,
-		PlatformFeeCents:  platformFeeCents,
-		TotalCents:        totalCents,
-		Currency:          "ETB",
-		Notes:             input.Notes,
-		ChapaTxRef:        &chapaTxRef,
-	})
-	if err != nil {
-		s.releaseInventory(ctx, cartItems)
-		return nil, domainerrors.Internal("failed to create order", err)
-	}
-
-	for _, item := range cartItems {
-		variant, err := s.variantRepo.GetByID(ctx, item.VariantID)
-		if err != nil {
-			s.releaseInventory(ctx, cartItems)
-			return nil, domainerrors.Internal("failed to get variant", err)
-		}
-
-		_, err = s.orderRepo.CreateItem(ctx, &domain.OrderItem{
-			ID:              uuid.New(),
-			OrderID:         order.ID,
-			VariantID:       item.VariantID,
-			ProductName:     variant.Title,
-			VariantTitle:    variant.Title,
-			Quantity:        item.Quantity,
-			UnitPriceCents:  item.PriceSnapshotCents,
-			TotalPriceCents: item.PriceSnapshotCents * int64(item.Quantity),
-		})
-		if err != nil {
-			s.releaseInventory(ctx, cartItems)
-			return nil, domainerrors.Internal("failed to create order item", err)
-		}
-	}
-
-	payment, err := s.paymentRepo.Create(ctx, &domain.Payment{
-		ID:            uuid.New(),
-		OrderID:       order.ID,
-		Provider:      "chapa",
-		Status:        domain.PaymentStatusPending,
-		AmountCents:   totalCents,
-		Currency:      "ETB",
-		ProviderTxRef: &chapaTxRef,
-	})
-	if err != nil {
-		s.releaseInventory(ctx, cartItems)
-		return nil, domainerrors.Internal("failed to create payment", err)
-	}
-	_ = payment
-
 	escrowTxID, err := s.blnkClient.CreateEscrowHold(ctx, blnk.EscrowHoldRequest{
-		OrderID:     order.ID,
-		MerchantID:  merchantID,
-		AmountCents: totalCents,
+		OrderID:     result.order.ID,
+		MerchantID:  result.merchantID,
+		AmountCents: result.totalCents,
 	})
 	if err != nil {
-		s.releaseInventory(ctx, cartItems)
+		s.releaseInventory(ctx, result.cartItems)
 		return nil, domainerrors.Internal("failed to create escrow hold", err)
 	}
 
-	if _, err := s.orderRepo.UpdateBlnkTransaction(ctx, order.ID, escrowTxID); err != nil {
+	if _, err := s.orderRepo.UpdateBlnkTransaction(ctx, result.order.ID, escrowTxID); err != nil {
 		if voidErr := s.blnkClient.VoidEscrow(ctx, escrowTxID); voidErr != nil {
 			slog.Error("CRITICAL: failed to void escrow after order update failure",
-				"order_id", order.ID,
+				"order_id", result.order.ID,
 				"escrow_id", escrowTxID,
 				"error", voidErr)
 		}
-		s.releaseInventory(ctx, cartItems)
+		s.releaseInventory(ctx, result.cartItems)
 		return nil, domainerrors.Internal("failed to associate escrow with order", err)
 	}
 
 	chapaResp, err := s.chapaClient.InitializePayment(ctx, chapa.InitializePaymentRequest{
-		Amount:      fmt.Sprintf("%.2f", float64(totalCents)/100),
+		Amount:      fmt.Sprintf("%.2f", float64(result.totalCents)/100),
 		Currency:    "ETB",
-		TxRef:       chapaTxRef,
+		TxRef:       result.chapaTxRef,
 		CallbackURL: "",
 		ReturnURL:   "",
-		Description: fmt.Sprintf("Order %s", order.ID.String()),
+		Description: fmt.Sprintf("Order %s", result.order.ID.String()),
 	})
 	if err != nil {
 		if voidErr := s.blnkClient.VoidEscrow(ctx, escrowTxID); voidErr != nil {
@@ -178,19 +209,28 @@ func (s *CheckoutService) Checkout(ctx context.Context, input CheckoutInput) (*C
 				"escrow_id", escrowTxID,
 				"error", voidErr)
 		}
-		s.releaseInventory(ctx, cartItems)
+		s.releaseInventory(ctx, result.cartItems)
 		return nil, domainerrors.Internal("failed to initialize payment", err)
 	}
 
-	_ = s.cartItemRepo.ClearCart(ctx, cart.ID)
+	_ = s.cartItemRepo.ClearCart(ctx, result.cartID)
 
 	return &CheckoutResult{
-		OrderID:    order.ID,
-		TotalCents: totalCents,
+		OrderID:    result.order.ID,
+		TotalCents: result.totalCents,
 		Currency:   "ETB",
 		PaymentURL: chapaResp.Data.CheckoutURL,
-		ChapaTxRef: chapaTxRef,
+		ChapaTxRef: result.chapaTxRef,
 	}, nil
+}
+
+func (s *CheckoutService) reserveInventoryWithRepo(ctx context.Context, items []domain.CartItem, inventoryRepo repository.InventoryRepository) error {
+	for _, item := range items {
+		if err := inventoryRepo.Reserve(ctx, item.VariantID, item.Quantity); err != nil {
+			return domainerrors.Internal("failed to reserve inventory", err)
+		}
+	}
+	return nil
 }
 
 func (s *CheckoutService) validateCartAndGetMerchant(ctx context.Context, items []domain.CartItem) (uuid.UUID, int64, error) {
@@ -300,7 +340,12 @@ func (s *CheckoutService) ProcessSuccessfulPayment(ctx context.Context, chapaTxR
 		return fmt.Errorf("order not found: %w", err)
 	}
 
-	if _, err := s.paymentRepo.UpdateStatus(ctx, order.ID, domain.PaymentStatusSucceeded); err != nil {
+	payment, err := s.paymentRepo.GetByOrderID(ctx, order.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get payment: %w", err)
+	}
+
+	if _, err := s.paymentRepo.UpdateStatus(ctx, payment.ID, domain.PaymentStatusSucceeded); err != nil {
 		return fmt.Errorf("failed to update payment status: %w", err)
 	}
 
@@ -322,7 +367,12 @@ func (s *CheckoutService) ProcessFailedPayment(ctx context.Context, chapaTxRef s
 		return fmt.Errorf("order not found: %w", err)
 	}
 
-	if _, err := s.paymentRepo.UpdateStatus(ctx, order.ID, domain.PaymentStatusFailed); err != nil {
+	payment, err := s.paymentRepo.GetByOrderID(ctx, order.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get payment: %w", err)
+	}
+
+	if _, err := s.paymentRepo.UpdateStatus(ctx, payment.ID, domain.PaymentStatusFailed); err != nil {
 		return fmt.Errorf("failed to update payment status: %w", err)
 	}
 

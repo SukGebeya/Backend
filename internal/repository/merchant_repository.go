@@ -13,14 +13,25 @@ import (
 )
 
 type merchantRepository struct {
+	pool    *pgxpool.Pool
 	queries *db.Queries
 }
 
 func NewMerchantRepository(pool *pgxpool.Pool) MerchantRepository {
-	return &merchantRepository{queries: db.New(pool)}
+	return &merchantRepository{
+		pool:    pool,
+		queries: db.New(pool),
+	}
 }
 
 var _ MerchantRepository = (*merchantRepository)(nil)
+
+func (r *merchantRepository) WithTx(tx pgx.Tx) MerchantRepository {
+	return &merchantRepository{
+		pool:    r.pool,
+		queries: r.queries.WithTx(tx),
+	}
+}
 
 func (r *merchantRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.MerchantProfile, error) {
 	merchant, err := r.queries.GetMerchantProfileByID(ctx, id)

@@ -3,22 +3,28 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/SukGebeya/Backend/internal/blnk"
 	"github.com/SukGebeya/Backend/internal/domain"
 	domainerrors "github.com/SukGebeya/Backend/internal/errors"
+	"github.com/SukGebeya/Backend/internal/jobs"
 	"github.com/SukGebeya/Backend/internal/repository"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 var _ OrderManager = (*OrderService)(nil)
 
 type OrderService struct {
-	orderRepo    repository.OrderRepository
-	merchantRepo repository.MerchantRepository
-	shipmentRepo repository.ShipmentRepository
-	walletRepo   repository.WalletTransactionRepository
-	blnkClient   *blnk.Client
+	orderRepo     repository.OrderRepository
+	merchantRepo  repository.MerchantRepository
+	shipmentRepo  repository.ShipmentRepository
+	walletRepo    repository.WalletTransactionRepository
+	blnkClient    blnk.BlnkClient
+	inventoryRepo repository.InventoryRepository
+	userRepo      repository.UserRepository
+	txManager     repository.TransactionManager
 }
 
 func NewOrderService(
@@ -26,14 +32,20 @@ func NewOrderService(
 	merchantRepo repository.MerchantRepository,
 	shipmentRepo repository.ShipmentRepository,
 	walletRepo repository.WalletTransactionRepository,
-	blnkClient *blnk.Client,
+	blnkClient blnk.BlnkClient,
+	inventoryRepo repository.InventoryRepository,
+	userRepo repository.UserRepository,
+	txManager repository.TransactionManager,
 ) *OrderService {
 	return &OrderService{
-		orderRepo:    orderRepo,
-		merchantRepo: merchantRepo,
-		shipmentRepo: shipmentRepo,
-		walletRepo:   walletRepo,
-		blnkClient:   blnkClient,
+		orderRepo:     orderRepo,
+		merchantRepo:  merchantRepo,
+		shipmentRepo:  shipmentRepo,
+		walletRepo:    walletRepo,
+		blnkClient:    blnkClient,
+		inventoryRepo: inventoryRepo,
+		userRepo:      userRepo,
+		txManager:     txManager,
 	}
 }
 
@@ -259,8 +271,16 @@ func (s *OrderService) ConfirmDelivery(ctx context.Context, orderID uuid.UUID) (
 	}
 
 	if err := s.blnkClient.CommitEscrow(ctx, *order.BlnkTransactionID); err != nil {
+		slog.Error("ConfirmDelivery: failed to commit escrow",
+			"order_id", orderID,
+			"blnk_txn_id", *order.BlnkTransactionID,
+			"error", err)
 		return nil, fmt.Errorf("failed to commit escrow: %w", err)
 	}
+
+	slog.Info("ConfirmDelivery: escrow committed",
+		"order_id", orderID,
+		"blnk_txn_id", *order.BlnkTransactionID)
 
 	merchantCreditReq := blnk.MerchantCreditRequest{
 		OrderID:        order.ID,
@@ -270,43 +290,92 @@ func (s *OrderService) ConfirmDelivery(ctx context.Context, orderID uuid.UUID) (
 		MerchantBlnkID: *merchant.BlnkBalanceID,
 	}
 
-	blnkTxnID, err := s.blnkClient.CreditMerchant(ctx, merchantCreditReq)
+	merchantTxnID, err := s.blnkClient.CreditMerchant(ctx, merchantCreditReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to credit merchant: %w", err)
+		slog.Error("ConfirmDelivery: CRITICAL - escrow committed but merchant credit failed",
+			"order_id", orderID,
+			"merchant_id", order.MerchantID,
+			"subtotal_cents", order.SubtotalCents,
+			"error", err)
+		return nil, fmt.Errorf("failed to credit merchant (escrow already committed - requires manual reconciliation): %w", err)
 	}
 
-	netAmountCents := order.SubtotalCents - order.PlatformFeeCents
-	description := fmt.Sprintf("Sale credit for order %s", order.ID.String())
+	slog.Info("ConfirmDelivery: merchant credited",
+		"order_id", orderID,
+		"merchant_id", order.MerchantID,
+		"blnk_txn_id", merchantTxnID)
 
-	walletTxn := &domain.WalletTransaction{
-		ID:                uuid.New(),
-		MerchantID:        order.MerchantID,
-		OrderID:           &order.ID,
-		Type:              domain.WalletTransactionTypeSaleCredit,
-		AmountCents:       netAmountCents,
-		Currency:          order.Currency,
-		BlnkTransactionID: blnkTxnID,
-		Status:            domain.WalletTransactionStatusApplied,
-		Description:       &description,
-	}
-
-	if _, err := s.walletRepo.Create(ctx, walletTxn); err != nil {
-		return nil, fmt.Errorf("failed to create wallet transaction: %w", err)
-	}
-
-	shipment, err := s.shipmentRepo.GetByOrderID(ctx, orderID)
-	if err == nil && shipment != nil {
-		if _, err := s.shipmentRepo.UpdateDelivered(ctx, shipment.ID); err != nil {
-			return nil, fmt.Errorf("failed to update shipment status: %w", err)
+	if order.PlatformFeeCents > 0 {
+		platformFeeTxnID, err := s.blnkClient.CreditPlatformFee(ctx, blnk.PlatformFeeRequest{
+			OrderID:  order.ID,
+			FeeCents: order.PlatformFeeCents,
+		})
+		if err != nil {
+			slog.Error("ConfirmDelivery: CRITICAL - merchant credited but platform fee transfer failed",
+				"order_id", orderID,
+				"fee_cents", order.PlatformFeeCents,
+				"error", err)
+		} else {
+			slog.Info("ConfirmDelivery: platform fee credited",
+				"order_id", orderID,
+				"fee_cents", order.PlatformFeeCents,
+				"blnk_txn_id", platformFeeTxnID)
 		}
 	}
 
-	updated, err := s.orderRepo.UpdateStatus(ctx, orderID, domain.OrderStatusDelivered)
+	var updatedOrder *domain.Order
+	var shipment *domain.Shipment
+
+	err = s.txManager.Run(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		txOrderRepo := s.orderRepo.WithTx(tx)
+		txShipmentRepo := s.shipmentRepo.WithTx(tx)
+		txWalletRepo := s.walletRepo.WithTx(tx)
+
+		netAmountCents := order.SubtotalCents - order.PlatformFeeCents
+		description := fmt.Sprintf("Sale credit for order %s", order.ID.String())
+
+		walletTxn := &domain.WalletTransaction{
+			ID:                uuid.New(),
+			MerchantID:        order.MerchantID,
+			OrderID:           &order.ID,
+			Type:              domain.WalletTransactionTypeSaleCredit,
+			AmountCents:       netAmountCents,
+			Currency:          order.Currency,
+			BlnkTransactionID: merchantTxnID,
+			Status:            domain.WalletTransactionStatusApplied,
+			Description:       &description,
+		}
+
+		if _, err := txWalletRepo.Create(ctx, walletTxn); err != nil {
+			return fmt.Errorf("failed to create wallet transaction: %w", err)
+		}
+
+		shipment, err = txShipmentRepo.GetByOrderID(ctx, orderID)
+		if err == nil && shipment != nil {
+			if _, err := txShipmentRepo.UpdateDelivered(ctx, shipment.ID); err != nil {
+				return fmt.Errorf("failed to update shipment status: %w", err)
+			}
+		}
+
+		updatedOrder, err = txOrderRepo.UpdateStatus(ctx, orderID, domain.OrderStatusDelivered)
+		if err != nil {
+			return fmt.Errorf("failed to update order status: %w", err)
+		}
+
+		return nil
+	})
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to update order status: %w", err)
+		slog.Error("ConfirmDelivery: CRITICAL - Blnk operations succeeded but DB transaction failed",
+			"order_id", orderID,
+			"merchant_txn_id", merchantTxnID,
+			"error", err)
+		return nil, err
 	}
 
-	return updated, nil
+	jobs.EnqueueOrderNotification(ctx, orderID, order.BuyerID, "delivered", s.userRepo)
+
+	return updatedOrder, nil
 }
 
 func (s *OrderService) MarkOrderShipped(ctx context.Context, input MarkOrderShippedInput) (*domain.Order, error) {
@@ -328,7 +397,14 @@ func (s *OrderService) MarkOrderShipped(ctx context.Context, input MarkOrderShip
 		return nil, fmt.Errorf("failed to update shipment: %w", err)
 	}
 
-	return s.orderRepo.UpdateStatus(ctx, input.OrderID, domain.OrderStatusShipped)
+	updated, err := s.orderRepo.UpdateStatus(ctx, input.OrderID, domain.OrderStatusShipped)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update order status: %w", err)
+	}
+
+	jobs.EnqueueOrderNotification(ctx, input.OrderID, updated.BuyerID, "shipped", s.userRepo)
+
+	return updated, nil
 }
 
 func (s *OrderService) CancelOrder(ctx context.Context, orderID uuid.UUID, cancelledBy string) (*domain.Order, error) {
@@ -347,9 +423,31 @@ func (s *OrderService) CancelOrder(ctx context.Context, orderID uuid.UUID, cance
 		return nil, domainerrors.BadRequest(fmt.Sprintf("cannot cancel order in %s status", order.Status))
 	}
 
+	items, err := s.orderRepo.ListItemsByOrderID(ctx, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get order items: %w", err)
+	}
+
 	if order.BlnkTransactionID != nil && *order.BlnkTransactionID != "" {
 		if err := s.blnkClient.VoidEscrow(ctx, *order.BlnkTransactionID); err != nil {
+			slog.Error("CancelOrder: failed to void escrow",
+				"order_id", orderID,
+				"blnk_txn_id", *order.BlnkTransactionID,
+				"error", err)
 			return nil, fmt.Errorf("failed to void escrow: %w", err)
+		}
+		slog.Info("CancelOrder: escrow voided",
+			"order_id", orderID,
+			"blnk_txn_id", *order.BlnkTransactionID)
+	}
+
+	for _, item := range items {
+		if err := s.inventoryRepo.Release(ctx, item.VariantID, item.Quantity); err != nil {
+			slog.Error("CancelOrder: failed to release inventory",
+				"order_id", orderID,
+				"variant_id", item.VariantID,
+				"quantity", item.Quantity,
+				"error", err)
 		}
 	}
 

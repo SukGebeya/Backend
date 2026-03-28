@@ -17,6 +17,7 @@ type BlnkClient interface {
 	CommitEscrow(ctx context.Context, inflightTxnID string) error
 	VoidEscrow(ctx context.Context, inflightTxnID string) error
 	CreditMerchant(ctx context.Context, req MerchantCreditRequest) (string, error)
+	CreditPlatformFee(ctx context.Context, req PlatformFeeRequest) (string, error)
 	DebitMerchantForPayout(ctx context.Context, req PayoutRequest) (string, error)
 	GetBalance(ctx context.Context, balanceID string) (int64, error)
 	GetTransactionHistory(ctx context.Context, balanceID string, limit int) ([]TransactionResponse, error)
@@ -99,6 +100,11 @@ type MerchantCreditRequest struct {
 	SubtotalCents  int64
 	FeeCents       int64
 	MerchantBlnkID string
+}
+
+type PlatformFeeRequest struct {
+	OrderID  uuid.UUID
+	FeeCents int64
 }
 
 type PayoutRequest struct {
@@ -294,6 +300,61 @@ func (c *Client) CreditMerchant(ctx context.Context, req MerchantCreditRequest) 
 	}
 
 	slog.Debug("CreditMerchant: Blnk API call succeeded",
+		"transaction_id", txn.TransactionID,
+		"response_status", resp.StatusCode,
+	)
+
+	return txn.TransactionID, nil
+}
+
+func (c *Client) CreditPlatformFee(ctx context.Context, req PlatformFeeRequest) (string, error) {
+	revenueBalanceID := os.Getenv("BLNK_REVENUE_BALANCE_ID")
+	if revenueBalanceID == "" {
+		slog.Error("CreditPlatformFee: BLNK_REVENUE_BALANCE_ID not set")
+		return "", fmt.Errorf("BLNK_REVENUE_BALANCE_ID environment variable not set")
+	}
+
+	escrowBalanceID := os.Getenv("BLNK_ESCROW_BALANCE_ID")
+	if escrowBalanceID == "" {
+		slog.Error("CreditPlatformFee: BLNK_ESCROW_BALANCE_ID not set")
+		return "", fmt.Errorf("BLNK_ESCROW_BALANCE_ID environment variable not set")
+	}
+
+	slog.Debug("CreditPlatformFee: calling Blnk API",
+		"order_id", req.OrderID.String(),
+		"fee_cents", req.FeeCents,
+	)
+
+	amount := float64(req.FeeCents) / 100.0
+
+	txnReq := blnkgo.CreateTransactionRequest{
+		ParentTransaction: blnkgo.ParentTransaction{
+			Amount:      amount,
+			Currency:    "ETB",
+			Precision:   100,
+			Reference:   fmt.Sprintf("platform-fee-%s", req.OrderID.String()),
+			Source:      escrowBalanceID,
+			Destination: revenueBalanceID,
+			Description: fmt.Sprintf("Platform fee for order %s", req.OrderID.String()),
+			MetaData: map[string]interface{}{
+				"order_id": req.OrderID.String(),
+				"type":     "platform_fee",
+			},
+		},
+		AllowOverdraft: false,
+		Inflight:       false,
+	}
+
+	txn, resp, err := c.sdk.Transaction.Create(txnReq)
+	if err != nil {
+		slog.Error("CreditPlatformFee: Blnk API call failed",
+			"error", err,
+			"order_id", req.OrderID.String(),
+		)
+		return "", fmt.Errorf("blnk CreditPlatformFee: %w", err)
+	}
+
+	slog.Debug("CreditPlatformFee: Blnk API call succeeded",
 		"transaction_id", txn.TransactionID,
 		"response_status", resp.StatusCode,
 	)

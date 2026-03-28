@@ -6,6 +6,7 @@ import (
 
 	"github.com/SukGebeya/Backend/internal/domain"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type UserRepository interface {
@@ -35,6 +36,7 @@ type MerchantRepository interface {
 	Update(ctx context.Context, merchant *domain.MerchantProfile) (*domain.MerchantProfile, error)
 	UpdateBlnkWallet(ctx context.Context, id uuid.UUID, balanceID, ledgerID string) (*domain.MerchantProfile, error)
 	List(ctx context.Context, opts domain.ListOptions) (*domain.PaginatedResult[domain.MerchantProfile], error)
+	WithTx(tx pgx.Tx) MerchantRepository
 }
 
 type CategoryRepository interface {
@@ -91,6 +93,7 @@ type InventoryRepository interface {
 	Reserve(ctx context.Context, variantID uuid.UUID, qty int) error
 	Release(ctx context.Context, variantID uuid.UUID, qty int) error
 	Commit(ctx context.Context, variantID uuid.UUID, qty int) error
+	WithTx(tx pgx.Tx) InventoryRepository
 }
 
 type RateLimitRepository interface {
@@ -119,6 +122,7 @@ type CartRepository interface {
 	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.CartStatus) (*domain.Cart, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 	DeleteBySessionID(ctx context.Context, sessionID string) error
+	WithTx(tx pgx.Tx) CartRepository
 }
 
 type CartItemRepository interface {
@@ -134,6 +138,7 @@ type CartItemRepository interface {
 	CountByCart(ctx context.Context, cartID uuid.UUID) (int64, error)
 	CountDistinctVariants(ctx context.Context, cartID uuid.UUID) (int, error)
 	MergeItems(ctx context.Context, sourceCartID, targetCartID uuid.UUID) error
+	WithTx(tx pgx.Tx) CartItemRepository
 }
 
 type SessionRepository interface {
@@ -157,6 +162,7 @@ type OrderRepository interface {
 	GetItemByID(ctx context.Context, id uuid.UUID) (*domain.OrderItem, error)
 	ListItemsByOrderID(ctx context.Context, orderID uuid.UUID) ([]domain.OrderItem, error)
 	CreateItem(ctx context.Context, item *domain.OrderItem) (*domain.OrderItem, error)
+	WithTx(tx pgx.Tx) OrderRepository
 }
 
 type PaymentRepository interface {
@@ -168,6 +174,7 @@ type PaymentRepository interface {
 	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.PaymentStatus) (*domain.Payment, error)
 	UpdateProviderResponse(ctx context.Context, id uuid.UUID, providerResponse map[string]any) (*domain.Payment, error)
 	UpdateBlnkTransaction(ctx context.Context, id uuid.UUID, blnkTxID string) (*domain.Payment, error)
+	WithTx(tx pgx.Tx) PaymentRepository
 }
 
 type ShipmentRepository interface {
@@ -177,6 +184,7 @@ type ShipmentRepository interface {
 	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.ShipmentStatus) (*domain.Shipment, error)
 	UpdateShipped(ctx context.Context, id uuid.UUID, carrier, trackingNumber *string, estimatedDelivery *time.Time) (*domain.Shipment, error)
 	UpdateDelivered(ctx context.Context, id uuid.UUID) (*domain.Shipment, error)
+	WithTx(tx pgx.Tx) ShipmentRepository
 }
 
 type WalletTransactionRepository interface {
@@ -186,6 +194,7 @@ type WalletTransactionRepository interface {
 	Create(ctx context.Context, txn *domain.WalletTransaction) (*domain.WalletTransaction, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.WalletTransactionStatus) (*domain.WalletTransaction, error)
 	CountByMerchantID(ctx context.Context, merchantID uuid.UUID) (int64, error)
+	WithTx(tx pgx.Tx) WalletTransactionRepository
 }
 
 type PayoutRepository interface {
