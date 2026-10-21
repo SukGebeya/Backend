@@ -23,7 +23,7 @@ func NewAddressHandler(addressService *service.AddressService) *AddressHandler {
 
 type CreateAddressRequest struct {
 	FullName  string  `json:"full_name" validate:"required,min=2,max=100" example:"Abebe Bikila"`
-	Phone     string  `json:"phone" validate:"required,min=10,max=15" example:"+251911234567"`
+	Phone     string  `json:"phone" validate:"required,etphone" example:"0911234567"`
 	Line1     string  `json:"line1" validate:"required,min=5,max=200" example:"Bole Sub-city, Woreda 03"`
 	Line2     *string `json:"line2" validate:"omitempty,max=200" example:"Apartment 4B"`
 	City      string  `json:"city" validate:"required,min=2,max=100" example:"Addis Ababa"`
@@ -34,7 +34,7 @@ type CreateAddressRequest struct {
 
 type UpdateAddressRequest struct {
 	FullName *string `json:"full_name" validate:"omitempty,min=2,max=100" example:"Abebe Bikila"`
-	Phone    *string `json:"phone" validate:"omitempty,min=10,max=15" example:"+251911234567"`
+	Phone    *string `json:"phone" validate:"omitempty,etphone" example:"0911234567"`
 	Line1    *string `json:"line1" validate:"omitempty,min=5,max=200" example:"Bole Sub-city, Woreda 03"`
 	Line2    *string `json:"line2" validate:"omitempty,max=200" example:"Apartment 4B"`
 	City     *string `json:"city" validate:"omitempty,min=2,max=100" example:"Addis Ababa"`

@@ -19,20 +19,25 @@ SET quantity = sqlc.arg(quantity), updated_at = NOW()
 WHERE id = sqlc.arg(id)
 RETURNING id, variant_id, quantity, reserved, updated_at;
 
--- name: ReserveInventory :exec
+-- name: ReserveInventory :execrows
 UPDATE inventory
 SET reserved = reserved + sqlc.arg(qty), updated_at = NOW()
 WHERE variant_id = sqlc.arg(variant_id) AND (quantity - reserved) >= sqlc.arg(qty);
 
--- name: ReleaseInventory :exec
+-- name: ReleaseInventory :execrows
 UPDATE inventory
 SET reserved = reserved - sqlc.arg(qty), updated_at = NOW()
 WHERE variant_id = sqlc.arg(variant_id) AND reserved >= sqlc.arg(qty);
 
--- name: CommitInventory :exec
+-- name: CommitInventory :execrows
 UPDATE inventory
 SET quantity = quantity - sqlc.arg(qty), reserved = reserved - sqlc.arg(qty), updated_at = NOW()
 WHERE variant_id = sqlc.arg(variant_id) AND reserved >= sqlc.arg(qty);
+
+-- name: RestockInventory :execrows
+UPDATE inventory
+SET quantity = quantity + sqlc.arg(qty), updated_at = NOW()
+WHERE variant_id = sqlc.arg(variant_id);
 
 -- name: GetInventoryByProductID :many
 SELECT i.id, i.variant_id, i.quantity, i.reserved, i.updated_at

@@ -10,9 +10,8 @@ const docTemplate = `{
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
         "contact": {
-            "name": "API Support",
-            "url": "https://github.com/natnael-alemayehu/sukgebeya",
-            "email": "support@example.com"
+            "name": "Gebeya",
+            "url": "https://github.com/SukGebeya/Backend"
         },
         "license": {
             "name": "MIT",
@@ -706,6 +705,104 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/merchants/{id}/wallet": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates the merchant's Blnk wallet if it has none (seeded merchants, or onboarding while Blnk was down). Safe to repeat.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Create a missing merchant wallet (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Merchant ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.MerchantProfileResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/orders/{id}/resolve": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "release pays the merchant as if delivery were confirmed; refund cancels the order and refunds the buyer through Chapa (set restock when the goods came back).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Resolve an order dispute (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Resolution",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.ResolveDisputeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.OrderResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/payouts": {
             "get": {
                 "security": [
@@ -775,7 +872,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Process a pending payout request - this will debit the merchant's wallet. Idempotency-Key header is recommended to prevent duplicate processing.",
+                "description": "Approves a pending payout and starts the Chapa transfer asynchronously. The merchant's funds are already held, so approval cannot overdraw the wallet.",
                 "consumes": [
                     "application/json"
                 ],
@@ -785,7 +882,7 @@ const docTemplate = `{
                 "tags": [
                     "admin"
                 ],
-                "summary": "Process a payout (admin)",
+                "summary": "Approve and process a payout (admin)",
                 "parameters": [
                     {
                         "type": "string",
@@ -799,6 +896,81 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.AdminPayoutResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/payouts/{id}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Rejects a pending payout and releases the held funds back to the merchant's wallet",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Reject a payout (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Payout ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Rejection reason",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.RejectPayoutRequest"
+                        }
                     }
                 ],
                 "responses": {
@@ -824,6 +996,37 @@ const docTemplate = `{
                         "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/reconciliation": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Compares every merchant wallet and the escrow balance in Blnk with Postgres records. Also runs daily at 03:00 Addis Ababa time.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Reconcile ledger with database (admin)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_internal_service.ReconciliationReport"
                         }
                     },
                     "500": {
@@ -954,6 +1157,174 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/otp/send": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Texts a 6-digit code (Amharic and English) to the phone on the account. One request per minute.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Send phone verification code",
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/otp/verify": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Confirms the code sent by SMS and marks the phone number verified. Required before checkout and opening a shop.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Verify phone number",
+                "parameters": [
+                    {
+                        "description": "Code",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.VerifyPhoneRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.UserResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/password/reset/confirm": {
+            "post": {
+                "description": "Sets a new password and signs the account out everywhere.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Reset password with SMS code",
+                "parameters": [
+                    {
+                        "description": "Reset",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.PasswordResetConfirmRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/password/reset/request": {
+            "post": {
+                "description": "Texts a reset code if the phone belongs to an account. Always answers 202 so it cannot reveal which numbers are registered.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Request a password reset code",
+                "parameters": [
+                    {
+                        "description": "Phone",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.PasswordResetRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.MessageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
                         "schema": {
                             "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
@@ -1384,7 +1755,7 @@ const docTemplate = `{
         },
         "/health": {
             "get": {
-                "description": "Check the health status of the API and its dependencies",
+                "description": "Check the health status of the API and its dependencies. Postgres and Redis are required; a Blnk outage reports \"degraded\" without failing the check, because browsing and carts still work.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1542,6 +1913,37 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/merchant/dashboard": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Shop summary: total sales, orders by status (paid and processing need action), wallet balance and money held for pending payouts.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "merchant"
+                ],
+                "summary": "Merchant dashboard",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.MerchantDashboardResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
@@ -1712,6 +2114,70 @@ const docTemplate = `{
                         "description": "Order details",
                         "schema": {
                             "$ref": "#/definitions/internal_http_handler.OrderDetailResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Order not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/merchant/orders/{id}/cancel": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Merchant cancels an order that has not shipped. Paid orders are restocked and refunded to the buyer.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "merchant"
+                ],
+                "summary": "Cancel order (merchant)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Cancelled order",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.OrderResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Order cannot be cancelled",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "401": {
@@ -2160,6 +2626,110 @@ const docTemplate = `{
                 }
             }
         },
+        "/merchant/products/{id}/images": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Attach an image (an https URL from your storage or CDN) to one of your products. The first image becomes the primary one.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "merchant"
+                ],
+                "summary": "Add a product image",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Image",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.AddImageRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.ImageResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/merchant/products/{id}/images/{imageId}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "merchant"
+                ],
+                "summary": "Remove a product image",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Image ID",
+                        "name": "imageId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/merchant/products/{id}/variants": {
             "post": {
                 "security": [
@@ -2388,6 +2958,83 @@ const docTemplate = `{
                 }
             }
         },
+        "/merchant/products/{id}/variants/{variantId}/stock": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Set the on-hand quantity for a variant. The quantity cannot be lower than what is currently reserved by carts and unpaid orders.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "merchant"
+                ],
+                "summary": "Set variant stock",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Variant ID",
+                        "name": "variantId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Stock level",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.SetStockRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.InventoryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/merchant/profile": {
             "get": {
                 "security": [
@@ -2528,6 +3175,46 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/merchant/wallet/banks": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Banks and mobile-money providers Chapa can transfer to. Use the id as bank_code when requesting a payout.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "wallet"
+                ],
+                "summary": "List payout banks",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_http_handler.BankResponse"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
@@ -3114,9 +3801,165 @@ const docTemplate = `{
                 }
             }
         },
+        "/orders/{id}/dispute": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Report a problem with an order that is being prepared or is on its way. The payment stays in escrow and is neither released to the merchant nor auto-confirmed until an admin resolves the dispute.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "orders"
+                ],
+                "summary": "Open a dispute (buyer)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Reason",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.OpenDisputeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.OrderResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/orders/{id}/payment/refresh": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Verifies the order's payment with Chapa immediately. Use it from the payment return page instead of waiting for the webhook.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "orders"
+                ],
+                "summary": "Re-check payment status (buyer)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Order ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Order with current status",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.OrderResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Order not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/payments/chapa/callback": {
+            "get": {
+                "description": "Chapa calls this URL (CHAPA_CALLBACK_URL) after checkout. The query is only a hint; the payment is verified with Chapa before the order changes.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "webhooks"
+                ],
+                "summary": "Chapa payment callback",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Transaction reference",
+                        "name": "trx_ref",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Transaction reference",
+                        "name": "tx_ref",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.WebhookAckResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/products": {
             "get": {
-                "description": "Get a paginated list of all active products",
+                "description": "Paginated list of active products with their lowest price, current availability, primary image and shop. Search works in Amharic and English.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3126,7 +3969,7 @@ const docTemplate = `{
                 "tags": [
                     "products"
                 ],
-                "summary": "List all active products",
+                "summary": "Browse products",
                 "parameters": [
                     {
                         "type": "integer",
@@ -3144,8 +3987,20 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "description": "Search in product name and description",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Filter by category ID",
                         "name": "category_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by merchant (shop) ID",
+                        "name": "merchant_id",
                         "in": "query"
                     }
                 ],
@@ -3153,7 +4008,13 @@ const docTemplate = `{
                     "200": {
                         "description": "List of products",
                         "schema": {
-                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.PaginatedResponse"
+                            "$ref": "#/definitions/internal_http_handler.ProductListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid filter",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
                         }
                     },
                     "500": {
@@ -3167,7 +4028,7 @@ const docTemplate = `{
         },
         "/products/{slug}": {
             "get": {
-                "description": "Get a single product by its slug",
+                "description": "Get an active product by ID or slug, with its variants (including how many units are available), images and shop.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3177,11 +4038,11 @@ const docTemplate = `{
                 "tags": [
                     "products"
                 ],
-                "summary": "Get product by slug",
+                "summary": "Get a product",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Product slug",
+                        "description": "Product ID or slug",
                         "name": "slug",
                         "in": "path",
                         "required": true
@@ -3662,7 +4523,7 @@ const docTemplate = `{
         },
         "/webhooks/chapa": {
             "post": {
-                "description": "Handle payment webhooks from Chapa payment gateway",
+                "description": "Receives Chapa payment events. The signature is checked, the event is recorded once, and the payment is re-verified with Chapa asynchronously before any order changes.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3676,10 +4537,15 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Webhook signature",
+                        "description": "HMAC-SHA256 of the payload",
+                        "name": "x-chapa-signature",
+                        "in": "header"
+                    },
+                    {
+                        "type": "string",
+                        "description": "HMAC-SHA256 of the webhook secret",
                         "name": "Chapa-Signature",
-                        "in": "header",
-                        "required": true
+                        "in": "header"
                     },
                     {
                         "description": "Webhook payload",
@@ -3687,18 +4553,15 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_http_handler.ChapaWebhookPayload"
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_internal_chapa.WebhookPayload"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Webhook received",
+                        "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/internal_http_handler.WebhookAckResponse"
                         }
                     },
                     "400": {
@@ -3718,6 +4581,80 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "github_com_SukGebeya_Backend_internal_chapa.WebhookPayload": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "string"
+                },
+                "charge": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "amount": {
+                            "type": "string"
+                        },
+                        "status": {
+                            "type": "string"
+                        },
+                        "tx_ref": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "event": {
+                    "type": "string"
+                },
+                "mode": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tx_ref": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_SukGebeya_Backend_internal_service.ReconciliationMismatch": {
+            "type": "object",
+            "properties": {
+                "account": {
+                    "type": "string"
+                },
+                "balance_id": {
+                    "type": "string"
+                },
+                "expected_cents": {
+                    "type": "integer"
+                },
+                "ledger_cents": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_SukGebeya_Backend_internal_service.ReconciliationReport": {
+            "type": "object",
+            "properties": {
+                "checked_at": {
+                    "type": "string"
+                },
+                "merchants_checked": {
+                    "type": "integer"
+                },
+                "mismatches": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_SukGebeya_Backend_internal_service.ReconciliationMismatch"
+                    }
+                }
+            }
+        },
         "github_com_SukGebeya_Backend_pkg_response.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -3751,6 +4688,26 @@ const docTemplate = `{
                 "total_pages": {
                     "type": "integer",
                     "example": 3
+                }
+            }
+        },
+        "internal_http_handler.AddImageRequest": {
+            "type": "object",
+            "required": [
+                "url"
+            ],
+            "properties": {
+                "alt_text": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "is_primary": {
+                    "type": "boolean"
+                },
+                "url": {
+                    "type": "string",
+                    "maxLength": 1000,
+                    "example": "https://cdn.gebeya.example/p/kemis.jpg"
                 }
             }
         },
@@ -3837,8 +4794,14 @@ const docTemplate = `{
         "internal_http_handler.AdminPayoutResponse": {
             "type": "object",
             "properties": {
+                "account_name": {
+                    "type": "string"
+                },
                 "amount_cents": {
                     "type": "integer"
+                },
+                "bank_code": {
+                    "type": "string"
                 },
                 "blnk_transaction_id": {
                     "type": "string"
@@ -3869,6 +4832,9 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "string"
+                },
+                "transfer_reference": {
+                    "type": "string"
                 }
             }
         },
@@ -3880,6 +4846,26 @@ const docTemplate = `{
                 },
                 "user": {
                     "$ref": "#/definitions/internal_http_handler.UserResponse"
+                }
+            }
+        },
+        "internal_http_handler.BankResponse": {
+            "type": "object",
+            "properties": {
+                "currency": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_mobile_money": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
                 }
             }
         },
@@ -3973,28 +4959,6 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_http_handler.ChapaWebhookPayload": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "object",
-                    "properties": {
-                        "amount": {
-                            "type": "string"
-                        },
-                        "status": {
-                            "type": "string"
-                        },
-                        "tx_ref": {
-                            "type": "string"
-                        }
-                    }
-                },
-                "event": {
-                    "type": "string"
-                }
-            }
-        },
         "internal_http_handler.CheckoutRequest": {
             "type": "object",
             "properties": {
@@ -4067,9 +5031,7 @@ const docTemplate = `{
                 },
                 "phone": {
                     "type": "string",
-                    "maxLength": 15,
-                    "minLength": 10,
-                    "example": "+251911234567"
+                    "example": "0911234567"
                 },
                 "subcity": {
                     "type": "string",
@@ -4122,8 +5084,7 @@ const docTemplate = `{
         "internal_http_handler.CreateProductRequest": {
             "type": "object",
             "required": [
-                "name",
-                "slug"
+                "name"
             ],
             "properties": {
                 "category_id": {
@@ -4197,6 +5158,12 @@ const docTemplate = `{
                     "minLength": 2,
                     "example": "COFFEE-YIRG-500G"
                 },
+                "stock_quantity": {
+                    "type": "integer",
+                    "maximum": 1000000,
+                    "minimum": 0,
+                    "example": 25
+                },
                 "title": {
                     "type": "string",
                     "maxLength": 200,
@@ -4208,11 +5175,17 @@ const docTemplate = `{
         "internal_http_handler.GetWalletResponse": {
             "type": "object",
             "properties": {
+                "available_cents": {
+                    "type": "integer"
+                },
                 "balance_cents": {
                     "type": "integer"
                 },
                 "currency": {
                     "type": "string"
+                },
+                "pending_payout_cents": {
+                    "type": "integer"
                 }
             }
         },
@@ -4228,6 +5201,46 @@ const docTemplate = `{
                 "status": {
                     "type": "string",
                     "example": "healthy"
+                }
+            }
+        },
+        "internal_http_handler.ImageResponse": {
+            "type": "object",
+            "properties": {
+                "alt_text": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_primary": {
+                    "type": "boolean"
+                },
+                "sort_order": {
+                    "type": "integer"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_http_handler.InventoryResponse": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "integer"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "reserved": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "variant_id": {
+                    "type": "string"
                 }
             }
         },
@@ -4266,6 +5279,42 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_http_handler.MerchantDashboardResponse": {
+            "type": "object",
+            "properties": {
+                "available_cents": {
+                    "type": "integer"
+                },
+                "balance_cents": {
+                    "type": "integer"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "is_verified": {
+                    "type": "boolean"
+                },
+                "orders_action_required": {
+                    "type": "integer"
+                },
+                "orders_by_status": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                },
+                "pending_payout_cents": {
+                    "type": "integer"
+                },
+                "shop_name": {
+                    "type": "string"
+                },
+                "total_sales_cents": {
+                    "type": "integer"
+                }
+            }
+        },
         "internal_http_handler.MerchantProfileResponse": {
             "type": "object",
             "properties": {
@@ -4283,6 +5332,15 @@ const docTemplate = `{
                 },
                 "created_at": {
                     "type": "string"
+                },
+                "delivery_fee_cents": {
+                    "type": "integer"
+                },
+                "free_delivery_threshold_cents": {
+                    "type": "integer"
+                },
+                "has_wallet": {
+                    "type": "boolean"
                 },
                 "id": {
                     "type": "string"
@@ -4305,8 +5363,14 @@ const docTemplate = `{
                 "shop_slug": {
                     "type": "string"
                 },
+                "tin": {
+                    "type": "string"
+                },
                 "total_sales_cents": {
                     "type": "integer"
+                },
+                "trade_license_number": {
+                    "type": "string"
                 },
                 "updated_at": {
                     "type": "string"
@@ -4369,6 +5433,14 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_http_handler.MessageResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
         "internal_http_handler.OnboardRequest": {
             "type": "object",
             "required": [
@@ -4393,7 +5465,18 @@ const docTemplate = `{
                 },
                 "contact_phone": {
                     "type": "string",
-                    "example": "+251911234567"
+                    "example": "0911234567"
+                },
+                "delivery_fee_cents": {
+                    "type": "integer",
+                    "maximum": 10000000,
+                    "minimum": 0,
+                    "example": 15000
+                },
+                "free_delivery_threshold_cents": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "example": 500000
                 },
                 "shop_description": {
                     "type": "string",
@@ -4411,12 +5494,25 @@ const docTemplate = `{
                     "maxLength": 100,
                     "minLength": 2,
                     "example": "tigist-habesha"
+                },
+                "tin": {
+                    "type": "string",
+                    "example": "0012345678"
+                },
+                "trade_license_number": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "example": "AA/12/3456/14"
                 }
             }
         },
         "internal_http_handler.OnboardResponse": {
             "type": "object",
             "properties": {
+                "blnk_balance_id": {
+                    "type": "string",
+                    "example": "bln_0b7a3c1e-0000-0000-0000-000000000000"
+                },
                 "merchant_id": {
                     "type": "string",
                     "example": "550e8400-e29b-41d4-a716-446655440000"
@@ -4432,6 +5528,20 @@ const docTemplate = `{
                 "shop_slug": {
                     "type": "string",
                     "example": "tigist-habesha"
+                }
+            }
+        },
+        "internal_http_handler.OpenDisputeRequest": {
+            "type": "object",
+            "required": [
+                "reason"
+            ],
+            "properties": {
+                "reason": {
+                    "type": "string",
+                    "maxLength": 1000,
+                    "minLength": 5,
+                    "example": "The item never arrived"
                 }
             }
         },
@@ -4490,6 +5600,12 @@ const docTemplate = `{
                 "currency": {
                     "type": "string"
                 },
+                "delivery_fee_cents": {
+                    "type": "integer"
+                },
+                "dispute_reason": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -4519,16 +5635,60 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_http_handler.PasswordResetConfirmRequest": {
+            "type": "object",
+            "required": [
+                "code",
+                "new_password",
+                "phone"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "482913"
+                },
+                "new_password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "example": "newsecurepassword"
+                },
+                "phone": {
+                    "type": "string",
+                    "example": "0911234567"
+                }
+            }
+        },
+        "internal_http_handler.PasswordResetRequest": {
+            "type": "object",
+            "required": [
+                "phone"
+            ],
+            "properties": {
+                "phone": {
+                    "type": "string",
+                    "example": "0911234567"
+                }
+            }
+        },
         "internal_http_handler.PayoutResponse": {
             "type": "object",
             "properties": {
+                "account_name": {
+                    "type": "string"
+                },
                 "amount_cents": {
                     "type": "integer"
+                },
+                "bank_code": {
+                    "type": "string"
                 },
                 "currency": {
                     "type": "string"
                 },
                 "destination": {
+                    "type": "string"
+                },
+                "failure_reason": {
                     "type": "string"
                 },
                 "id": {
@@ -4538,6 +5698,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "method": {
+                    "type": "string"
+                },
+                "processed_at": {
                     "type": "string"
                 },
                 "requested_at": {
@@ -4551,6 +5714,12 @@ const docTemplate = `{
         "internal_http_handler.ProductDetailResponse": {
             "type": "object",
             "properties": {
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_http_handler.ImageResponse"
+                    }
+                },
                 "product": {
                     "$ref": "#/definitions/internal_http_handler.ProductResponse"
                 },
@@ -4559,6 +5728,29 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/internal_http_handler.VariantResponse"
                     }
+                }
+            }
+        },
+        "internal_http_handler.ProductListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_http_handler.ProductSummaryResponse"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "per_page": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
                 }
             }
         },
@@ -4585,6 +5777,68 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_http_handler.ProductSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "available_quantity": {
+                    "type": "integer",
+                    "example": 12
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "in_stock": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "is_digital": {
+                    "type": "boolean"
+                },
+                "merchant_id": {
+                    "type": "string"
+                },
+                "merchant_verified": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "min_price_cents": {
+                    "type": "integer",
+                    "example": 25000
+                },
+                "name": {
+                    "type": "string"
+                },
+                "primary_image_url": {
+                    "type": "string"
+                },
+                "shop_name": {
+                    "type": "string",
+                    "example": "Tigist Habesha Designs"
+                },
+                "shop_slug": {
+                    "type": "string",
+                    "example": "tigist-habesha"
                 },
                 "slug": {
                     "type": "string"
@@ -4626,7 +5880,7 @@ const docTemplate = `{
                 },
                 "phone": {
                     "type": "string",
-                    "example": "+1234567890"
+                    "example": "0911234567"
                 },
                 "role": {
                     "type": "string",
@@ -4638,20 +5892,46 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_http_handler.RejectPayoutRequest": {
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "type": "string",
+                    "maxLength": 500
+                }
+            }
+        },
         "internal_http_handler.RequestPayoutRequest": {
             "type": "object",
             "required": [
+                "account_name",
                 "amount_cents",
+                "bank_code",
                 "destination",
                 "method"
             ],
             "properties": {
+                "account_name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 2,
+                    "example": "Tigist Bekele"
+                },
                 "amount_cents": {
                     "type": "integer",
-                    "minimum": 100
+                    "minimum": 100,
+                    "example": 50000
+                },
+                "bank_code": {
+                    "type": "string",
+                    "maxLength": 20,
+                    "example": "855"
                 },
                 "destination": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 5,
+                    "example": "0911234567"
                 },
                 "method": {
                     "type": "string",
@@ -4659,7 +5939,38 @@ const docTemplate = `{
                         "telebirr",
                         "bank_transfer",
                         "cbe_birr"
-                    ]
+                    ],
+                    "example": "telebirr"
+                }
+            }
+        },
+        "internal_http_handler.ResolveDisputeRequest": {
+            "type": "object",
+            "required": [
+                "outcome"
+            ],
+            "properties": {
+                "outcome": {
+                    "type": "string",
+                    "enum": [
+                        "release",
+                        "refund"
+                    ],
+                    "example": "refund"
+                },
+                "restock": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "internal_http_handler.SetStockRequest": {
+            "type": "object",
+            "properties": {
+                "quantity": {
+                    "type": "integer",
+                    "maximum": 1000000,
+                    "minimum": 0,
+                    "example": 40
                 }
             }
         },
@@ -4710,8 +6021,14 @@ const docTemplate = `{
                 "contact_phone": {
                     "type": "string"
                 },
+                "delivery_fee_cents": {
+                    "type": "integer"
+                },
                 "description": {
                     "type": "string"
+                },
+                "free_delivery_threshold_cents": {
+                    "type": "integer"
                 },
                 "is_verified": {
                     "type": "boolean"
@@ -4830,9 +6147,7 @@ const docTemplate = `{
                 },
                 "phone": {
                     "type": "string",
-                    "maxLength": 15,
-                    "minLength": 10,
-                    "example": "+251911234567"
+                    "example": "0911234567"
                 },
                 "subcity": {
                     "type": "string",
@@ -4916,11 +6231,23 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 100
                 },
+                "clear_free_delivery_threshold": {
+                    "type": "boolean"
+                },
                 "contact_email": {
                     "type": "string"
                 },
                 "contact_phone": {
                     "type": "string"
+                },
+                "delivery_fee_cents": {
+                    "type": "integer",
+                    "maximum": 10000000,
+                    "minimum": 0
+                },
+                "free_delivery_threshold_cents": {
+                    "type": "integer",
+                    "minimum": 0
                 },
                 "shop_banner_url": {
                     "type": "string"
@@ -4936,6 +6263,13 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 100,
                     "minLength": 2
+                },
+                "tin": {
+                    "type": "string"
+                },
+                "trade_license_number": {
+                    "type": "string",
+                    "maxLength": 50
                 }
             }
         },
@@ -4948,13 +6282,9 @@ const docTemplate = `{
                 "status": {
                     "type": "string",
                     "enum": [
-                        "pending_payment",
-                        "paid",
                         "processing",
                         "shipped",
-                        "delivered",
-                        "cancelled",
-                        "refunded"
+                        "cancelled"
                     ],
                     "example": "processing"
                 }
@@ -4999,9 +6329,15 @@ const docTemplate = `{
                     "type": "string",
                     "example": "newemail@example.com"
                 },
+                "full_name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 2,
+                    "example": "Abebe Bikila"
+                },
                 "phone": {
                     "type": "string",
-                    "example": "+1987654321"
+                    "example": "0911234567"
                 }
             }
         },
@@ -5071,17 +6407,29 @@ const docTemplate = `{
                     "type": "string",
                     "example": "user@example.com"
                 },
+                "full_name": {
+                    "type": "string",
+                    "example": "Abebe Bikila"
+                },
                 "id": {
                     "type": "string",
                     "example": "550e8400-e29b-41d4-a716-446655440000"
                 },
+                "kyc_status": {
+                    "type": "string",
+                    "example": "pending"
+                },
                 "phone": {
                     "type": "string",
-                    "example": "+1234567890"
+                    "example": "+251911234567"
+                },
+                "phone_verified": {
+                    "type": "boolean",
+                    "example": true
                 },
                 "role": {
                     "type": "string",
-                    "example": "user"
+                    "example": "buyer"
                 },
                 "updated_at": {
                     "type": "string",
@@ -5095,6 +6443,9 @@ const docTemplate = `{
                 "attributes": {
                     "type": "object",
                     "additionalProperties": {}
+                },
+                "available_quantity": {
+                    "type": "integer"
                 },
                 "compare_price_cents": {
                     "type": "integer"
@@ -5135,6 +6486,27 @@ const docTemplate = `{
                     "type": "boolean"
                 }
             }
+        },
+        "internal_http_handler.VerifyPhoneRequest": {
+            "type": "object",
+            "required": [
+                "code"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "482913"
+                }
+            }
+        },
+        "internal_http_handler.WebhookAckResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "example": "received"
+                }
+            }
         }
     },
     "securityDefinitions": {
@@ -5153,8 +6525,8 @@ var SwaggerInfo = &swag.Spec{
 	Host:             "localhost:8080",
 	BasePath:         "/api/v1",
 	Schemes:          []string{},
-	Title:            "Go Boilerplate API",
-	Description:      "A production-ready Go REST API boilerplate with authentication, notes, and user management.\nFeatures include JWT authentication, rate limiting, soft deletes, and Redis-based token storage.",
+	Title:            "Gebeya API",
+	Description:      "Marketplace backend for small merchants in Addis Ababa: storefronts, carts,\nescrow-backed checkout through Chapa, and Blnk-powered merchant wallets.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

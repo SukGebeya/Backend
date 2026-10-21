@@ -2,7 +2,7 @@ package jobs
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -10,445 +10,255 @@ import (
 	"github.com/SukGebeya/Backend/internal/domain"
 	domainerrors "github.com/SukGebeya/Backend/internal/errors"
 	"github.com/SukGebeya/Backend/internal/repository"
+	"github.com/SukGebeya/Backend/pkg/sms"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 )
 
 const (
-	defaultJobTimeout = 30 * time.Second
+	defaultJobTimeout     = 60 * time.Second
+	paymentPendingSnooze  = time.Minute
+	transferPendingSnooze = 2 * time.Minute
+	maxPendingAge         = 7 * 24 * time.Hour
 )
 
-var globalRiverClient *river.Client[pgx.Tx]
-
-func SetRiverClient(client *river.Client[pgx.Tx]) {
-	globalRiverClient = client
+type CartExpirer interface {
+	ExpireCart(ctx context.Context, cartID uuid.UUID) error
 }
 
-func EnqueueOrderNotification(ctx context.Context, orderID, buyerID uuid.UUID, event string, userRepo repository.UserRepository) {
-	if globalRiverClient == nil {
-		slog.Error("cannot enqueue notification: river client not initialized")
-		return
-	}
-
-	user, err := userRepo.GetByID(ctx, buyerID)
-	if err != nil {
-		slog.Error("failed to get buyer for notification", "buyer_id", buyerID, "error", err)
-		return
-	}
-
-	phone := ""
-	if user.Phone != nil {
-		phone = *user.Phone
-	}
-
-	if phone == "" {
-		slog.Info("skipping notification: buyer has no phone", "order_id", orderID, "buyer_id", buyerID)
-		return
-	}
-
-	_, err = globalRiverClient.Insert(ctx, SendOrderNotificationArgs{
-		OrderID: orderID,
-		Event:   event,
-		Phone:   phone,
-	}, nil)
-	if err != nil {
-		slog.Error("failed to enqueue notification job", "order_id", orderID, "event", event, "error", err)
-		return
-	}
-
-	slog.Info("enqueued notification job", "order_id", orderID, "event", event)
+type PaymentProcessor interface {
+	ProcessPayment(ctx context.Context, txRef string) error
+	ProcessReversal(ctx context.Context, txRef string) error
+	ExpireUnpaidOrder(ctx context.Context, orderID uuid.UUID) error
+	RefundOrder(ctx context.Context, orderID uuid.UUID) error
 }
 
-type ReleaseCartReservationWorker struct {
-	river.WorkerDefaults[ReleaseCartReservationArgs]
-	cartRepo      repository.CartRepository
-	cartItemRepo  repository.CartItemRepository
-	inventoryRepo repository.InventoryRepository
+type OrderSettler interface {
+	SettleOrder(ctx context.Context, orderID uuid.UUID) error
+	AutoConfirmDelivery(ctx context.Context, orderID uuid.UUID) error
 }
 
-func NewReleaseCartReservationWorker(cartRepo repository.CartRepository, cartItemRepo repository.CartItemRepository, inventoryRepo repository.InventoryRepository) *ReleaseCartReservationWorker {
-	return &ReleaseCartReservationWorker{
-		cartRepo:      cartRepo,
-		cartItemRepo:  cartItemRepo,
-		inventoryRepo: inventoryRepo,
-	}
+type Reconciler interface {
+	Reconcile(ctx context.Context) error
 }
 
-func (w *ReleaseCartReservationWorker) Timeout(job *river.Job[ReleaseCartReservationArgs]) time.Duration {
-	return defaultJobTimeout
+type PayoutProcessor interface {
+	ProcessPayout(ctx context.Context, payoutID uuid.UUID) error
 }
 
-func (w *ReleaseCartReservationWorker) Work(ctx context.Context, job *river.Job[ReleaseCartReservationArgs]) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
+type WorkerDeps struct {
+	Carts         CartExpirer
+	Payments      PaymentProcessor
+	Orders        OrderSettler
+	Payouts       PayoutProcessor
+	Reconciler    Reconciler
+	SMS           sms.Sender
+	WebhookEvents repository.WebhookEventRepository
+	OrderRepo     repository.OrderRepository
+	UserRepo      repository.UserRepository
+}
 
-	cartID := job.Args.CartID
+func AddWorkers(workers *river.Workers, deps WorkerDeps) {
+	river.AddWorker(workers, &MarkCartExpiredWorker{carts: deps.Carts})
+	river.AddWorker(workers, &ProcessPaymentWebhookWorker{payments: deps.Payments, webhookEvents: deps.WebhookEvents})
+	river.AddWorker(workers, &ExpireUnpaidOrderWorker{payments: deps.Payments})
+	river.AddWorker(workers, &RefundOrderWorker{payments: deps.Payments})
+	river.AddWorker(workers, &SettleOrderWorker{orders: deps.Orders})
+	river.AddWorker(workers, &AutoConfirmDeliveryWorker{orders: deps.Orders})
+	river.AddWorker(workers, &ProcessPaymentReversalWorker{payments: deps.Payments, webhookEvents: deps.WebhookEvents})
+	river.AddWorker(workers, &ReconcileLedgerWorker{reconciler: deps.Reconciler})
+	river.AddWorker(workers, &ProcessPayoutWorker{payouts: deps.Payouts})
+	river.AddWorker(workers, &SendOrderNotificationWorker{orderRepo: deps.OrderRepo, userRepo: deps.UserRepo, sms: deps.SMS})
+}
 
-	slog.Info("releasing cart reservations", "cart_id", cartID, "attempt", job.Attempt)
-
-	cart, err := w.cartRepo.GetByID(ctx, cartID)
-	if err != nil {
-		if domainerrors.IsNotFound(err) {
-			slog.Info("cart no longer exists, skipping reservation release", "cart_id", cartID)
-			return nil
-		}
-		slog.Error("failed to get cart for reservation release", "cart_id", cartID, "error", err)
-		return err
-	}
-
-	if cart.Status != "active" {
-		slog.Info("cart is no longer active, skipping reservation release", "cart_id", cartID, "status", cart.Status)
+// outcome converts service errors into River semantics: not-ready work is
+// snoozed, permanent client errors are cancelled, everything else retries.
+func outcome(job *rivertype.JobRow, err error, snooze time.Duration) error {
+	if err == nil {
 		return nil
 	}
-
-	cartItems, err := w.cartItemRepo.ListByCart(ctx, cartID)
-	if err != nil {
-		slog.Error("failed to get cart items for reservation release", "cart_id", cartID, "error", err)
-		return err
+	if errors.Is(err, blnk.ErrInflightBusy) {
+		return river.JobSnooze(10 * time.Second)
 	}
-
-	for _, item := range cartItems {
-		if err := w.inventoryRepo.Release(ctx, item.VariantID, item.Quantity); err != nil {
-			slog.Error("failed to release inventory reservation",
-				"cart_id", cartID,
-				"variant_id", item.VariantID,
-				"quantity", item.Quantity,
-				"error", err,
-			)
-		} else {
-			slog.Info("released inventory reservation",
-				"cart_id", cartID,
-				"variant_id", item.VariantID,
-				"quantity", item.Quantity,
-			)
+	if errors.Is(err, ErrNotReady) {
+		if time.Since(job.CreatedAt) > maxPendingAge {
+			return river.JobCancel(err)
 		}
+		return river.JobSnooze(snooze)
 	}
-
-	slog.Info("cart reservation release completed", "cart_id", cartID)
-
-	return nil
+	if appErr, ok := domainerrors.IsAppError(err); ok && appErr.HTTPStatus >= 400 && appErr.HTTPStatus < 500 {
+		slog.Warn("job cancelled: permanent error", "job_id", job.ID, "kind", job.Kind, "error", err)
+		return river.JobCancel(err)
+	}
+	return err
 }
 
 type MarkCartExpiredWorker struct {
 	river.WorkerDefaults[MarkCartExpiredArgs]
-	cartRepo     repository.CartRepository
-	cartItemRepo repository.CartItemRepository
+	carts CartExpirer
 }
 
-func NewMarkCartExpiredWorker(cartRepo repository.CartRepository, cartItemRepo repository.CartItemRepository) *MarkCartExpiredWorker {
-	return &MarkCartExpiredWorker{
-		cartRepo:     cartRepo,
-		cartItemRepo: cartItemRepo,
-	}
-}
-
-func (w *MarkCartExpiredWorker) Timeout(job *river.Job[MarkCartExpiredArgs]) time.Duration {
+func (w *MarkCartExpiredWorker) Timeout(*river.Job[MarkCartExpiredArgs]) time.Duration {
 	return defaultJobTimeout
 }
 
 func (w *MarkCartExpiredWorker) Work(ctx context.Context, job *river.Job[MarkCartExpiredArgs]) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
-
-	cartID := job.Args.CartID
-
-	slog.Info("processing cart expiry", "cart_id", cartID, "attempt", job.Attempt)
-
-	cart, err := w.cartRepo.GetByID(ctx, cartID)
-	if err != nil {
-		if domainerrors.IsNotFound(err) {
-			slog.Info("cart no longer exists, skipping expiry processing", "cart_id", cartID)
-			return nil
-		}
-		slog.Error("failed to get cart for expiry check", "cart_id", cartID, "error", err)
-		return err
-	}
-
-	if cart.Status != "active" {
-		slog.Info("cart is no longer active, skipping expiry processing", "cart_id", cartID, "status", cart.Status)
-		return nil
-	}
-
-	if _, err := w.cartRepo.UpdateStatus(ctx, cartID, domain.CartStatusAbandoned); err != nil {
-		slog.Error("failed to mark cart as expired", "cart_id", cartID, "error", err)
-		return err
-	}
-
-	slog.Info("cart marked as abandoned due to expiry", "cart_id", cartID)
-
-	return nil
+	return outcome(job.JobRow, w.carts.ExpireCart(ctx, job.Args.CartID), time.Hour)
 }
 
 type ProcessPaymentWebhookWorker struct {
 	river.WorkerDefaults[ProcessPaymentWebhookArgs]
-	orderRepo     repository.OrderRepository
-	paymentRepo   repository.PaymentRepository
-	inventoryRepo repository.InventoryRepository
-	blnkClient    blnk.BlnkClient
-	userRepo      repository.UserRepository
+	payments      PaymentProcessor
+	webhookEvents repository.WebhookEventRepository
 }
 
-func NewProcessPaymentWebhookWorker(
-	orderRepo repository.OrderRepository,
-	paymentRepo repository.PaymentRepository,
-	inventoryRepo repository.InventoryRepository,
-	blnkClient blnk.BlnkClient,
-	userRepo repository.UserRepository,
-) *ProcessPaymentWebhookWorker {
-	return &ProcessPaymentWebhookWorker{
-		orderRepo:     orderRepo,
-		paymentRepo:   paymentRepo,
-		inventoryRepo: inventoryRepo,
-		blnkClient:    blnkClient,
-		userRepo:      userRepo,
-	}
-}
-
-func (w *ProcessPaymentWebhookWorker) Timeout(job *river.Job[ProcessPaymentWebhookArgs]) time.Duration {
+func (w *ProcessPaymentWebhookWorker) Timeout(*river.Job[ProcessPaymentWebhookArgs]) time.Duration {
 	return defaultJobTimeout
 }
 
 func (w *ProcessPaymentWebhookWorker) Work(ctx context.Context, job *river.Job[ProcessPaymentWebhookArgs]) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
+	slog.Info("processing payment", "tx_ref", job.Args.TxRef, "attempt", job.Attempt)
 
-	txRef := job.Args.TxRef
-	status := job.Args.Status
+	err := w.payments.ProcessPayment(ctx, job.Args.TxRef)
+	result := outcome(job.JobRow, err, paymentPendingSnooze)
 
-	slog.Info("processing payment webhook", "tx_ref", txRef, "status", status, "attempt", job.Attempt)
-
-	order, err := w.orderRepo.GetByChapaTxRef(ctx, txRef)
-	if err != nil {
-		if domainerrors.IsNotFound(err) {
-			slog.Warn("order not found for tx_ref", "tx_ref", txRef)
-			return nil
+	if job.Args.WebhookEventID != nil && w.webhookEvents != nil && !errors.Is(err, ErrNotReady) {
+		status := domain.WebhookEventStatusProcessed
+		var msg *string
+		if err != nil {
+			status = domain.WebhookEventStatusFailed
+			text := err.Error()
+			msg = &text
 		}
-		slog.Error("failed to get order by tx_ref", "tx_ref", txRef, "error", err)
-		return err
+		if updateErr := w.webhookEvents.UpdateStatus(ctx, *job.Args.WebhookEventID, status, msg); updateErr != nil {
+			slog.Error("failed to update webhook event status", "webhook_event_id", *job.Args.WebhookEventID, "error", updateErr)
+		}
 	}
 
-	if order.Status != domain.OrderStatusPendingPayment {
-		slog.Info("order already processed", "order_id", order.ID, "status", order.Status)
+	return result
+}
+
+type ProcessPaymentReversalWorker struct {
+	river.WorkerDefaults[ProcessPaymentReversalArgs]
+	payments      PaymentProcessor
+	webhookEvents repository.WebhookEventRepository
+}
+
+func (w *ProcessPaymentReversalWorker) Timeout(*river.Job[ProcessPaymentReversalArgs]) time.Duration {
+	return defaultJobTimeout
+}
+
+func (w *ProcessPaymentReversalWorker) Work(ctx context.Context, job *river.Job[ProcessPaymentReversalArgs]) error {
+	err := w.payments.ProcessReversal(ctx, job.Args.TxRef)
+	if job.Args.WebhookEventID != nil && w.webhookEvents != nil {
+		status := domain.WebhookEventStatusProcessed
+		var msg *string
+		if err != nil {
+			status = domain.WebhookEventStatusFailed
+			text := err.Error()
+			msg = &text
+		}
+		if updateErr := w.webhookEvents.UpdateStatus(ctx, *job.Args.WebhookEventID, status, msg); updateErr != nil {
+			slog.Error("failed to update webhook event status", "webhook_event_id", *job.Args.WebhookEventID, "error", updateErr)
+		}
+	}
+	return outcome(job.JobRow, err, time.Minute)
+}
+
+type AutoConfirmDeliveryWorker struct {
+	river.WorkerDefaults[AutoConfirmDeliveryArgs]
+	orders OrderSettler
+}
+
+func (w *AutoConfirmDeliveryWorker) Timeout(*river.Job[AutoConfirmDeliveryArgs]) time.Duration {
+	return defaultJobTimeout
+}
+
+func (w *AutoConfirmDeliveryWorker) Work(ctx context.Context, job *river.Job[AutoConfirmDeliveryArgs]) error {
+	return outcome(job.JobRow, w.orders.AutoConfirmDelivery(ctx, job.Args.OrderID), time.Hour)
+}
+
+type ReconcileLedgerWorker struct {
+	river.WorkerDefaults[ReconcileLedgerArgs]
+	reconciler Reconciler
+}
+
+func (w *ReconcileLedgerWorker) Timeout(*river.Job[ReconcileLedgerArgs]) time.Duration {
+	return 10 * time.Minute
+}
+
+func (w *ReconcileLedgerWorker) Work(ctx context.Context, job *river.Job[ReconcileLedgerArgs]) error {
+	if w.reconciler == nil {
 		return nil
 	}
-
-	payment, err := w.paymentRepo.GetByOrderID(ctx, order.ID)
-	if err != nil {
-		slog.Error("failed to get payment for order", "order_id", order.ID, "error", err)
-		return err
-	}
-
-	if status == "success" {
-		if _, err := w.paymentRepo.UpdateStatus(ctx, payment.ID, domain.PaymentStatusSucceeded); err != nil {
-			slog.Error("failed to update payment status", "payment_id", payment.ID, "error", err)
-			return err
-		}
-
-		if _, err := w.orderRepo.UpdateStatus(ctx, order.ID, domain.OrderStatusPaid); err != nil {
-			slog.Error("failed to update order status", "order_id", order.ID, "error", err)
-			return err
-		}
-
-		if err := w.commitOrderInventory(ctx, order.ID); err != nil {
-			slog.Error("failed to commit inventory", "order_id", order.ID, "error", err)
-			return err
-		}
-
-		EnqueueOrderNotification(ctx, order.ID, order.BuyerID, "payment_confirmed", w.userRepo)
-
-		slog.Info("payment webhook processed successfully", "tx_ref", txRef, "order_id", order.ID)
-	} else {
-		if _, err := w.paymentRepo.UpdateStatus(ctx, payment.ID, domain.PaymentStatusFailed); err != nil {
-			slog.Error("failed to update payment status to failed", "payment_id", payment.ID, "error", err)
-			return err
-		}
-
-		if _, err := w.orderRepo.UpdateStatus(ctx, order.ID, domain.OrderStatusCancelled); err != nil {
-			slog.Error("failed to update order status to cancelled", "order_id", order.ID, "error", err)
-			return err
-		}
-
-		if order.BlnkTransactionID != nil && *order.BlnkTransactionID != "" {
-			if err := w.blnkClient.VoidEscrow(ctx, *order.BlnkTransactionID); err != nil {
-				slog.Error("failed to void escrow", "order_id", order.ID, "blnk_txn_id", *order.BlnkTransactionID, "error", err)
-				return err
-			}
-		}
-
-		if err := w.releaseOrderInventory(ctx, order.ID); err != nil {
-			slog.Error("failed to release order inventory", "order_id", order.ID, "error", err)
-			return err
-		}
-
-		slog.Info("payment webhook processed as failed", "tx_ref", txRef, "order_id", order.ID)
-	}
-
-	return nil
+	return w.reconciler.Reconcile(ctx)
 }
 
-func (w *ProcessPaymentWebhookWorker) releaseOrderInventory(ctx context.Context, orderID uuid.UUID) error {
-	items, err := w.orderRepo.ListItemsByOrderID(ctx, orderID)
-	if err != nil {
-		return err
-	}
-
-	for _, item := range items {
-		if err := w.inventoryRepo.Release(ctx, item.VariantID, item.Quantity); err != nil {
-			slog.Error("failed to release inventory for order item",
-				"order_id", orderID,
-				"variant_id", item.VariantID,
-				"quantity", item.Quantity,
-				"error", err,
-			)
-		} else {
-			slog.Info("released inventory for failed order",
-				"order_id", orderID,
-				"variant_id", item.VariantID,
-				"quantity", item.Quantity,
-			)
-		}
-	}
-
-	return nil
+// DailyAt is a River periodic schedule that fires once a day at a wall-clock time
+// in a given location (e.g. 03:00 Africa/Addis_Ababa).
+type DailyAt struct {
+	Hour     int
+	Location *time.Location
 }
 
-func (w *ProcessPaymentWebhookWorker) commitOrderInventory(ctx context.Context, orderID uuid.UUID) error {
-	items, err := w.orderRepo.ListItemsByOrderID(ctx, orderID)
-	if err != nil {
-		return fmt.Errorf("failed to list order items: %w", err)
+func (d DailyAt) Next(current time.Time) time.Time {
+	local := current.In(d.Location)
+	next := time.Date(local.Year(), local.Month(), local.Day(), d.Hour, 0, 0, 0, d.Location)
+	if !next.After(local) {
+		next = next.AddDate(0, 0, 1)
 	}
-
-	for _, item := range items {
-		if err := w.inventoryRepo.Commit(ctx, item.VariantID, item.Quantity); err != nil {
-			slog.Error("failed to commit inventory for order item",
-				"order_id", orderID,
-				"variant_id", item.VariantID,
-				"quantity", item.Quantity,
-				"error", err,
-			)
-			return fmt.Errorf("failed to commit inventory for variant %s: %w", item.VariantID, err)
-		}
-		slog.Info("committed inventory for order",
-			"order_id", orderID,
-			"variant_id", item.VariantID,
-			"quantity", item.Quantity,
-		)
-	}
-
-	return nil
+	return next
 }
 
-func AddWorkers(workers *river.Workers, cartRepo repository.CartRepository, cartItemRepo repository.CartItemRepository, orderRepo repository.OrderRepository, paymentRepo repository.PaymentRepository, inventoryRepo repository.InventoryRepository, blnkClient blnk.BlnkClient, payoutRepo repository.PayoutRepository, merchantRepo repository.MerchantRepository, userRepo repository.UserRepository) {
-	river.AddWorker(workers, NewReleaseCartReservationWorker(cartRepo, cartItemRepo, inventoryRepo))
-	river.AddWorker(workers, NewMarkCartExpiredWorker(cartRepo, cartItemRepo))
-	river.AddWorker(workers, NewProcessPaymentWebhookWorker(orderRepo, paymentRepo, inventoryRepo, blnkClient, userRepo))
-	river.AddWorker(workers, NewSendOrderNotificationWorker())
-	river.AddWorker(workers, NewProcessPayoutWorker(payoutRepo, merchantRepo, blnkClient))
+type ExpireUnpaidOrderWorker struct {
+	river.WorkerDefaults[ExpireUnpaidOrderArgs]
+	payments PaymentProcessor
+}
+
+func (w *ExpireUnpaidOrderWorker) Timeout(*river.Job[ExpireUnpaidOrderArgs]) time.Duration {
+	return defaultJobTimeout
+}
+
+func (w *ExpireUnpaidOrderWorker) Work(ctx context.Context, job *river.Job[ExpireUnpaidOrderArgs]) error {
+	return outcome(job.JobRow, w.payments.ExpireUnpaidOrder(ctx, job.Args.OrderID), paymentPendingSnooze)
+}
+
+type RefundOrderWorker struct {
+	river.WorkerDefaults[RefundOrderArgs]
+	payments PaymentProcessor
+}
+
+func (w *RefundOrderWorker) Timeout(*river.Job[RefundOrderArgs]) time.Duration {
+	return defaultJobTimeout
+}
+
+func (w *RefundOrderWorker) Work(ctx context.Context, job *river.Job[RefundOrderArgs]) error {
+	return outcome(job.JobRow, w.payments.RefundOrder(ctx, job.Args.OrderID), transferPendingSnooze)
+}
+
+type SettleOrderWorker struct {
+	river.WorkerDefaults[SettleOrderArgs]
+	orders OrderSettler
+}
+
+func (w *SettleOrderWorker) Timeout(*river.Job[SettleOrderArgs]) time.Duration {
+	return defaultJobTimeout
+}
+
+func (w *SettleOrderWorker) Work(ctx context.Context, job *river.Job[SettleOrderArgs]) error {
+	return outcome(job.JobRow, w.orders.SettleOrder(ctx, job.Args.OrderID), time.Minute)
 }
 
 type ProcessPayoutWorker struct {
 	river.WorkerDefaults[ProcessPayoutArgs]
-	payoutRepo   repository.PayoutRepository
-	merchantRepo repository.MerchantRepository
-	blnkClient   blnk.BlnkClient
+	payouts PayoutProcessor
 }
 
-func NewProcessPayoutWorker(payoutRepo repository.PayoutRepository, merchantRepo repository.MerchantRepository, blnkClient blnk.BlnkClient) *ProcessPayoutWorker {
-	return &ProcessPayoutWorker{
-		payoutRepo:   payoutRepo,
-		merchantRepo: merchantRepo,
-		blnkClient:   blnkClient,
-	}
-}
-
-func (w *ProcessPayoutWorker) Timeout(job *river.Job[ProcessPayoutArgs]) time.Duration {
+func (w *ProcessPayoutWorker) Timeout(*river.Job[ProcessPayoutArgs]) time.Duration {
 	return defaultJobTimeout
 }
 
 func (w *ProcessPayoutWorker) Work(ctx context.Context, job *river.Job[ProcessPayoutArgs]) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
-
-	payoutID := job.Args.PayoutID
-
-	slog.Info("processing payout", "payout_id", payoutID, "attempt", job.Attempt)
-
-	payout, err := w.payoutRepo.GetByID(ctx, payoutID)
-	if err != nil {
-		if domainerrors.IsNotFound(err) {
-			slog.Warn("payout not found", "payout_id", payoutID)
-			return nil
-		}
-		slog.Error("failed to get payout", "payout_id", payoutID, "error", err)
-		return err
-	}
-
-	if payout.Status != domain.PayoutStatusProcessing {
-		slog.Info("payout is not in processing status, skipping", "payout_id", payoutID, "status", payout.Status)
-		return nil
-	}
-
-	merchant, err := w.merchantRepo.GetByID(ctx, payout.MerchantID)
-	if err != nil {
-		slog.Error("failed to get merchant for payout", "payout_id", payoutID, "merchant_id", payout.MerchantID, "error", err)
-		return err
-	}
-
-	if merchant.BlnkBalanceID == nil || *merchant.BlnkBalanceID == "" {
-		slog.Error("merchant has no Blnk wallet", "payout_id", payoutID, "merchant_id", payout.MerchantID)
-		failureReason := "Merchant has no Blnk wallet"
-		_, _ = w.payoutRepo.UpdateStatus(ctx, payoutID, domain.PayoutStatusFailed, nil, &failureReason)
-		return nil
-	}
-
-	blnkTxID, err := w.blnkClient.DebitMerchantForPayout(ctx, blnk.PayoutRequest{
-		PayoutID:       payout.ID,
-		MerchantID:     payout.MerchantID,
-		AmountCents:    payout.AmountCents,
-		Method:         string(payout.Method),
-		Destination:    payout.Destination,
-		MerchantBlnkID: *merchant.BlnkBalanceID,
-	})
-	if err != nil {
-		slog.Error("failed to debit merchant wallet",
-			"payout_id", payoutID,
-			"merchant_id", payout.MerchantID,
-			"error", err,
-		)
-		failureReason := "Failed to process payout with Blnk"
-		_, _ = w.payoutRepo.UpdateStatus(ctx, payoutID, domain.PayoutStatusFailed, nil, &failureReason)
-		return err
-	}
-
-	_, err = w.payoutRepo.UpdateStatus(ctx, payoutID, domain.PayoutStatusCompleted, &blnkTxID, nil)
-	if err != nil {
-		slog.Error("failed to update payout status to completed",
-			"payout_id", payoutID,
-			"blnk_tx_id", blnkTxID,
-			"error", err,
-		)
-		return err
-	}
-
-	slog.Info("payout processed successfully",
-		"payout_id", payoutID,
-		"merchant_id", payout.MerchantID,
-		"amount_cents", payout.AmountCents,
-		"blnk_tx_id", blnkTxID,
-	)
-
-	return nil
+	return outcome(job.JobRow, w.payouts.ProcessPayout(ctx, job.Args.PayoutID), transferPendingSnooze)
 }

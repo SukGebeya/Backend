@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	"github.com/SukGebeya/Backend/internal/domain"
 	domainerrors "github.com/SukGebeya/Backend/internal/errors"
 	"github.com/SukGebeya/Backend/internal/repository"
+	"github.com/SukGebeya/Backend/pkg/phone"
 	"github.com/google/uuid"
 )
 
@@ -36,8 +38,9 @@ func (s *UserService) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 type UpdateProfileInput struct {
-	Email *string
-	Phone *string
+	Email    *string
+	Phone    *string
+	FullName *string
 }
 
 func (s *UserService) UpdateProfile(ctx context.Context, userID uuid.UUID, input UpdateProfileInput) (*domain.User, error) {
@@ -47,6 +50,8 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID uuid.UUID, input
 	}
 
 	if input.Email != nil {
+		email := strings.ToLower(strings.TrimSpace(*input.Email))
+		input.Email = &email
 		existing, _ := s.userRepo.GetByEmail(ctx, *input.Email)
 		if existing != nil && existing.ID != userID {
 			return nil, domainerrors.EmailExists("email already in use")
@@ -54,15 +59,26 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID uuid.UUID, input
 		user.Email = input.Email
 	}
 
+	phoneChanged := false
 	if input.Phone != nil {
-		existing, _ := s.userRepo.GetByPhone(ctx, *input.Phone)
+		normalized, err := phone.Normalize(*input.Phone)
+		if err != nil {
+			return nil, domainerrors.Validation("phone must be an Ethiopian mobile number")
+		}
+		existing, _ := s.userRepo.GetByPhone(ctx, normalized)
 		if existing != nil && existing.ID != userID {
 			return nil, domainerrors.Conflict("phone already in use")
 		}
-		user.Phone = input.Phone
+		phoneChanged = user.Phone == nil || *user.Phone != normalized
+		user.Phone = &normalized
 	}
 
-	if input.Email == nil && input.Phone == nil {
+	if input.FullName != nil {
+		name := strings.TrimSpace(*input.FullName)
+		user.FullName = &name
+	}
+
+	if input.Email == nil && input.Phone == nil && input.FullName == nil {
 		return user, nil
 	}
 
@@ -70,7 +86,18 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID uuid.UUID, input
 		return nil, domainerrors.Validation("email or phone is required")
 	}
 
-	return s.userRepo.Update(ctx, user)
+	updated, err := s.userRepo.Update(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	if phoneChanged && updated.PhoneVerifiedAt != nil {
+		if err := s.userRepo.ClearPhoneVerified(ctx, userID); err != nil {
+			return nil, err
+		}
+		updated.PhoneVerifiedAt = nil
+	}
+	return updated, nil
 }
 
 func (s *UserService) UpdateKYCStatus(ctx context.Context, userID uuid.UUID, kycStatus domain.KYCStatus) (*domain.User, error) {

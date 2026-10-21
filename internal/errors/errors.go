@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 )
@@ -56,7 +57,8 @@ func IsAppError(err error) (*AppError, bool) {
 	if err == nil {
 		return nil, false
 	}
-	if appErr, ok := err.(*AppError); ok {
+	var appErr *AppError
+	if errors.As(err, &appErr) {
 		return appErr, true
 	}
 	return nil, false
@@ -163,9 +165,6 @@ func InsufficientInventory(message string) *AppError {
 }
 
 func IsNotFound(err error) bool {
-	if err == nil {
-		return false
-	}
-	appErr, ok := err.(*AppError)
-	return ok && appErr.Code == CodeNotFound
+	appErr, ok := IsAppError(err)
+	return ok && appErr.HTTPStatus == http.StatusNotFound
 }

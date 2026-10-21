@@ -16,12 +16,13 @@ const (
 	OrderStatusDelivered      OrderStatus = "delivered"
 	OrderStatusCancelled      OrderStatus = "cancelled"
 	OrderStatusRefunded       OrderStatus = "refunded"
+	OrderStatusDisputed       OrderStatus = "disputed"
 )
 
 func (s OrderStatus) IsValid() bool {
 	switch s {
 	case OrderStatusPendingPayment, OrderStatusPaid, OrderStatusProcessing,
-		OrderStatusShipped, OrderStatusDelivered, OrderStatusCancelled, OrderStatusRefunded:
+		OrderStatusShipped, OrderStatusDelivered, OrderStatusCancelled, OrderStatusRefunded, OrderStatusDisputed:
 		return true
 	default:
 		return false
@@ -44,6 +45,9 @@ type Order struct {
 	Currency          string      `db:"currency" json:"currency"`
 	Notes             *string     `db:"notes" json:"notes,omitempty"`
 	BlnkTransactionID *string     `db:"blnk_transaction_id" json:"blnk_transaction_id,omitempty"`
+	DeliveryFeeCents  int64       `db:"delivery_fee_cents" json:"delivery_fee_cents"`
+	DisputedAt        *time.Time  `db:"disputed_at" json:"disputed_at,omitempty"`
+	DisputeReason     *string     `db:"dispute_reason" json:"dispute_reason,omitempty"`
 	ChapaTxRef        *string     `db:"chapa_tx_ref" json:"chapa_tx_ref,omitempty"`
 	CreatedAt         time.Time   `db:"created_at" json:"created_at"`
 	UpdatedAt         time.Time   `db:"updated_at" json:"updated_at"`
@@ -81,12 +85,14 @@ type CreateOrderItemInput struct {
 	UnitPriceCents int64
 }
 
-const PlatformFeePercent = 5
+const DefaultPlatformFeePercent = 5
 
-func CalculatePlatformFee(subtotalCents int64) int64 {
-	return subtotalCents * PlatformFeePercent / 100
+func CalculatePlatformFee(subtotalCents, feePercent int64) int64 {
+	return subtotalCents * feePercent / 100
 }
 
-func CalculateMerchantPayout(subtotalCents, platformFeeCents int64) int64 {
-	return subtotalCents - platformFeeCents
+// CalculateMerchantPayout is what the merchant receives at settlement: the goods
+// subtotal minus the platform fee, plus the delivery fee they charged in full.
+func CalculateMerchantPayout(subtotalCents, platformFeeCents, deliveryFeeCents int64) int64 {
+	return subtotalCents - platformFeeCents + deliveryFeeCents
 }

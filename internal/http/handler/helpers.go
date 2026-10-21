@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 	"github.com/SukGebeya/Backend/internal/domain"
 	apperrors "github.com/SukGebeya/Backend/internal/errors"
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 func decodeJSON(r *http.Request, v any) error {
@@ -39,11 +39,6 @@ func parseIntQueryParam(r *http.Request, key string, defaultValue int) int {
 	return parsed
 }
 
-func parseBoolQueryParam(r *http.Request, key string) bool {
-	val := r.URL.Query().Get(key)
-	return val == "true" || val == "1"
-}
-
 func parseListOptions(r *http.Request) domain.ListOptions {
 	page := parseIntQueryParam(r, "page", 1)
 	perPage := parseIntQueryParam(r, "per_page", 20)
@@ -60,12 +55,15 @@ func parseListOptions(r *http.Request) domain.ListOptions {
 
 func toUserResponse(u *domain.User) *UserResponse {
 	return &UserResponse{
-		ID:        u.ID.String(),
-		Email:     u.Email,
-		Phone:     u.Phone,
-		Role:      string(u.Role),
-		CreatedAt: u.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt: u.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		ID:            u.ID.String(),
+		Email:         u.Email,
+		Phone:         u.Phone,
+		FullName:      u.FullName,
+		Role:          string(u.Role),
+		KYCStatus:     string(u.KYCStatus),
+		PhoneVerified: u.PhoneVerifiedAt != nil,
+		CreatedAt:     u.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:     u.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 }
 

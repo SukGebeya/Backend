@@ -23,17 +23,23 @@ type OnboardRequest struct {
 	ShopName        string `json:"shop_name" validate:"required,min=2,max=100" example:"Tigist Habesha Designs"`
 	ShopSlug        string `json:"shop_slug" validate:"omitempty,min=2,max=100,slug" example:"tigist-habesha"`
 	ShopDescription string `json:"shop_description" validate:"omitempty,max=500" example:"Traditional Ethiopian clothing handmade in Addis"`
-	ContactPhone    string `json:"contact_phone" validate:"required,phone" example:"+251911234567"`
+	ContactPhone    string `json:"contact_phone" validate:"required,etphone" example:"0911234567"`
 	ContactEmail    string `json:"contact_email" validate:"omitempty,email" example:"tigist@example.com"`
 	Address         string `json:"address" validate:"omitempty,max=200" example:"Bole, Addis Ababa"`
 	City            string `json:"city" validate:"required,max=100" example:"Addis Ababa"`
+
+	DeliveryFeeCents           int64   `json:"delivery_fee_cents" validate:"min=0,max=10000000" example:"15000"`
+	FreeDeliveryThresholdCents *int64  `json:"free_delivery_threshold_cents" validate:"omitempty,min=0" example:"500000"`
+	TIN                        *string `json:"tin" validate:"omitempty,numeric,len=10" example:"0012345678"`
+	TradeLicenseNumber         *string `json:"trade_license_number" validate:"omitempty,max=50" example:"AA/12/3456/14"`
 }
 
 type OnboardResponse struct {
-	MerchantID string `json:"merchant_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	ShopSlug   string `json:"shop_slug" example:"tigist-habesha"`
-	ShopName   string `json:"shop_name" example:"Tigist Habesha Designs"`
-	Message    string `json:"message" example:"Merchant profile created. KYC verification pending."`
+	MerchantID    string  `json:"merchant_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	ShopSlug      string  `json:"shop_slug" example:"tigist-habesha"`
+	ShopName      string  `json:"shop_name" example:"Tigist Habesha Designs"`
+	BlnkBalanceID *string `json:"blnk_balance_id,omitempty" example:"bln_0b7a3c1e-0000-0000-0000-000000000000"`
+	Message       string  `json:"message" example:"Merchant profile created. KYC verification pending."`
 }
 
 type MerchantProfileResponse struct {
@@ -52,6 +58,12 @@ type MerchantProfileResponse struct {
 	TotalSalesCents int64  `json:"total_sales_cents"`
 	CreatedAt       string `json:"created_at"`
 	UpdatedAt       string `json:"updated_at"`
+
+	DeliveryFeeCents           int64   `json:"delivery_fee_cents"`
+	FreeDeliveryThresholdCents *int64  `json:"free_delivery_threshold_cents,omitempty"`
+	TIN                        *string `json:"tin,omitempty"`
+	TradeLicenseNumber         *string `json:"trade_license_number,omitempty"`
+	HasWallet                  bool    `json:"has_wallet"`
 }
 
 type UpdateMerchantRequest struct {
@@ -59,10 +71,16 @@ type UpdateMerchantRequest struct {
 	ShopDescription string `json:"shop_description" validate:"omitempty,max=500"`
 	ShopLogoURL     string `json:"shop_logo_url" validate:"omitempty,url"`
 	ShopBannerURL   string `json:"shop_banner_url" validate:"omitempty,url"`
-	ContactPhone    string `json:"contact_phone" validate:"omitempty,phone"`
+	ContactPhone    string `json:"contact_phone" validate:"omitempty,etphone"`
 	ContactEmail    string `json:"contact_email" validate:"omitempty,email"`
 	Address         string `json:"address" validate:"omitempty,max=200"`
 	City            string `json:"city" validate:"omitempty,max=100"`
+
+	DeliveryFeeCents           *int64  `json:"delivery_fee_cents" validate:"omitempty,min=0,max=10000000"`
+	FreeDeliveryThresholdCents *int64  `json:"free_delivery_threshold_cents" validate:"omitempty,min=0"`
+	ClearFreeDeliveryThreshold bool    `json:"clear_free_delivery_threshold"`
+	TIN                        *string `json:"tin" validate:"omitempty,numeric,len=10"`
+	TradeLicenseNumber         *string `json:"trade_license_number" validate:"omitempty,max=50"`
 }
 
 type ShopResponse struct {
@@ -75,6 +93,9 @@ type ShopResponse struct {
 	ContactEmail string `json:"contact_email,omitempty"`
 	City         string `json:"city"`
 	IsVerified   bool   `json:"is_verified"`
+
+	DeliveryFeeCents           int64  `json:"delivery_fee_cents"`
+	FreeDeliveryThresholdCents *int64 `json:"free_delivery_threshold_cents,omitempty"`
 }
 
 // Onboard godoc
@@ -131,6 +152,11 @@ func (h *MerchantHandler) Onboard(w http.ResponseWriter, r *http.Request) {
 		ContactEmail:    contactEmail,
 		Address:         address,
 		City:            req.City,
+
+		DeliveryFeeCents:           req.DeliveryFeeCents,
+		FreeDeliveryThresholdCents: req.FreeDeliveryThresholdCents,
+		TIN:                        req.TIN,
+		TradeLicenseNumber:         req.TradeLicenseNumber,
 	})
 	if err != nil {
 		response.Error(w, err)
@@ -138,10 +164,11 @@ func (h *MerchantHandler) Onboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.JSON(w, http.StatusCreated, OnboardResponse{
-		MerchantID: merchant.ID.String(),
-		ShopSlug:   merchant.ShopSlug,
-		ShopName:   merchant.ShopName,
-		Message:    "Merchant profile created. KYC verification pending.",
+		MerchantID:    merchant.ID.String(),
+		ShopSlug:      merchant.ShopSlug,
+		ShopName:      merchant.ShopName,
+		BlnkBalanceID: merchant.BlnkBalanceID,
+		Message:       "Merchant profile created. KYC verification pending.",
 	})
 }
 
@@ -236,6 +263,12 @@ func (h *MerchantHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) 
 		ContactEmail:    contactEmail,
 		Address:         address,
 		City:            city,
+
+		DeliveryFeeCents:           req.DeliveryFeeCents,
+		FreeDeliveryThresholdCents: req.FreeDeliveryThresholdCents,
+		ClearFreeDeliveryThreshold: req.ClearFreeDeliveryThreshold,
+		TIN:                        req.TIN,
+		TradeLicenseNumber:         req.TradeLicenseNumber,
 	})
 	if err != nil {
 		response.Error(w, err)
@@ -300,6 +333,12 @@ func toMerchantProfileResponse(m *domain.MerchantProfile) *MerchantProfileRespon
 		TotalSalesCents: m.TotalSalesCents,
 		CreatedAt:       m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:       m.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+
+		DeliveryFeeCents:           m.DeliveryFeeCents,
+		FreeDeliveryThresholdCents: m.FreeDeliveryThresholdCents,
+		TIN:                        m.TIN,
+		TradeLicenseNumber:         m.TradeLicenseNumber,
+		HasWallet:                  m.BlnkBalanceID != nil && *m.BlnkBalanceID != "",
 	}
 }
 
@@ -314,6 +353,9 @@ func toShopResponse(m *domain.MerchantProfile) *ShopResponse {
 		ContactEmail: ptrToStr(m.ContactEmail),
 		City:         m.City,
 		IsVerified:   m.IsVerified,
+
+		DeliveryFeeCents:           m.DeliveryFeeCents,
+		FreeDeliveryThresholdCents: m.FreeDeliveryThresholdCents,
 	}
 }
 

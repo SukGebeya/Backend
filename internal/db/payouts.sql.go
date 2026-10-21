@@ -12,6 +12,36 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const claimPayoutForProcessing = `-- name: ClaimPayoutForProcessing :one
+UPDATE payouts
+SET status = 'processing'
+WHERE id = $1 AND status = 'pending'
+RETURNING id, merchant_id, amount_cents, currency, method, destination, status, blnk_transaction_id, failure_reason, requested_at, processed_at, account_name, bank_code, transfer_reference, provider_response
+`
+
+func (q *Queries) ClaimPayoutForProcessing(ctx context.Context, id uuid.UUID) (Payout, error) {
+	row := q.db.QueryRow(ctx, claimPayoutForProcessing, id)
+	var i Payout
+	err := row.Scan(
+		&i.ID,
+		&i.MerchantID,
+		&i.AmountCents,
+		&i.Currency,
+		&i.Method,
+		&i.Destination,
+		&i.Status,
+		&i.BlnkTransactionID,
+		&i.FailureReason,
+		&i.RequestedAt,
+		&i.ProcessedAt,
+		&i.AccountName,
+		&i.BankCode,
+		&i.TransferReference,
+		&i.ProviderResponse,
+	)
+	return i, err
+}
+
 const countPayoutsByMerchantID = `-- name: CountPayoutsByMerchantID :one
 SELECT COUNT(*) FROM payouts WHERE merchant_id = $1
 `
@@ -36,20 +66,24 @@ func (q *Queries) CountPayoutsByStatus(ctx context.Context, status string) (int6
 
 const createPayout = `-- name: CreatePayout :one
 INSERT INTO payouts (
-    id, merchant_id, amount_cents, currency, method, destination, status
+    id, merchant_id, amount_cents, currency, method, destination, status,
+    account_name, bank_code, blnk_transaction_id
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7
-) RETURNING id, merchant_id, amount_cents, currency, method, destination, status, blnk_transaction_id, failure_reason, requested_at, processed_at
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+) RETURNING id, merchant_id, amount_cents, currency, method, destination, status, blnk_transaction_id, failure_reason, requested_at, processed_at, account_name, bank_code, transfer_reference, provider_response
 `
 
 type CreatePayoutParams struct {
-	ID          uuid.UUID `json:"id"`
-	MerchantID  uuid.UUID `json:"merchant_id"`
-	AmountCents int64     `json:"amount_cents"`
-	Currency    string    `json:"currency"`
-	Method      string    `json:"method"`
-	Destination string    `json:"destination"`
-	Status      string    `json:"status"`
+	ID                uuid.UUID `json:"id"`
+	MerchantID        uuid.UUID `json:"merchant_id"`
+	AmountCents       int64     `json:"amount_cents"`
+	Currency          string    `json:"currency"`
+	Method            string    `json:"method"`
+	Destination       string    `json:"destination"`
+	Status            string    `json:"status"`
+	AccountName       *string   `json:"account_name"`
+	BankCode          *string   `json:"bank_code"`
+	BlnkTransactionID *string   `json:"blnk_transaction_id"`
 }
 
 func (q *Queries) CreatePayout(ctx context.Context, arg CreatePayoutParams) (Payout, error) {
@@ -61,6 +95,9 @@ func (q *Queries) CreatePayout(ctx context.Context, arg CreatePayoutParams) (Pay
 		arg.Method,
 		arg.Destination,
 		arg.Status,
+		arg.AccountName,
+		arg.BankCode,
+		arg.BlnkTransactionID,
 	)
 	var i Payout
 	err := row.Scan(
@@ -75,12 +112,16 @@ func (q *Queries) CreatePayout(ctx context.Context, arg CreatePayoutParams) (Pay
 		&i.FailureReason,
 		&i.RequestedAt,
 		&i.ProcessedAt,
+		&i.AccountName,
+		&i.BankCode,
+		&i.TransferReference,
+		&i.ProviderResponse,
 	)
 	return i, err
 }
 
 const getPayoutByID = `-- name: GetPayoutByID :one
-SELECT id, merchant_id, amount_cents, currency, method, destination, status, blnk_transaction_id, failure_reason, requested_at, processed_at FROM payouts WHERE id = $1
+SELECT id, merchant_id, amount_cents, currency, method, destination, status, blnk_transaction_id, failure_reason, requested_at, processed_at, account_name, bank_code, transfer_reference, provider_response FROM payouts WHERE id = $1
 `
 
 func (q *Queries) GetPayoutByID(ctx context.Context, id uuid.UUID) (Payout, error) {
@@ -98,12 +139,16 @@ func (q *Queries) GetPayoutByID(ctx context.Context, id uuid.UUID) (Payout, erro
 		&i.FailureReason,
 		&i.RequestedAt,
 		&i.ProcessedAt,
+		&i.AccountName,
+		&i.BankCode,
+		&i.TransferReference,
+		&i.ProviderResponse,
 	)
 	return i, err
 }
 
 const listAllPayouts = `-- name: ListAllPayouts :many
-SELECT id, merchant_id, amount_cents, currency, method, destination, status, blnk_transaction_id, failure_reason, requested_at, processed_at FROM payouts
+SELECT id, merchant_id, amount_cents, currency, method, destination, status, blnk_transaction_id, failure_reason, requested_at, processed_at, account_name, bank_code, transfer_reference, provider_response FROM payouts
 ORDER BY requested_at DESC
 OFFSET $1 LIMIT $2
 `
@@ -134,6 +179,10 @@ func (q *Queries) ListAllPayouts(ctx context.Context, arg ListAllPayoutsParams) 
 			&i.FailureReason,
 			&i.RequestedAt,
 			&i.ProcessedAt,
+			&i.AccountName,
+			&i.BankCode,
+			&i.TransferReference,
+			&i.ProviderResponse,
 		); err != nil {
 			return nil, err
 		}
@@ -146,7 +195,7 @@ func (q *Queries) ListAllPayouts(ctx context.Context, arg ListAllPayoutsParams) 
 }
 
 const listPayoutsByMerchantID = `-- name: ListPayoutsByMerchantID :many
-SELECT id, merchant_id, amount_cents, currency, method, destination, status, blnk_transaction_id, failure_reason, requested_at, processed_at FROM payouts
+SELECT id, merchant_id, amount_cents, currency, method, destination, status, blnk_transaction_id, failure_reason, requested_at, processed_at, account_name, bank_code, transfer_reference, provider_response FROM payouts
 WHERE merchant_id = $1
 ORDER BY requested_at DESC
 OFFSET $2 LIMIT $3
@@ -179,6 +228,10 @@ func (q *Queries) ListPayoutsByMerchantID(ctx context.Context, arg ListPayoutsBy
 			&i.FailureReason,
 			&i.RequestedAt,
 			&i.ProcessedAt,
+			&i.AccountName,
+			&i.BankCode,
+			&i.TransferReference,
+			&i.ProviderResponse,
 		); err != nil {
 			return nil, err
 		}
@@ -191,7 +244,7 @@ func (q *Queries) ListPayoutsByMerchantID(ctx context.Context, arg ListPayoutsBy
 }
 
 const listPayoutsByStatus = `-- name: ListPayoutsByStatus :many
-SELECT id, merchant_id, amount_cents, currency, method, destination, status, blnk_transaction_id, failure_reason, requested_at, processed_at FROM payouts
+SELECT id, merchant_id, amount_cents, currency, method, destination, status, blnk_transaction_id, failure_reason, requested_at, processed_at, account_name, bank_code, transfer_reference, provider_response FROM payouts
 WHERE status = $1
 ORDER BY requested_at DESC
 OFFSET $2 LIMIT $3
@@ -224,6 +277,10 @@ func (q *Queries) ListPayoutsByStatus(ctx context.Context, arg ListPayoutsByStat
 			&i.FailureReason,
 			&i.RequestedAt,
 			&i.ProcessedAt,
+			&i.AccountName,
+			&i.BankCode,
+			&i.TransferReference,
+			&i.ProviderResponse,
 		); err != nil {
 			return nil, err
 		}
@@ -235,32 +292,50 @@ func (q *Queries) ListPayoutsByStatus(ctx context.Context, arg ListPayoutsByStat
 	return items, nil
 }
 
+const sumPayoutsSince = `-- name: SumPayoutsSince :one
+SELECT COALESCE(SUM(amount_cents), 0)::bigint
+FROM payouts
+WHERE merchant_id = $1 AND requested_at >= $2 AND status <> 'failed'
+`
+
+type SumPayoutsSinceParams struct {
+	MerchantID  uuid.UUID          `json:"merchant_id"`
+	RequestedAt pgtype.Timestamptz `json:"requested_at"`
+}
+
+func (q *Queries) SumPayoutsSince(ctx context.Context, arg SumPayoutsSinceParams) (int64, error) {
+	row := q.db.QueryRow(ctx, sumPayoutsSince, arg.MerchantID, arg.RequestedAt)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const updatePayoutStatus = `-- name: UpdatePayoutStatus :one
 UPDATE payouts
-SET 
-    status = $2, 
-    blnk_transaction_id = $3, 
-    failure_reason = $4, 
-    processed_at = $5
-WHERE id = $1
-RETURNING id, merchant_id, amount_cents, currency, method, destination, status, blnk_transaction_id, failure_reason, requested_at, processed_at
+SET
+    status = $1,
+    blnk_transaction_id = COALESCE($2, blnk_transaction_id),
+    failure_reason = $3,
+    processed_at = $4
+WHERE id = $5
+RETURNING id, merchant_id, amount_cents, currency, method, destination, status, blnk_transaction_id, failure_reason, requested_at, processed_at, account_name, bank_code, transfer_reference, provider_response
 `
 
 type UpdatePayoutStatusParams struct {
-	ID                uuid.UUID          `json:"id"`
 	Status            string             `json:"status"`
 	BlnkTransactionID *string            `json:"blnk_transaction_id"`
 	FailureReason     *string            `json:"failure_reason"`
 	ProcessedAt       pgtype.Timestamptz `json:"processed_at"`
+	ID                uuid.UUID          `json:"id"`
 }
 
 func (q *Queries) UpdatePayoutStatus(ctx context.Context, arg UpdatePayoutStatusParams) (Payout, error) {
 	row := q.db.QueryRow(ctx, updatePayoutStatus,
-		arg.ID,
 		arg.Status,
 		arg.BlnkTransactionID,
 		arg.FailureReason,
 		arg.ProcessedAt,
+		arg.ID,
 	)
 	var i Payout
 	err := row.Scan(
@@ -275,6 +350,48 @@ func (q *Queries) UpdatePayoutStatus(ctx context.Context, arg UpdatePayoutStatus
 		&i.FailureReason,
 		&i.RequestedAt,
 		&i.ProcessedAt,
+		&i.AccountName,
+		&i.BankCode,
+		&i.TransferReference,
+		&i.ProviderResponse,
+	)
+	return i, err
+}
+
+const updatePayoutTransfer = `-- name: UpdatePayoutTransfer :one
+UPDATE payouts
+SET
+    transfer_reference = $1,
+    provider_response = $2
+WHERE id = $3
+RETURNING id, merchant_id, amount_cents, currency, method, destination, status, blnk_transaction_id, failure_reason, requested_at, processed_at, account_name, bank_code, transfer_reference, provider_response
+`
+
+type UpdatePayoutTransferParams struct {
+	TransferReference *string   `json:"transfer_reference"`
+	ProviderResponse  []byte    `json:"provider_response"`
+	ID                uuid.UUID `json:"id"`
+}
+
+func (q *Queries) UpdatePayoutTransfer(ctx context.Context, arg UpdatePayoutTransferParams) (Payout, error) {
+	row := q.db.QueryRow(ctx, updatePayoutTransfer, arg.TransferReference, arg.ProviderResponse, arg.ID)
+	var i Payout
+	err := row.Scan(
+		&i.ID,
+		&i.MerchantID,
+		&i.AmountCents,
+		&i.Currency,
+		&i.Method,
+		&i.Destination,
+		&i.Status,
+		&i.BlnkTransactionID,
+		&i.FailureReason,
+		&i.RequestedAt,
+		&i.ProcessedAt,
+		&i.AccountName,
+		&i.BankCode,
+		&i.TransferReference,
+		&i.ProviderResponse,
 	)
 	return i, err
 }

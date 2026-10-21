@@ -22,6 +22,10 @@ func NewPayoutRepository(pool *pgxpool.Pool) PayoutRepository {
 	return &payoutRepository{queries: db.New(pool)}
 }
 
+func (r *payoutRepository) WithTx(tx pgx.Tx) PayoutRepository {
+	return &payoutRepository{queries: r.queries.WithTx(tx)}
+}
+
 var _ PayoutRepository = (*payoutRepository)(nil)
 
 func (r *payoutRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Payout, error) {
@@ -93,13 +97,16 @@ func (r *payoutRepository) ListAll(ctx context.Context, page, pageSize int) ([]d
 
 func (r *payoutRepository) Create(ctx context.Context, payout *domain.Payout) (*domain.Payout, error) {
 	created, err := r.queries.CreatePayout(ctx, db.CreatePayoutParams{
-		ID:          payout.ID,
-		MerchantID:  payout.MerchantID,
-		AmountCents: payout.AmountCents,
-		Currency:    payout.Currency,
-		Method:      string(payout.Method),
-		Destination: payout.Destination,
-		Status:      string(payout.Status),
+		ID:                payout.ID,
+		MerchantID:        payout.MerchantID,
+		AmountCents:       payout.AmountCents,
+		Currency:          payout.Currency,
+		Method:            string(payout.Method),
+		Destination:       payout.Destination,
+		Status:            string(payout.Status),
+		AccountName:       payout.AccountName,
+		BankCode:          payout.BankCode,
+		BlnkTransactionID: payout.BlnkTransactionID,
 	})
 	if err != nil {
 		return nil, domainerrors.Internal("failed to create payout", err)
@@ -127,6 +134,43 @@ func (r *payoutRepository) UpdateStatus(ctx context.Context, id uuid.UUID, statu
 		return nil, domainerrors.Internal("failed to update payout status", err)
 	}
 	return dbPayoutToDomain(payout), nil
+}
+
+func (r *payoutRepository) ClaimForProcessing(ctx context.Context, id uuid.UUID) (*domain.Payout, error) {
+	payout, err := r.queries.ClaimPayoutForProcessing(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domainerrors.Conflict("payout is not in pending status")
+		}
+		return nil, domainerrors.Internal("failed to claim payout", err)
+	}
+	return dbPayoutToDomain(payout), nil
+}
+
+func (r *payoutRepository) UpdateTransfer(ctx context.Context, id uuid.UUID, reference string, providerResponse []byte) (*domain.Payout, error) {
+	payout, err := r.queries.UpdatePayoutTransfer(ctx, db.UpdatePayoutTransferParams{
+		ID:                id,
+		TransferReference: &reference,
+		ProviderResponse:  providerResponse,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domainerrors.NotFound("payout not found")
+		}
+		return nil, domainerrors.Internal("failed to update payout transfer", err)
+	}
+	return dbPayoutToDomain(payout), nil
+}
+
+func (r *payoutRepository) SumSince(ctx context.Context, merchantID uuid.UUID, since time.Time) (int64, error) {
+	total, err := r.queries.SumPayoutsSince(ctx, db.SumPayoutsSinceParams{
+		MerchantID:  merchantID,
+		RequestedAt: pgtype.Timestamptz{Time: since, Valid: true},
+	})
+	if err != nil {
+		return 0, domainerrors.Internal("failed to sum payouts", err)
+	}
+	return total, nil
 }
 
 func (r *payoutRepository) CountByMerchantID(ctx context.Context, merchantID uuid.UUID) (int64, error) {
@@ -169,7 +213,10 @@ func dbPayoutToDomain(p db.Payout) *domain.Payout {
 		Method:            domain.PayoutMethod(p.Method),
 		Destination:       p.Destination,
 		Status:            domain.PayoutStatus(p.Status),
+		AccountName:       p.AccountName,
+		BankCode:          p.BankCode,
 		BlnkTransactionID: blnkTxID,
+		TransferReference: p.TransferReference,
 		FailureReason:     failureReason,
 		RequestedAt:       p.RequestedAt.Time,
 		ProcessedAt:       processedAt,

@@ -46,8 +46,7 @@ func (r *walletTransactionRepository) GetByID(ctx context.Context, id uuid.UUID)
 }
 
 func (r *walletTransactionRepository) GetByOrderID(ctx context.Context, orderID uuid.UUID) (*domain.WalletTransaction, error) {
-	var pgOrderID pgtype.UUID
-	pgOrderID = pgtype.UUID{Bytes: orderID, Valid: true}
+	pgOrderID := pgtype.UUID{Bytes: orderID, Valid: true}
 
 	txn, err := r.queries.GetWalletTransactionByOrderID(ctx, pgOrderID)
 	if err != nil {
@@ -104,6 +103,15 @@ func (r *walletTransactionRepository) Create(ctx context.Context, txn *domain.Wa
 		return nil, domainerrors.Internal("failed to create wallet transaction", err)
 	}
 	return dbWalletTransactionToDomain(created), nil
+}
+
+// NetByMerchant is the sum of applied credits minus debits recorded for a merchant.
+func (r *walletTransactionRepository) NetByMerchant(ctx context.Context, merchantID uuid.UUID) (int64, error) {
+	row, err := r.queries.SumWalletTransactionsByMerchant(ctx, merchantID)
+	if err != nil {
+		return 0, domainerrors.Internal("failed to sum wallet transactions", err)
+	}
+	return row.Credits - row.Debits, nil
 }
 
 func (r *walletTransactionRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status domain.WalletTransactionStatus) (*domain.WalletTransaction, error) {

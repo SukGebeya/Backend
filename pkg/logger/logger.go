@@ -84,19 +84,19 @@ func (l *Logger) Error(msg string, args ...any) {
 }
 
 func (l *Logger) DebugCtx(ctx context.Context, msg string, args ...any) {
-	l.Logger.DebugContext(ctx, msg, args...)
+	l.DebugContext(ctx, msg, args...)
 }
 
 func (l *Logger) InfoCtx(ctx context.Context, msg string, args ...any) {
-	l.Logger.InfoContext(ctx, msg, args...)
+	l.InfoContext(ctx, msg, args...)
 }
 
 func (l *Logger) WarnCtx(ctx context.Context, msg string, args ...any) {
-	l.Logger.WarnContext(ctx, msg, args...)
+	l.WarnContext(ctx, msg, args...)
 }
 
 func (l *Logger) ErrorCtx(ctx context.Context, msg string, args ...any) {
-	l.Logger.ErrorContext(ctx, msg, args...)
+	l.ErrorContext(ctx, msg, args...)
 }
 
 func SetDefault(l *Logger) {

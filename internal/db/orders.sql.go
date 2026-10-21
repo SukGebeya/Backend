@@ -23,6 +23,38 @@ func (q *Queries) CountOrdersByBuyerID(ctx context.Context, buyerID uuid.UUID) (
 	return count, err
 }
 
+const countOrdersByMerchantGroupedByStatus = `-- name: CountOrdersByMerchantGroupedByStatus :many
+SELECT status::text AS status, COUNT(*)::bigint AS count
+FROM orders
+WHERE merchant_id = $1
+GROUP BY status
+`
+
+type CountOrdersByMerchantGroupedByStatusRow struct {
+	Status string `json:"status"`
+	Count  int64  `json:"count"`
+}
+
+func (q *Queries) CountOrdersByMerchantGroupedByStatus(ctx context.Context, merchantID uuid.UUID) ([]CountOrdersByMerchantGroupedByStatusRow, error) {
+	rows, err := q.db.Query(ctx, countOrdersByMerchantGroupedByStatus, merchantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CountOrdersByMerchantGroupedByStatusRow{}
+	for rows.Next() {
+		var i CountOrdersByMerchantGroupedByStatusRow
+		if err := rows.Scan(&i.Status, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const countOrdersByMerchantID = `-- name: CountOrdersByMerchantID :one
 SELECT COUNT(*) FROM orders WHERE merchant_id = $1
 `
@@ -35,9 +67,9 @@ func (q *Queries) CountOrdersByMerchantID(ctx context.Context, merchantID uuid.U
 }
 
 const createOrder = `-- name: CreateOrder :one
-INSERT INTO orders (id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, chapa_tx_ref)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-RETURNING id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, blnk_transaction_id, chapa_tx_ref, created_at, updated_at
+INSERT INTO orders (id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, chapa_tx_ref, delivery_fee_cents)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+RETURNING id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, blnk_transaction_id, chapa_tx_ref, created_at, updated_at, delivery_fee_cents, disputed_at, dispute_reason
 `
 
 type CreateOrderParams struct {
@@ -52,6 +84,7 @@ type CreateOrderParams struct {
 	Currency          string      `json:"currency"`
 	Notes             *string     `json:"notes"`
 	ChapaTxRef        *string     `json:"chapa_tx_ref"`
+	DeliveryFeeCents  int64       `json:"delivery_fee_cents"`
 }
 
 func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) (Order, error) {
@@ -67,6 +100,7 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) (Order
 		arg.Currency,
 		arg.Notes,
 		arg.ChapaTxRef,
+		arg.DeliveryFeeCents,
 	)
 	var i Order
 	err := row.Scan(
@@ -84,6 +118,9 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) (Order
 		&i.ChapaTxRef,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeliveryFeeCents,
+		&i.DisputedAt,
+		&i.DisputeReason,
 	)
 	return i, err
 }
@@ -131,7 +168,7 @@ func (q *Queries) CreateOrderItem(ctx context.Context, arg CreateOrderItemParams
 }
 
 const getOrderByChapaTxRef = `-- name: GetOrderByChapaTxRef :one
-SELECT id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, blnk_transaction_id, chapa_tx_ref, created_at, updated_at
+SELECT id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, blnk_transaction_id, chapa_tx_ref, created_at, updated_at, delivery_fee_cents, disputed_at, dispute_reason
 FROM orders
 WHERE chapa_tx_ref = $1
 `
@@ -154,12 +191,15 @@ func (q *Queries) GetOrderByChapaTxRef(ctx context.Context, chapaTxRef *string) 
 		&i.ChapaTxRef,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeliveryFeeCents,
+		&i.DisputedAt,
+		&i.DisputeReason,
 	)
 	return i, err
 }
 
 const getOrderByID = `-- name: GetOrderByID :one
-SELECT id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, blnk_transaction_id, chapa_tx_ref, created_at, updated_at
+SELECT id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, blnk_transaction_id, chapa_tx_ref, created_at, updated_at, delivery_fee_cents, disputed_at, dispute_reason
 FROM orders
 WHERE id = $1
 `
@@ -182,6 +222,9 @@ func (q *Queries) GetOrderByID(ctx context.Context, id uuid.UUID) (Order, error)
 		&i.ChapaTxRef,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeliveryFeeCents,
+		&i.DisputedAt,
+		&i.DisputeReason,
 	)
 	return i, err
 }
@@ -245,7 +288,7 @@ func (q *Queries) ListOrderItemsByOrderID(ctx context.Context, orderID uuid.UUID
 }
 
 const listOrdersByBuyerID = `-- name: ListOrdersByBuyerID :many
-SELECT id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, blnk_transaction_id, chapa_tx_ref, created_at, updated_at
+SELECT id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, blnk_transaction_id, chapa_tx_ref, created_at, updated_at, delivery_fee_cents, disputed_at, dispute_reason
 FROM orders
 WHERE buyer_id = $1
 ORDER BY created_at DESC
@@ -282,6 +325,9 @@ func (q *Queries) ListOrdersByBuyerID(ctx context.Context, arg ListOrdersByBuyer
 			&i.ChapaTxRef,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeliveryFeeCents,
+			&i.DisputedAt,
+			&i.DisputeReason,
 		); err != nil {
 			return nil, err
 		}
@@ -294,7 +340,7 @@ func (q *Queries) ListOrdersByBuyerID(ctx context.Context, arg ListOrdersByBuyer
 }
 
 const listOrdersByMerchantID = `-- name: ListOrdersByMerchantID :many
-SELECT id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, blnk_transaction_id, chapa_tx_ref, created_at, updated_at
+SELECT id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, blnk_transaction_id, chapa_tx_ref, created_at, updated_at, delivery_fee_cents, disputed_at, dispute_reason
 FROM orders
 WHERE merchant_id = $1
 ORDER BY created_at DESC
@@ -331,6 +377,9 @@ func (q *Queries) ListOrdersByMerchantID(ctx context.Context, arg ListOrdersByMe
 			&i.ChapaTxRef,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeliveryFeeCents,
+			&i.DisputedAt,
+			&i.DisputeReason,
 		); err != nil {
 			return nil, err
 		}
@@ -343,7 +392,7 @@ func (q *Queries) ListOrdersByMerchantID(ctx context.Context, arg ListOrdersByMe
 }
 
 const listOrdersByStatus = `-- name: ListOrdersByStatus :many
-SELECT id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, blnk_transaction_id, chapa_tx_ref, created_at, updated_at
+SELECT id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, blnk_transaction_id, chapa_tx_ref, created_at, updated_at, delivery_fee_cents, disputed_at, dispute_reason
 FROM orders
 WHERE status = $1
 ORDER BY created_at DESC
@@ -380,6 +429,9 @@ func (q *Queries) ListOrdersByStatus(ctx context.Context, arg ListOrdersByStatus
 			&i.ChapaTxRef,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeliveryFeeCents,
+			&i.DisputedAt,
+			&i.DisputeReason,
 		); err != nil {
 			return nil, err
 		}
@@ -391,11 +443,101 @@ func (q *Queries) ListOrdersByStatus(ctx context.Context, arg ListOrdersByStatus
 	return items, nil
 }
 
+const openOrderDispute = `-- name: OpenOrderDispute :one
+UPDATE orders
+SET status = 'disputed', disputed_at = NOW(), dispute_reason = $1, updated_at = NOW()
+WHERE id = $2 AND status::text = ANY($3::text[])
+RETURNING id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, blnk_transaction_id, chapa_tx_ref, created_at, updated_at, delivery_fee_cents, disputed_at, dispute_reason
+`
+
+type OpenOrderDisputeParams struct {
+	Reason       *string   `json:"reason"`
+	ID           uuid.UUID `json:"id"`
+	FromStatuses []string  `json:"from_statuses"`
+}
+
+func (q *Queries) OpenOrderDispute(ctx context.Context, arg OpenOrderDisputeParams) (Order, error) {
+	row := q.db.QueryRow(ctx, openOrderDispute, arg.Reason, arg.ID, arg.FromStatuses)
+	var i Order
+	err := row.Scan(
+		&i.ID,
+		&i.BuyerID,
+		&i.MerchantID,
+		&i.ShippingAddressID,
+		&i.Status,
+		&i.SubtotalCents,
+		&i.PlatformFeeCents,
+		&i.TotalCents,
+		&i.Currency,
+		&i.Notes,
+		&i.BlnkTransactionID,
+		&i.ChapaTxRef,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeliveryFeeCents,
+		&i.DisputedAt,
+		&i.DisputeReason,
+	)
+	return i, err
+}
+
+const sumUnsettledEscrowCents = `-- name: SumUnsettledEscrowCents :one
+SELECT COALESCE(SUM(o.total_cents), 0)::bigint
+FROM orders o
+WHERE o.status IN ('paid', 'processing', 'shipped', 'disputed', 'delivered')
+  AND NOT EXISTS (SELECT 1 FROM wallet_transactions wt WHERE wt.order_id = o.id AND wt.type = 'sale_credit')
+`
+
+func (q *Queries) SumUnsettledEscrowCents(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, sumUnsettledEscrowCents)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const transitionOrderStatus = `-- name: TransitionOrderStatus :one
+UPDATE orders
+SET status = $1, updated_at = NOW()
+WHERE id = $2 AND status::text = ANY($3::text[])
+RETURNING id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, blnk_transaction_id, chapa_tx_ref, created_at, updated_at, delivery_fee_cents, disputed_at, dispute_reason
+`
+
+type TransitionOrderStatusParams struct {
+	ToStatus     OrderStatus `json:"to_status"`
+	ID           uuid.UUID   `json:"id"`
+	FromStatuses []string    `json:"from_statuses"`
+}
+
+func (q *Queries) TransitionOrderStatus(ctx context.Context, arg TransitionOrderStatusParams) (Order, error) {
+	row := q.db.QueryRow(ctx, transitionOrderStatus, arg.ToStatus, arg.ID, arg.FromStatuses)
+	var i Order
+	err := row.Scan(
+		&i.ID,
+		&i.BuyerID,
+		&i.MerchantID,
+		&i.ShippingAddressID,
+		&i.Status,
+		&i.SubtotalCents,
+		&i.PlatformFeeCents,
+		&i.TotalCents,
+		&i.Currency,
+		&i.Notes,
+		&i.BlnkTransactionID,
+		&i.ChapaTxRef,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeliveryFeeCents,
+		&i.DisputedAt,
+		&i.DisputeReason,
+	)
+	return i, err
+}
+
 const updateOrderBlnkTransaction = `-- name: UpdateOrderBlnkTransaction :one
 UPDATE orders
 SET blnk_transaction_id = $1, updated_at = NOW()
 WHERE id = $2
-RETURNING id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, blnk_transaction_id, chapa_tx_ref, created_at, updated_at
+RETURNING id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, blnk_transaction_id, chapa_tx_ref, created_at, updated_at, delivery_fee_cents, disputed_at, dispute_reason
 `
 
 type UpdateOrderBlnkTransactionParams struct {
@@ -421,6 +563,9 @@ func (q *Queries) UpdateOrderBlnkTransaction(ctx context.Context, arg UpdateOrde
 		&i.ChapaTxRef,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeliveryFeeCents,
+		&i.DisputedAt,
+		&i.DisputeReason,
 	)
 	return i, err
 }
@@ -429,7 +574,7 @@ const updateOrderStatus = `-- name: UpdateOrderStatus :one
 UPDATE orders
 SET status = $1, updated_at = NOW()
 WHERE id = $2
-RETURNING id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, blnk_transaction_id, chapa_tx_ref, created_at, updated_at
+RETURNING id, buyer_id, merchant_id, shipping_address_id, status, subtotal_cents, platform_fee_cents, total_cents, currency, notes, blnk_transaction_id, chapa_tx_ref, created_at, updated_at, delivery_fee_cents, disputed_at, dispute_reason
 `
 
 type UpdateOrderStatusParams struct {
@@ -455,6 +600,9 @@ func (q *Queries) UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusPa
 		&i.ChapaTxRef,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeliveryFeeCents,
+		&i.DisputedAt,
+		&i.DisputeReason,
 	)
 	return i, err
 }

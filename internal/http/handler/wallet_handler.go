@@ -27,8 +27,10 @@ func NewWalletHandler(walletService *service.WalletService, merchantService *ser
 }
 
 type GetWalletResponse struct {
-	BalanceCents int64  `json:"balance_cents"`
-	Currency     string `json:"currency"`
+	BalanceCents       int64  `json:"balance_cents"`
+	PendingPayoutCents int64  `json:"pending_payout_cents"`
+	AvailableCents     int64  `json:"available_cents"`
+	Currency           string `json:"currency"`
 }
 
 type TransactionResponse struct {
@@ -53,20 +55,55 @@ type TransactionListResponse struct {
 }
 
 type RequestPayoutRequest struct {
-	AmountCents int64  `json:"amount_cents" validate:"required,min=100"`
-	Method      string `json:"method" validate:"required,oneof=telebirr bank_transfer cbe_birr"`
-	Destination string `json:"destination" validate:"required"`
+	AmountCents int64  `json:"amount_cents" validate:"required,min=100" example:"50000"`
+	Method      string `json:"method" validate:"required,oneof=telebirr bank_transfer cbe_birr" example:"telebirr"`
+	Destination string `json:"destination" validate:"required,min=5,max=50" example:"0911234567"`
+	AccountName string `json:"account_name" validate:"required,min=2,max=100" example:"Tigist Bekele"`
+	BankCode    string `json:"bank_code" validate:"required,max=20" example:"855"`
 }
 
 type PayoutResponse struct {
-	ID          uuid.UUID `json:"id"`
-	MerchantID  uuid.UUID `json:"merchant_id"`
-	AmountCents int64     `json:"amount_cents"`
-	Currency    string    `json:"currency"`
-	Method      string    `json:"method"`
-	Destination string    `json:"destination"`
-	Status      string    `json:"status"`
-	RequestedAt string    `json:"requested_at"`
+	ID            uuid.UUID `json:"id"`
+	MerchantID    uuid.UUID `json:"merchant_id"`
+	AmountCents   int64     `json:"amount_cents"`
+	Currency      string    `json:"currency"`
+	Method        string    `json:"method"`
+	Destination   string    `json:"destination"`
+	AccountName   *string   `json:"account_name,omitempty"`
+	BankCode      *string   `json:"bank_code,omitempty"`
+	Status        string    `json:"status"`
+	FailureReason *string   `json:"failure_reason,omitempty"`
+	RequestedAt   string    `json:"requested_at"`
+	ProcessedAt   *string   `json:"processed_at,omitempty"`
+}
+
+type BankResponse struct {
+	ID       string `json:"id"`
+	Slug     string `json:"slug"`
+	Name     string `json:"name"`
+	Currency string `json:"currency"`
+	IsMobile bool   `json:"is_mobile_money"`
+}
+
+func toPayoutResponse(p *domain.Payout) PayoutResponse {
+	resp := PayoutResponse{
+		ID:            p.ID,
+		MerchantID:    p.MerchantID,
+		AmountCents:   p.AmountCents,
+		Currency:      p.Currency,
+		Method:        string(p.Method),
+		Destination:   p.Destination,
+		AccountName:   p.AccountName,
+		BankCode:      p.BankCode,
+		Status:        string(p.Status),
+		FailureReason: p.FailureReason,
+		RequestedAt:   p.RequestedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+	if p.ProcessedAt != nil {
+		processed := p.ProcessedAt.Format("2006-01-02T15:04:05Z07:00")
+		resp.ProcessedAt = &processed
+	}
+	return resp
 }
 
 // GetWallet godoc
@@ -103,8 +140,10 @@ func (h *WalletHandler) GetWallet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.JSON(w, http.StatusOK, GetWalletResponse{
-		BalanceCents: balance.BalanceCents,
-		Currency:     balance.Currency,
+		BalanceCents:       balance.BalanceCents,
+		PendingPayoutCents: balance.PendingPayoutCents,
+		AvailableCents:     balance.AvailableCents,
+		Currency:           balance.Currency,
 	})
 }
 
@@ -223,6 +262,8 @@ func (h *WalletHandler) RequestPayout(w http.ResponseWriter, r *http.Request) {
 		AmountCents: req.AmountCents,
 		Method:      domain.PayoutMethod(req.Method),
 		Destination: req.Destination,
+		AccountName: req.AccountName,
+		BankCode:    req.BankCode,
 	}
 
 	payout, err := h.walletService.RequestPayout(ctx, merchant.ID, input)
@@ -231,16 +272,7 @@ func (h *WalletHandler) RequestPayout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.JSON(w, http.StatusCreated, PayoutResponse{
-		ID:          payout.ID,
-		MerchantID:  payout.MerchantID,
-		AmountCents: payout.AmountCents,
-		Currency:    payout.Currency,
-		Method:      string(payout.Method),
-		Destination: payout.Destination,
-		Status:      string(payout.Status),
-		RequestedAt: payout.RequestedAt.Format("2006-01-02T15:04:05Z07:00"),
-	})
+	response.JSON(w, http.StatusCreated, toPayoutResponse(payout))
 }
 
 // GetMerchantPayouts godoc
@@ -290,17 +322,8 @@ func (h *WalletHandler) GetMerchantPayouts(w http.ResponseWriter, r *http.Reques
 	}
 
 	items := make([]PayoutResponse, len(result.Items))
-	for i, p := range result.Items {
-		items[i] = PayoutResponse{
-			ID:          p.ID,
-			MerchantID:  p.MerchantID,
-			AmountCents: p.AmountCents,
-			Currency:    p.Currency,
-			Method:      string(p.Method),
-			Destination: p.Destination,
-			Status:      string(p.Status),
-			RequestedAt: p.RequestedAt.Format("2006-01-02T15:04:05Z07:00"),
-		}
+	for i := range result.Items {
+		items[i] = toPayoutResponse(&result.Items[i])
 	}
 
 	response.JSON(w, http.StatusOK, response.PaginatedResponse{
@@ -327,13 +350,54 @@ func (h *WalletHandler) GetMerchantPayouts(w http.ResponseWriter, r *http.Reques
 // @Failure 500 {object} response.ErrorResponse
 // @Router /merchant/wallet/payouts/{payout_id} [get]
 func (h *WalletHandler) GetPayoutByID(w http.ResponseWriter, r *http.Request) {
-	_ = r.Context()
-	payoutIDStr := chi.URLParam(r, "payout_id")
-	_, err := uuid.Parse(payoutIDStr)
+	payoutID, err := uuid.Parse(chi.URLParam(r, "payout_id"))
 	if err != nil {
 		response.Error(w, apperrors.BadRequest("invalid payout ID"))
 		return
 	}
 
-	response.Error(w, apperrors.NotFound("payout not found"))
+	merchant, ok := middleware.GetMerchantProfile(r.Context())
+	if !ok {
+		response.Error(w, apperrors.Forbidden("merchant profile required"))
+		return
+	}
+
+	payout, err := h.walletService.GetPayout(r.Context(), merchant.ID, payoutID)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, toPayoutResponse(payout))
+}
+
+// ListBanks godoc
+// @Summary List payout banks
+// @Description Banks and mobile-money providers Chapa can transfer to. Use the id as bank_code when requesting a payout.
+// @Tags wallet
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} BankResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 500 {object} response.ErrorResponse
+// @Router /merchant/wallet/banks [get]
+func (h *WalletHandler) ListBanks(w http.ResponseWriter, r *http.Request) {
+	banks, err := h.walletService.ListBanks(r.Context())
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	items := make([]BankResponse, len(banks))
+	for i, b := range banks {
+		items[i] = BankResponse{
+			ID:       b.ID.String(),
+			Slug:     b.Slug,
+			Name:     b.Name,
+			Currency: b.Currency,
+			IsMobile: b.IsMobile == 1,
+		}
+	}
+
+	response.JSON(w, http.StatusOK, items)
 }

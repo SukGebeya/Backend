@@ -27,6 +27,7 @@ const createWalletTransaction = `-- name: CreateWalletTransaction :one
 INSERT INTO wallet_transactions (id, merchant_id, order_id, type, amount_cents, currency, blnk_transaction_id, status, description)
 VALUES ($1, $2, $3, $4, $5, $6, 
         $7, $8, $9)
+ON CONFLICT (blnk_transaction_id) DO UPDATE SET blnk_transaction_id = EXCLUDED.blnk_transaction_id
 RETURNING id, merchant_id, order_id, type, amount_cents, currency, blnk_transaction_id, status, description, created_at
 `
 
@@ -97,7 +98,7 @@ func (q *Queries) GetWalletTransactionByID(ctx context.Context, id uuid.UUID) (W
 const getWalletTransactionByOrderID = `-- name: GetWalletTransactionByOrderID :one
 SELECT id, merchant_id, order_id, type, amount_cents, currency, blnk_transaction_id, status, description, created_at
 FROM wallet_transactions
-WHERE order_id = $1
+WHERE order_id = $1 AND type = 'sale_credit'
 `
 
 func (q *Queries) GetWalletTransactionByOrderID(ctx context.Context, orderID pgtype.UUID) (WalletTransaction, error) {
@@ -161,6 +162,26 @@ func (q *Queries) ListWalletTransactionsByMerchantID(ctx context.Context, arg Li
 		return nil, err
 	}
 	return items, nil
+}
+
+const sumWalletTransactionsByMerchant = `-- name: SumWalletTransactionsByMerchant :one
+SELECT
+    COALESCE(SUM(CASE WHEN type IN ('sale_credit', 'advance_credit') THEN amount_cents ELSE 0 END), 0)::bigint AS credits,
+    COALESCE(SUM(CASE WHEN type IN ('payout_debit', 'refund_debit', 'reversal_debit', 'advance_repayment_debit') THEN amount_cents ELSE 0 END), 0)::bigint AS debits
+FROM wallet_transactions
+WHERE merchant_id = $1 AND status = 'applied'
+`
+
+type SumWalletTransactionsByMerchantRow struct {
+	Credits int64 `json:"credits"`
+	Debits  int64 `json:"debits"`
+}
+
+func (q *Queries) SumWalletTransactionsByMerchant(ctx context.Context, merchantID uuid.UUID) (SumWalletTransactionsByMerchantRow, error) {
+	row := q.db.QueryRow(ctx, sumWalletTransactionsByMerchant, merchantID)
+	var i SumWalletTransactionsByMerchantRow
+	err := row.Scan(&i.Credits, &i.Debits)
+	return i, err
 }
 
 const updateWalletTransactionStatus = `-- name: UpdateWalletTransactionStatus :one

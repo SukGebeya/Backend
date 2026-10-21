@@ -9,9 +9,10 @@ import (
 type WalletTransactionType string
 
 const (
-	WalletTransactionTypeSaleCredit  WalletTransactionType = "sale_credit"
-	WalletTransactionTypePayoutDebit WalletTransactionType = "payout_debit"
-	WalletTransactionTypeRefundDebit WalletTransactionType = "refund_debit"
+	WalletTransactionTypeSaleCredit    WalletTransactionType = "sale_credit"
+	WalletTransactionTypePayoutDebit   WalletTransactionType = "payout_debit"
+	WalletTransactionTypeRefundDebit   WalletTransactionType = "refund_debit"
+	WalletTransactionTypeReversalDebit WalletTransactionType = "reversal_debit"
 )
 
 type WalletTransactionStatus string
@@ -47,8 +48,10 @@ type CreateWalletTransactionInput struct {
 }
 
 type WalletBalance struct {
-	BalanceCents int64  `json:"balance_cents"`
-	Currency     string `json:"currency"`
+	BalanceCents   int64  `json:"balance_cents"`
+	InflightCents  int64  `json:"inflight_debit_cents"`
+	AvailableCents int64  `json:"available_cents"`
+	Currency       string `json:"currency"`
 }
 
 type PayoutStatus string
@@ -76,7 +79,10 @@ type Payout struct {
 	Method            PayoutMethod `db:"method" json:"method"`
 	Destination       string       `db:"destination" json:"destination"`
 	Status            PayoutStatus `db:"status" json:"status"`
+	AccountName       *string      `db:"account_name" json:"account_name,omitempty"`
+	BankCode          *string      `db:"bank_code" json:"bank_code,omitempty"`
 	BlnkTransactionID *string      `db:"blnk_transaction_id" json:"blnk_transaction_id,omitempty"`
+	TransferReference *string      `db:"transfer_reference" json:"transfer_reference,omitempty"`
 	FailureReason     *string      `db:"failure_reason" json:"failure_reason,omitempty"`
 	RequestedAt       time.Time    `db:"requested_at" json:"requested_at"`
 	ProcessedAt       *time.Time   `db:"processed_at" json:"processed_at,omitempty"`
@@ -94,6 +100,8 @@ type RequestPayoutInput struct {
 	AmountCents int64        `json:"amount_cents" validate:"required,min=100"`
 	Method      PayoutMethod `json:"method" validate:"required,oneof=telebirr bank_transfer cbe_birr"`
 	Destination string       `json:"destination" validate:"required"`
+	AccountName string       `json:"account_name" validate:"required,min=2,max=100"`
+	BankCode    string       `json:"bank_code" validate:"required"`
 }
 
 type ProcessPayoutInput struct {

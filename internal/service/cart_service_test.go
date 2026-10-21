@@ -15,16 +15,9 @@ import (
 func TestCartService_GetOrCreateCart_UserCart(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
+	pool := testutil.NewTestDatabase(t)
 
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
-
-	redisContainer := testutil.SetupRedis(t)
-	redisClient := testutil.CreateRedisClient(t, redisContainer.ConnectionString)
-	defer testutil.CleanupRedis(t, redisContainer, redisClient)
+	redisClient := testutil.NewTestRedis(t)
 
 	userRepo := repository.NewUserRepository(pool)
 	cartRepo := repository.NewCartRepository(pool)
@@ -63,16 +56,9 @@ func TestCartService_GetOrCreateCart_UserCart(t *testing.T) {
 func TestCartService_GetOrCreateCart_SessionCart(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
+	pool := testutil.NewTestDatabase(t)
 
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
-
-	redisContainer := testutil.SetupRedis(t)
-	redisClient := testutil.CreateRedisClient(t, redisContainer.ConnectionString)
-	defer testutil.CleanupRedis(t, redisContainer, redisClient)
+	redisClient := testutil.NewTestRedis(t)
 
 	cartRepo := repository.NewCartRepository(pool)
 	cartItemRepo := repository.NewCartItemRepository(pool)
@@ -104,16 +90,9 @@ func TestCartService_GetOrCreateCart_SessionCart(t *testing.T) {
 func TestCartService_GetOrCreateCart_ReturnsExistingCart(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
+	pool := testutil.NewTestDatabase(t)
 
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
-
-	redisContainer := testutil.SetupRedis(t)
-	redisClient := testutil.CreateRedisClient(t, redisContainer.ConnectionString)
-	defer testutil.CleanupRedis(t, redisContainer, redisClient)
+	redisClient := testutil.NewTestRedis(t)
 
 	userRepo := repository.NewUserRepository(pool)
 	cartRepo := repository.NewCartRepository(pool)
@@ -149,16 +128,9 @@ func TestCartService_GetOrCreateCart_ReturnsExistingCart(t *testing.T) {
 func TestCartService_AddItem(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
+	pool := testutil.NewTestDatabase(t)
 
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
-
-	redisContainer := testutil.SetupRedis(t)
-	redisClient := testutil.CreateRedisClient(t, redisContainer.ConnectionString)
-	defer testutil.CleanupRedis(t, redisContainer, redisClient)
+	redisClient := testutil.NewTestRedis(t)
 
 	userRepo := repository.NewUserRepository(pool)
 	merchantRepo := repository.NewMerchantRepository(pool)
@@ -237,6 +209,9 @@ func TestCartService_AddItem(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create variant: %v", err)
 	}
+	if _, err := inventoryRepo.Create(ctx, &domain.Inventory{ID: uuid.New(), VariantID: createdVariant.ID, Quantity: 100}); err != nil {
+		t.Fatalf("failed to stock variant: %v", err)
+	}
 
 	cart, err := cartService.GetOrCreateCart(ctx, &createdUser.ID, nil)
 	if err != nil {
@@ -268,16 +243,9 @@ func TestCartService_AddItem(t *testing.T) {
 func TestCartService_AddItem_MergeQuantity(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
+	pool := testutil.NewTestDatabase(t)
 
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
-
-	redisContainer := testutil.SetupRedis(t)
-	redisClient := testutil.CreateRedisClient(t, redisContainer.ConnectionString)
-	defer testutil.CleanupRedis(t, redisContainer, redisClient)
+	redisClient := testutil.NewTestRedis(t)
 
 	userRepo := repository.NewUserRepository(pool)
 	merchantRepo := repository.NewMerchantRepository(pool)
@@ -356,6 +324,9 @@ func TestCartService_AddItem_MergeQuantity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create variant: %v", err)
 	}
+	if _, err := inventoryRepo.Create(ctx, &domain.Inventory{ID: uuid.New(), VariantID: createdVariant.ID, Quantity: 100}); err != nil {
+		t.Fatalf("failed to stock variant: %v", err)
+	}
 
 	cart, err := cartService.GetOrCreateCart(ctx, &createdUser.ID, nil)
 	if err != nil {
@@ -380,16 +351,9 @@ func TestCartService_AddItem_MergeQuantity(t *testing.T) {
 func TestCartService_MergeCart(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
+	pool := testutil.NewTestDatabase(t)
 
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
-
-	redisContainer := testutil.SetupRedis(t)
-	redisClient := testutil.CreateRedisClient(t, redisContainer.ConnectionString)
-	defer testutil.CleanupRedis(t, redisContainer, redisClient)
+	redisClient := testutil.NewTestRedis(t)
 
 	userRepo := repository.NewUserRepository(pool)
 	merchantRepo := repository.NewMerchantRepository(pool)
@@ -467,6 +431,9 @@ func TestCartService_MergeCart(t *testing.T) {
 	createdVariant, err := variantRepo.Create(ctx, variant)
 	if err != nil {
 		t.Fatalf("failed to create variant: %v", err)
+	}
+	if _, err := inventoryRepo.Create(ctx, &domain.Inventory{ID: uuid.New(), VariantID: createdVariant.ID, Quantity: 100}); err != nil {
+		t.Fatalf("failed to stock variant: %v", err)
 	}
 
 	sessionID := "test-session-merge"
@@ -505,16 +472,9 @@ func TestCartService_MergeCart(t *testing.T) {
 func TestCartService_UpdateItemQuantityByVariant(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
+	pool := testutil.NewTestDatabase(t)
 
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
-
-	redisContainer := testutil.SetupRedis(t)
-	redisClient := testutil.CreateRedisClient(t, redisContainer.ConnectionString)
-	defer testutil.CleanupRedis(t, redisContainer, redisClient)
+	redisClient := testutil.NewTestRedis(t)
 
 	userRepo := repository.NewUserRepository(pool)
 	merchantRepo := repository.NewMerchantRepository(pool)
@@ -592,6 +552,9 @@ func TestCartService_UpdateItemQuantityByVariant(t *testing.T) {
 	createdVariant, err := variantRepo.Create(ctx, variant)
 	if err != nil {
 		t.Fatalf("failed to create variant: %v", err)
+	}
+	if _, err := inventoryRepo.Create(ctx, &domain.Inventory{ID: uuid.New(), VariantID: createdVariant.ID, Quantity: 100}); err != nil {
+		t.Fatalf("failed to stock variant: %v", err)
 	}
 
 	cart, err := cartService.GetOrCreateCart(ctx, &createdUser.ID, nil)
@@ -630,16 +593,9 @@ func TestCartService_UpdateItemQuantityByVariant(t *testing.T) {
 func TestCartService_RemoveItemByVariant(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
+	pool := testutil.NewTestDatabase(t)
 
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
-
-	redisContainer := testutil.SetupRedis(t)
-	redisClient := testutil.CreateRedisClient(t, redisContainer.ConnectionString)
-	defer testutil.CleanupRedis(t, redisContainer, redisClient)
+	redisClient := testutil.NewTestRedis(t)
 
 	userRepo := repository.NewUserRepository(pool)
 	merchantRepo := repository.NewMerchantRepository(pool)
@@ -718,6 +674,9 @@ func TestCartService_RemoveItemByVariant(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create variant: %v", err)
 	}
+	if _, err := inventoryRepo.Create(ctx, &domain.Inventory{ID: uuid.New(), VariantID: createdVariant.ID, Quantity: 100}); err != nil {
+		t.Fatalf("failed to stock variant: %v", err)
+	}
 
 	cart, err := cartService.GetOrCreateCart(ctx, &createdUser.ID, nil)
 	if err != nil {
@@ -747,16 +706,9 @@ func TestCartService_RemoveItemByVariant(t *testing.T) {
 func TestCartService_ClearCart(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
+	pool := testutil.NewTestDatabase(t)
 
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
-
-	redisContainer := testutil.SetupRedis(t)
-	redisClient := testutil.CreateRedisClient(t, redisContainer.ConnectionString)
-	defer testutil.CleanupRedis(t, redisContainer, redisClient)
+	redisClient := testutil.NewTestRedis(t)
 
 	userRepo := repository.NewUserRepository(pool)
 	merchantRepo := repository.NewMerchantRepository(pool)
@@ -835,6 +787,9 @@ func TestCartService_ClearCart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create variant1: %v", err)
 	}
+	if _, err := inventoryRepo.Create(ctx, &domain.Inventory{ID: uuid.New(), VariantID: createdVariant1.ID, Quantity: 100}); err != nil {
+		t.Fatalf("failed to stock variant: %v", err)
+	}
 
 	variant2 := &domain.ProductVariant{
 		ID:         uuid.New(),
@@ -850,6 +805,9 @@ func TestCartService_ClearCart(t *testing.T) {
 	createdVariant2, err := variantRepo.Create(ctx, variant2)
 	if err != nil {
 		t.Fatalf("failed to create variant2: %v", err)
+	}
+	if _, err := inventoryRepo.Create(ctx, &domain.Inventory{ID: uuid.New(), VariantID: createdVariant2.ID, Quantity: 100}); err != nil {
+		t.Fatalf("failed to stock variant: %v", err)
 	}
 
 	cart, err := cartService.GetOrCreateCart(ctx, &createdUser.ID, nil)

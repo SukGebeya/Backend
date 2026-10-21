@@ -42,8 +42,10 @@ type User struct {
 	KYCStatus    KYCStatus `db:"kyc_status" json:"kyc_status"`
 	NationalID   *string   `db:"national_id" json:"national_id"`
 	IsActive     bool      `db:"is_active" json:"is_active"`
-	CreatedAt    time.Time `db:"created_at" json:"created_at"`
-	UpdatedAt    time.Time `db:"updated_at" json:"updated_at"`
+
+	PhoneVerifiedAt *time.Time `db:"phone_verified_at" json:"phone_verified_at,omitempty"`
+	CreatedAt       time.Time  `db:"created_at" json:"created_at"`
+	UpdatedAt       time.Time  `db:"updated_at" json:"updated_at"`
 }
 
 func (u *User) DisplayName() string {

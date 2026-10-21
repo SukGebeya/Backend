@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/SukGebeya/Backend/internal/db"
 	"github.com/SukGebeya/Backend/internal/domain"
@@ -239,6 +240,21 @@ func NewProductImageRepository(pool *pgxpool.Pool) ProductImageRepository {
 
 var _ ProductImageRepository = (*productImageRepository)(nil)
 
+func (r *productImageRepository) Count(ctx context.Context, productID uuid.UUID) (int64, error) {
+	count, err := r.queries.CountProductImages(ctx, productID)
+	if err != nil {
+		return 0, domainerrors.Internal("failed to count product images", err)
+	}
+	return count, nil
+}
+
+func (r *productImageRepository) ClearPrimary(ctx context.Context, productID uuid.UUID) error {
+	if err := r.queries.ClearPrimaryProductImage(ctx, productID); err != nil {
+		return domainerrors.Internal("failed to update product images", err)
+	}
+	return nil
+}
+
 func (r *productImageRepository) GetByProduct(ctx context.Context, productID uuid.UUID) ([]domain.ProductImage, error) {
 	images, err := r.queries.GetProductImages(ctx, productID)
 	if err != nil {
@@ -445,4 +461,79 @@ func dbProductVariantToDomain(v db.ProductVariant) *domain.ProductVariant {
 		CreatedAt:         v.CreatedAt.Time,
 		UpdatedAt:         v.UpdatedAt.Time,
 	}
+}
+
+// likePattern turns free text into an ILIKE pattern, escaping wildcards so a
+// search for "50%" matches literally. Works for Amharic (Ge'ez script) as well.
+func likePattern(search string) *string {
+	search = strings.TrimSpace(search)
+	if search == "" {
+		return nil
+	}
+	escaped := strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(search)
+	pattern := "%" + escaped + "%"
+	return &pattern
+}
+
+func (r *productRepository) Browse(ctx context.Context, filter domain.ProductFilter, opts domain.ListOptions) (*domain.PaginatedResult[domain.ProductSummary], error) {
+	var categoryID, merchantID pgtype.UUID
+	if filter.CategoryID != nil {
+		categoryID = pgtype.UUID{Bytes: *filter.CategoryID, Valid: true}
+	}
+	if filter.MerchantID != nil {
+		merchantID = pgtype.UUID{Bytes: *filter.MerchantID, Valid: true}
+	}
+	search := likePattern(filter.Search)
+
+	rows, err := r.queries.BrowseProducts(ctx, db.BrowseProductsParams{
+		CategoryID: categoryID,
+		MerchantID: merchantID,
+		Search:     search,
+		PageOffset: int32(opts.Offset()),
+		PageLimit:  int32(opts.Limit()),
+	})
+	if err != nil {
+		return nil, domainerrors.Internal("failed to browse products", err)
+	}
+	total, err := r.queries.CountBrowseProducts(ctx, db.CountBrowseProductsParams{
+		CategoryID: categoryID,
+		MerchantID: merchantID,
+		Search:     search,
+	})
+	if err != nil {
+		return nil, domainerrors.Internal("failed to count products", err)
+	}
+
+	items := make([]domain.ProductSummary, len(rows))
+	for i, row := range rows {
+		product := dbProductToDomain(db.Product{
+			ID: row.ID, MerchantID: row.MerchantID, CategoryID: row.CategoryID, Name: row.Name, Slug: row.Slug,
+			Description: row.Description, Status: row.Status, IsDigital: row.IsDigital, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+		})
+		summary := domain.ProductSummary{
+			Product:           *product,
+			MinPriceCents:     row.MinPriceCents,
+			AvailableQuantity: row.AvailableQuantity,
+			ShopName:          row.ShopName,
+			ShopSlug:          row.ShopSlug,
+			MerchantVerified:  row.MerchantVerified,
+		}
+		if row.PrimaryImageUrl != "" {
+			url := row.PrimaryImageUrl
+			summary.PrimaryImageURL = &url
+		}
+		items[i] = summary
+	}
+
+	totalPages := 0
+	if opts.PerPage > 0 {
+		totalPages = int((total + int64(opts.PerPage) - 1) / int64(opts.PerPage))
+	}
+	return &domain.PaginatedResult[domain.ProductSummary]{
+		Items:      items,
+		Total:      total,
+		Page:       opts.Page,
+		PerPage:    opts.PerPage,
+		TotalPages: totalPages,
+	}, nil
 }

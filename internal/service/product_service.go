@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/SukGebeya/Backend/internal/domain"
 	domainerrors "github.com/SukGebeya/Backend/internal/errors"
@@ -57,10 +58,22 @@ func (s *ProductService) ListByCategory(ctx context.Context, categoryID uuid.UUI
 	return s.productRepo.ListByCategory(ctx, categoryID, opts)
 }
 
+func (s *ProductService) Browse(ctx context.Context, filter domain.ProductFilter, opts domain.ListOptions) (*domain.PaginatedResult[domain.ProductSummary], error) {
+	return s.productRepo.Browse(ctx, filter, opts)
+}
+
+// Create stores a product. Slugs are unique across the marketplace so public
+// product URLs are unambiguous; when none is given one is generated from the
+// name (Amharic names get a random slug since they have no Latin form).
 func (s *ProductService) Create(ctx context.Context, input CreateProductInput) (*domain.Product, error) {
-	existing, _ := s.productRepo.GetBySlugAndMerchant(ctx, input.Slug, input.MerchantID)
-	if existing != nil {
-		return nil, domainerrors.Conflict("product with this slug already exists for this merchant")
+	if input.Slug == "" {
+		slug, err := s.uniqueSlug(ctx, input.Name)
+		if err != nil {
+			return nil, err
+		}
+		input.Slug = slug
+	} else if existing, _ := s.productRepo.GetBySlug(ctx, input.Slug); existing != nil {
+		return nil, domainerrors.Conflict("a product with this slug already exists")
 	}
 
 	product := &domain.Product{
@@ -102,24 +115,86 @@ func (s *ProductService) Update(ctx context.Context, id uuid.UUID, input UpdateP
 	return s.productRepo.Update(ctx, product)
 }
 
+// Delete archives the product rather than removing it: past orders reference its
+// variants and must keep resolving.
 func (s *ProductService) Delete(ctx context.Context, id uuid.UUID) error {
-	if err := s.imageRepo.DeleteByProduct(ctx, id); err != nil {
+	product, err := s.productRepo.GetByID(ctx, id)
+	if err != nil {
 		return err
 	}
-	if err := s.variantRepo.DeleteByProduct(ctx, id); err != nil {
+	product.Status = domain.ProductStatusArchived
+	_, err = s.productRepo.Update(ctx, product)
+	return err
+}
+
+func (s *ProductService) uniqueSlug(ctx context.Context, name string) (string, error) {
+	base := generateSlug(name)
+	slug := base
+	for i := 0; i < 5; i++ {
+		existing, err := s.productRepo.GetBySlug(ctx, slug)
+		if err != nil && !domainerrors.IsNotFound(err) {
+			return "", err
+		}
+		if existing == nil {
+			return slug, nil
+		}
+		slug = base + "-" + uuid.NewString()[:4]
+	}
+	return base + "-" + uuid.NewString()[:8], nil
+}
+
+func (s *ProductService) ListImages(ctx context.Context, productID uuid.UUID) ([]domain.ProductImage, error) {
+	return s.imageRepo.GetByProduct(ctx, productID)
+}
+
+func (s *ProductService) AddImage(ctx context.Context, productID uuid.UUID, url string, altText *string, isPrimary bool) (*domain.ProductImage, error) {
+	count, err := s.imageRepo.Count(ctx, productID)
+	if err != nil {
+		return nil, err
+	}
+	if count >= domain.MaxImagesPerProduct {
+		return nil, domainerrors.BadRequest(fmt.Sprintf("a product can have at most %d images", domain.MaxImagesPerProduct))
+	}
+	if count == 0 {
+		isPrimary = true
+	}
+	if isPrimary {
+		if err := s.imageRepo.ClearPrimary(ctx, productID); err != nil {
+			return nil, err
+		}
+	}
+	return s.imageRepo.Create(ctx, &domain.ProductImage{
+		ID:        uuid.New(),
+		ProductID: productID,
+		URL:       url,
+		AltText:   altText,
+		SortOrder: int(count),
+		IsPrimary: isPrimary,
+	})
+}
+
+func (s *ProductService) DeleteImage(ctx context.Context, productID, imageID uuid.UUID) error {
+	images, err := s.imageRepo.GetByProduct(ctx, productID)
+	if err != nil {
 		return err
 	}
-	return s.productRepo.Delete(ctx, id)
+	for _, img := range images {
+		if img.ID == imageID {
+			return s.imageRepo.Delete(ctx, imageID)
+		}
+	}
+	return domainerrors.NotFound("image not found")
 }
 
 var _ ProductVariantManager = (*ProductVariantService)(nil)
 
 type ProductVariantService struct {
-	variantRepo repository.ProductVariantRepository
+	variantRepo   repository.ProductVariantRepository
+	inventoryRepo repository.InventoryRepository
 }
 
-func NewProductVariantService(variantRepo repository.ProductVariantRepository) *ProductVariantService {
-	return &ProductVariantService{variantRepo: variantRepo}
+func NewProductVariantService(variantRepo repository.ProductVariantRepository, inventoryRepo repository.InventoryRepository) *ProductVariantService {
+	return &ProductVariantService{variantRepo: variantRepo, inventoryRepo: inventoryRepo}
 }
 
 func (s *ProductVariantService) GetByID(ctx context.Context, id uuid.UUID) (*domain.ProductVariant, error) {
@@ -156,7 +231,23 @@ func (s *ProductVariantService) Create(ctx context.Context, input CreateVariantI
 		IsActive:          input.IsActive,
 	}
 
-	return s.variantRepo.Create(ctx, variant)
+	created, err := s.variantRepo.Create(ctx, variant)
+	if err != nil {
+		return nil, err
+	}
+
+	if input.StockQuantity < 0 {
+		input.StockQuantity = 0
+	}
+	if _, err := s.inventoryRepo.Create(ctx, &domain.Inventory{
+		ID:        uuid.New(),
+		VariantID: created.ID,
+		Quantity:  input.StockQuantity,
+	}); err != nil {
+		return nil, err
+	}
+
+	return created, nil
 }
 
 func (s *ProductVariantService) Update(ctx context.Context, id uuid.UUID, input UpdateVariantInput) (*domain.ProductVariant, error) {
@@ -184,6 +275,13 @@ func (s *ProductVariantService) Update(ctx context.Context, id uuid.UUID, input 
 	return s.variantRepo.Update(ctx, variant)
 }
 
+// Delete deactivates the variant; order history keeps pointing at it.
 func (s *ProductVariantService) Delete(ctx context.Context, id uuid.UUID) error {
-	return s.variantRepo.Delete(ctx, id)
+	variant, err := s.variantRepo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	variant.IsActive = false
+	_, err = s.variantRepo.Update(ctx, variant)
+	return err
 }

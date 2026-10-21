@@ -13,24 +13,27 @@ import (
 )
 
 type ProductHandler struct {
-	productService *service.ProductService
-	variantService *service.ProductVariantService
+	productService   *service.ProductService
+	variantService   *service.ProductVariantService
+	inventoryService *service.InventoryService
 }
 
 func NewProductHandler(
 	productService *service.ProductService,
 	variantService *service.ProductVariantService,
+	inventoryService *service.InventoryService,
 ) *ProductHandler {
 	return &ProductHandler{
-		productService: productService,
-		variantService: variantService,
+		productService:   productService,
+		variantService:   variantService,
+		inventoryService: inventoryService,
 	}
 }
 
 type CreateProductRequest struct {
 	CategoryID  string `json:"category_id" validate:"omitempty,uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Name        string `json:"name" validate:"required,min=2,max=200" example:"Traditional Ethiopian Coffee"`
-	Slug        string `json:"slug" validate:"required,min=2,max=200" example:"traditional-ethiopian-coffee"`
+	Slug        string `json:"slug" validate:"omitempty,min=2,max=200,slug" example:"traditional-ethiopian-coffee"`
 	Description string `json:"description" validate:"omitempty,max=2000" example:"Premium Ethiopian coffee from Yirgacheffe region"`
 	Status      string `json:"status" validate:"omitempty,oneof=draft active archived" example:"draft"`
 	IsDigital   bool   `json:"is_digital"`
@@ -52,6 +55,19 @@ type CreateVariantRequest struct {
 	Currency          string         `json:"currency" validate:"required,len=3" example:"ETB"`
 	Attributes        map[string]any `json:"attributes"`
 	IsActive          bool           `json:"is_active"`
+	StockQuantity     int            `json:"stock_quantity" validate:"min=0,max=1000000" example:"25"`
+}
+
+type SetStockRequest struct {
+	Quantity int `json:"quantity" validate:"min=0,max=1000000" example:"40"`
+}
+
+type InventoryResponse struct {
+	VariantID string `json:"variant_id"`
+	Quantity  int    `json:"quantity"`
+	Reserved  int    `json:"reserved"`
+	Available int    `json:"available"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 type UpdateVariantRequest struct {
@@ -78,6 +94,65 @@ type ProductResponse struct {
 type ProductDetailResponse struct {
 	Product  ProductResponse   `json:"product"`
 	Variants []VariantResponse `json:"variants"`
+	Images   []ImageResponse   `json:"images"`
+}
+
+type ProductSummaryResponse struct {
+	ProductResponse
+	MinPriceCents     int64   `json:"min_price_cents" example:"25000"`
+	AvailableQuantity int64   `json:"available_quantity" example:"12"`
+	InStock           bool    `json:"in_stock" example:"true"`
+	PrimaryImageURL   *string `json:"primary_image_url,omitempty"`
+	ShopName          string  `json:"shop_name" example:"Tigist Habesha Designs"`
+	ShopSlug          string  `json:"shop_slug" example:"tigist-habesha"`
+	MerchantVerified  bool    `json:"merchant_verified" example:"true"`
+}
+
+type ProductListResponse struct {
+	Items      []ProductSummaryResponse `json:"items"`
+	Total      int64                    `json:"total"`
+	Page       int                      `json:"page"`
+	PerPage    int                      `json:"per_page"`
+	TotalPages int                      `json:"total_pages"`
+}
+
+type AddImageRequest struct {
+	URL       string  `json:"url" validate:"required,url,startswith=https://,max=1000" example:"https://cdn.gebeya.example/p/kemis.jpg"`
+	AltText   *string `json:"alt_text" validate:"omitempty,max=200"`
+	IsPrimary bool    `json:"is_primary"`
+}
+
+type ImageResponse struct {
+	ID        string  `json:"id"`
+	URL       string  `json:"url"`
+	AltText   *string `json:"alt_text,omitempty"`
+	SortOrder int     `json:"sort_order"`
+	IsPrimary bool    `json:"is_primary"`
+}
+
+func toImageResponse(img *domain.ProductImage) ImageResponse {
+	return ImageResponse{ID: img.ID.String(), URL: img.URL, AltText: img.AltText, SortOrder: img.SortOrder, IsPrimary: img.IsPrimary}
+}
+
+func toImageResponses(images []domain.ProductImage) []ImageResponse {
+	out := make([]ImageResponse, len(images))
+	for i := range images {
+		out[i] = toImageResponse(&images[i])
+	}
+	return out
+}
+
+func toProductSummaryResponse(p *domain.ProductSummary) ProductSummaryResponse {
+	return ProductSummaryResponse{
+		ProductResponse:   toProductResponse(&p.Product),
+		MinPriceCents:     p.MinPriceCents,
+		AvailableQuantity: p.AvailableQuantity,
+		InStock:           p.AvailableQuantity > 0,
+		PrimaryImageURL:   p.PrimaryImageURL,
+		ShopName:          p.ShopName,
+		ShopSlug:          p.ShopSlug,
+		MerchantVerified:  p.MerchantVerified,
+	}
 }
 
 type VariantResponse struct {
@@ -90,71 +165,95 @@ type VariantResponse struct {
 	Currency          string         `json:"currency"`
 	Attributes        map[string]any `json:"attributes"`
 	IsActive          bool           `json:"is_active"`
+	AvailableQuantity *int           `json:"available_quantity,omitempty"`
 	CreatedAt         string         `json:"created_at"`
 	UpdatedAt         string         `json:"updated_at"`
 }
 
 // ListProducts godoc
-// @Summary List all active products
-// @Description Get a paginated list of all active products
+// @Summary Browse products
+// @Description Paginated list of active products with their lowest price, current availability, primary image and shop. Search works in Amharic and English.
 // @Tags products
 // @Accept json
 // @Produce json
 // @Param page query int false "Page number" default(1)
 // @Param per_page query int false "Items per page" default(20)
+// @Param q query string false "Search in product name and description"
 // @Param category_id query string false "Filter by category ID"
-// @Success 200 {object} response.PaginatedResponse "List of products"
+// @Param merchant_id query string false "Filter by merchant (shop) ID"
+// @Success 200 {object} ProductListResponse "List of products"
+// @Failure 400 {object} response.ErrorResponse "Invalid filter"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
 // @Router /products [get]
 func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 	opts := parseListOptions(r)
+	query := r.URL.Query()
 
-	categoryIDStr := r.URL.Query().Get("category_id")
-	if categoryIDStr != "" {
-		categoryID, err := uuid.Parse(categoryIDStr)
-		if err != nil {
-			response.Error(w, apperrors.BadRequest("invalid category_id"))
-			return
-		}
-		result, err := h.productService.ListByCategory(r.Context(), categoryID, opts)
-		if err != nil {
-			response.Error(w, err)
-			return
-		}
-		response.JSON(w, http.StatusOK, result)
+	filter := domain.ProductFilter{Search: query.Get("q")}
+	if len([]rune(filter.Search)) > 100 {
+		response.Error(w, apperrors.BadRequest("search query is too long"))
 		return
 	}
+	for param, target := range map[string]**uuid.UUID{"category_id": &filter.CategoryID, "merchant_id": &filter.MerchantID} {
+		if raw := query.Get(param); raw != "" {
+			id, err := uuid.Parse(raw)
+			if err != nil {
+				response.Error(w, apperrors.BadRequest("invalid "+param))
+				return
+			}
+			*target = &id
+		}
+	}
 
-	result, err := h.productService.List(r.Context(), opts)
+	result, err := h.productService.Browse(r.Context(), filter, opts)
 	if err != nil {
 		response.Error(w, err)
 		return
 	}
 
-	response.JSON(w, http.StatusOK, result)
+	items := make([]ProductSummaryResponse, len(result.Items))
+	for i := range result.Items {
+		items[i] = toProductSummaryResponse(&result.Items[i])
+	}
+	response.JSON(w, http.StatusOK, ProductListResponse{
+		Items:      items,
+		Total:      result.Total,
+		Page:       result.Page,
+		PerPage:    result.PerPage,
+		TotalPages: result.TotalPages,
+	})
 }
 
 // GetProduct godoc
-// @Summary Get product by slug
-// @Description Get a single product by its slug
+// @Summary Get a product
+// @Description Get an active product by ID or slug, with its variants (including how many units are available), images and shop.
 // @Tags products
 // @Accept json
 // @Produce json
-// @Param slug path string true "Product slug"
+// @Param slug path string true "Product ID or slug"
 // @Success 200 {object} ProductDetailResponse "Product details with variants"
 // @Failure 404 {object} response.ErrorResponse "Product not found"
 // @Failure 500 {object} response.ErrorResponse "Internal server error"
 // @Router /products/{slug} [get]
 func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
-	slug, err := parseStringParam(r, "slug")
+	key, err := parseStringParam(r, "slug")
 	if err != nil {
 		response.Error(w, err)
 		return
 	}
 
-	product, err := h.productService.GetBySlug(r.Context(), slug)
+	var product *domain.Product
+	if id, parseErr := uuid.Parse(key); parseErr == nil {
+		product, err = h.productService.GetByID(r.Context(), id)
+	} else {
+		product, err = h.productService.GetBySlug(r.Context(), key)
+	}
 	if err != nil {
 		response.Error(w, err)
+		return
+	}
+	if product.Status != domain.ProductStatusActive {
+		response.Error(w, apperrors.NotFound("product not found"))
 		return
 	}
 
@@ -164,10 +263,120 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	stock, err := h.inventoryService.GetByProductID(r.Context(), product.ID)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	available := make(map[uuid.UUID]int, len(stock))
+	for _, inv := range stock {
+		available[inv.VariantID] = max(inv.Quantity-inv.Reserved, 0)
+	}
+
+	images, err := h.productService.ListImages(r.Context(), product.ID)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	variantResponses := toVariantResponses(variants)
+	for i := range variantResponses {
+		qty := available[variants[i].ID]
+		variantResponses[i].AvailableQuantity = &qty
+	}
+
 	response.JSON(w, http.StatusOK, ProductDetailResponse{
 		Product:  toProductResponse(product),
-		Variants: toVariantResponses(variants),
+		Variants: variantResponses,
+		Images:   toImageResponses(images),
 	})
+}
+
+// AddProductImage godoc
+// @Summary Add a product image
+// @Description Attach an image (an https URL from your storage or CDN) to one of your products. The first image becomes the primary one.
+// @Tags merchant
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Product ID"
+// @Param request body AddImageRequest true "Image"
+// @Success 201 {object} ImageResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Router /merchant/products/{id}/images [post]
+func (h *ProductHandler) AddProductImage(w http.ResponseWriter, r *http.Request) {
+	product, ok := h.ownedProduct(w, r)
+	if !ok {
+		return
+	}
+
+	var req AddImageRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.Error(w, err)
+		return
+	}
+	if errs := validation.Validate(req); len(errs) > 0 {
+		response.JSON(w, http.StatusBadRequest, errs)
+		return
+	}
+
+	image, err := h.productService.AddImage(r.Context(), product.ID, req.URL, req.AltText, req.IsPrimary)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	response.JSON(w, http.StatusCreated, toImageResponse(image))
+}
+
+// DeleteProductImage godoc
+// @Summary Remove a product image
+// @Tags merchant
+// @Security BearerAuth
+// @Param id path string true "Product ID"
+// @Param imageId path string true "Image ID"
+// @Success 204
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /merchant/products/{id}/images/{imageId} [delete]
+func (h *ProductHandler) DeleteProductImage(w http.ResponseWriter, r *http.Request) {
+	product, ok := h.ownedProduct(w, r)
+	if !ok {
+		return
+	}
+	imageID, err := parseUUIDParam(r, "imageId")
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	if err := h.productService.DeleteImage(r.Context(), product.ID, imageID); err != nil {
+		response.Error(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *ProductHandler) ownedProduct(w http.ResponseWriter, r *http.Request) (*domain.Product, bool) {
+	productID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		response.Error(w, err)
+		return nil, false
+	}
+	merchant, ok := middleware.GetMerchantProfile(r.Context())
+	if !ok {
+		response.Error(w, forbidden("merchant profile required"))
+		return nil, false
+	}
+	product, err := h.productService.GetByID(r.Context(), productID)
+	if err != nil {
+		response.Error(w, err)
+		return nil, false
+	}
+	if product.MerchantID != merchant.ID {
+		response.Error(w, forbidden("not authorized to modify this product"))
+		return nil, false
+	}
+	return product, true
 }
 
 // ListMyProducts godoc
@@ -491,6 +700,7 @@ func (h *ProductHandler) AddVariant(w http.ResponseWriter, r *http.Request) {
 		Currency:          currency,
 		Attributes:        req.Attributes,
 		IsActive:          req.IsActive,
+		StockQuantity:     req.StockQuantity,
 	})
 	if err != nil {
 		response.Error(w, err)
@@ -498,6 +708,85 @@ func (h *ProductHandler) AddVariant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.JSON(w, http.StatusCreated, toVariantResponse(variant))
+}
+
+// SetVariantStock godoc
+// @Summary Set variant stock
+// @Description Set the on-hand quantity for a variant. The quantity cannot be lower than what is currently reserved by carts and unpaid orders.
+// @Tags merchant
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Product ID"
+// @Param variantId path string true "Variant ID"
+// @Param request body SetStockRequest true "Stock level"
+// @Success 200 {object} InventoryResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /merchant/products/{id}/variants/{variantId}/stock [put]
+func (h *ProductHandler) SetVariantStock(w http.ResponseWriter, r *http.Request) {
+	productID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	variantID, err := parseUUIDParam(r, "variantId")
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	merchant, ok := middleware.GetMerchantProfile(r.Context())
+	if !ok {
+		response.Error(w, forbidden("merchant profile required"))
+		return
+	}
+
+	product, err := h.productService.GetByID(r.Context(), productID)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	if product.MerchantID != merchant.ID {
+		response.Error(w, forbidden("not authorized to modify this product"))
+		return
+	}
+
+	variant, err := h.variantService.GetByID(r.Context(), variantID)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	if variant.ProductID != productID {
+		response.Error(w, apperrors.NotFound("variant not found"))
+		return
+	}
+
+	var req SetStockRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.Error(w, err)
+		return
+	}
+	if errs := validation.Validate(req); len(errs) > 0 {
+		response.JSON(w, http.StatusBadRequest, errs)
+		return
+	}
+
+	inv, err := h.inventoryService.SetStock(r.Context(), variantID, req.Quantity)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, InventoryResponse{
+		VariantID: inv.VariantID.String(),
+		Quantity:  inv.Quantity,
+		Reserved:  inv.Reserved,
+		Available: inv.Quantity - inv.Reserved,
+		UpdatedAt: inv.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	})
 }
 
 // UpdateVariant godoc

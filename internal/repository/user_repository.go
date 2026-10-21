@@ -151,8 +151,29 @@ func (r *userRepository) Count(ctx context.Context) (int64, error) {
 	return count, nil
 }
 
+func (r *userRepository) MarkPhoneVerified(ctx context.Context, id uuid.UUID) error {
+	if err := r.queries.MarkUserPhoneVerified(ctx, id); err != nil {
+		return domainerrors.Internal("failed to mark phone verified", err)
+	}
+	return nil
+}
+
+func (r *userRepository) ClearPhoneVerified(ctx context.Context, id uuid.UUID) error {
+	if err := r.queries.ClearUserPhoneVerified(ctx, id); err != nil {
+		return domainerrors.Internal("failed to clear phone verification", err)
+	}
+	return nil
+}
+
+func (r *userRepository) UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error {
+	if err := r.queries.UpdateUserPassword(ctx, db.UpdateUserPasswordParams{ID: id, PasswordHash: passwordHash}); err != nil {
+		return domainerrors.Internal("failed to update password", err)
+	}
+	return nil
+}
+
 func dbUserToDomain(u db.User) *domain.User {
-	return &domain.User{
+	user := &domain.User{
 		ID:           u.ID,
 		Email:        u.Email,
 		Phone:        u.Phone,
@@ -166,4 +187,8 @@ func dbUserToDomain(u db.User) *domain.User {
 		CreatedAt:    u.CreatedAt.Time,
 		UpdatedAt:    u.UpdatedAt.Time,
 	}
+	if u.PhoneVerifiedAt.Valid {
+		user.PhoneVerifiedAt = &u.PhoneVerifiedAt.Time
+	}
+	return user
 }

@@ -71,6 +71,7 @@ type InventoryManager interface {
 	GetByProductID(ctx context.Context, productID uuid.UUID) ([]domain.Inventory, error)
 	Create(ctx context.Context, input CreateInventoryInput) (*domain.Inventory, error)
 	UpdateQuantity(ctx context.Context, id uuid.UUID, quantity int) (*domain.Inventory, error)
+	SetStock(ctx context.Context, variantID uuid.UUID, quantity int) (*domain.Inventory, error)
 	Reserve(ctx context.Context, variantID uuid.UUID, qty int) error
 	Release(ctx context.Context, variantID uuid.UUID, qty int) error
 	Commit(ctx context.Context, variantID uuid.UUID, qty int) error
@@ -120,6 +121,7 @@ type CreateVariantInput struct {
 	Currency          string
 	Attributes        map[string]any
 	IsActive          bool
+	StockQuantity     int
 }
 
 type UpdateVariantInput struct {
@@ -192,6 +194,12 @@ type JobScheduler interface {
 	ScheduleCartExpiry(ctx context.Context, cartID uuid.UUID, expiresAt time.Time) error
 }
 
+type PaymentManager interface {
+	ProcessPayment(ctx context.Context, txRef string) error
+	ExpireUnpaidOrder(ctx context.Context, orderID uuid.UUID) error
+	RefundOrder(ctx context.Context, orderID uuid.UUID) error
+}
+
 type OrderManager interface {
 	GetByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, error)
 	GetByChapaTxRef(ctx context.Context, chapaTxRef string) (*domain.Order, error)
@@ -210,8 +218,6 @@ type OrderManager interface {
 
 type CheckoutManager interface {
 	Checkout(ctx context.Context, input CheckoutInput) (*CheckoutResult, error)
-	ProcessSuccessfulPayment(ctx context.Context, chapaTxRef string) error
-	ProcessFailedPayment(ctx context.Context, chapaTxRef string) error
 }
 
 type CreateOrderInput struct {
@@ -271,11 +277,14 @@ type WalletManager interface {
 }
 
 type WalletBalanceResponse struct {
-	BalanceCents int64  `json:"balance_cents"`
-	Currency     string `json:"currency"`
+	BalanceCents       int64  `json:"balance_cents"`
+	PendingPayoutCents int64  `json:"pending_payout_cents"`
+	AvailableCents     int64  `json:"available_cents"`
+	Currency           string `json:"currency"`
 }
 
 type AdminPayoutManager interface {
 	ListPayouts(ctx context.Context, status *domain.PayoutStatus, page, pageSize int) (*domain.PaginatedResult[domain.Payout], error)
-	ProcessPayout(ctx context.Context, payoutID uuid.UUID) (*domain.Payout, error)
+	ApprovePayout(ctx context.Context, payoutID uuid.UUID) (*domain.Payout, error)
+	RejectPayout(ctx context.Context, payoutID uuid.UUID, reason string) (*domain.Payout, error)
 }

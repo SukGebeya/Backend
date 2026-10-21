@@ -10,6 +10,10 @@
 BINARY_NAME=api
 MAIN_PATH=./cmd/api
 
+SQLC ?= go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0
+GOOSE ?= go tool goose
+SWAG ?= go tool swag
+
 # ==================== Building ====================
 
 build:
@@ -26,8 +30,8 @@ test:
 test-unit: ## Run unit tests only (short tests without integration)
 	go test -v -short -race -coverprofile=coverage.out ./...
 
-test-integration: ## Run integration tests (requires Docker)
-	go test -v -run Integration -race -coverprofile=coverage.out ./...
+test-integration: ## Run the end-to-end money flow against a running API (make local + make run)
+	./scripts/e2e-money-flow.sh
 
 test-coverage: test
 	go tool cover -html=coverage.out
@@ -44,7 +48,7 @@ deps:
 	go mod tidy
 
 lint:
-	golangci-lint run ./...
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run ./...
 
 fmt:
 	go fmt ./...
@@ -56,19 +60,19 @@ vet:
 
 migrate-up:
 	@eval $$(grep -v '^#' .env | grep -v '^$$' | sed 's/^/export /') && \
-	goose -dir migrations postgres "$$DATABASE_URL" up
+	$(GOOSE) -dir migrations postgres "$$DATABASE_URL" up
 
 migrate-down:
 	@eval $$(grep -v '^#' .env | grep -v '^$$' | sed 's/^/export /') && \
-	goose -dir migrations postgres "$$DATABASE_URL" down
+	$(GOOSE) -dir migrations postgres "$$DATABASE_URL" down
 
 migrate-status:
 	@eval $$(grep -v '^#' .env | grep -v '^$$' | sed 's/^/export /') && \
-	goose -dir migrations postgres "$$DATABASE_URL" status
+	$(GOOSE) -dir migrations postgres "$$DATABASE_URL" status
 
 migrate-create:
 	@read -p "Enter migration name: " name; \
-	goose -dir migrations create $$name sql
+	$(GOOSE) -dir migrations create $$name sql
 
 # ==================== Database Seeding ====================
 
@@ -99,7 +103,7 @@ seed-reset: ## Reset database: migrate down, up, then seed
 		echo "Aborted."; \
 	fi
 
-seed-blnk: ## Setup Blnk ledger and balances (updates .env.example)
+seed-blnk: ## Setup Blnk ledger and balances (writes the IDs into .env)
 	@echo "🚀 Setting up Blnk..."
 	@if [ -z "$$BLNK_SECRET_KEY" ]; then \
 		eval $$(grep -v '^#' .env | grep -v '^$$' | sed 's/^/export /'); \
@@ -119,10 +123,10 @@ generate-keys:
 	@mv keys/public.pem keys/access_public.pem
 
 sqlc-generate:
-	sqlc generate
+	$(SQLC) generate
 
 swagger:
-	swag init -g cmd/api/main.go -o ./docs --parseInternal --parseDependency --parseDepth 2
+	$(SWAG) init -g cmd/api/main.go -o ./docs --parseInternal --parseDependency --parseDepth 2
 
 mocks: ## Generate mocks for testing
 	go generate ./internal/service/...
@@ -133,9 +137,9 @@ mocks: ## Generate mocks for testing
 air:
 	air -c .air.toml
 
-local: ## Run only postgres and redis for local development with air
-	docker compose -f docker-compose-dev.yml up -d postgres redis
-	@echo "Database and Redis started. Run 'make air' to start the app with hot reload."
+local: ## Run postgres, redis and Blnk for local development with air
+	docker compose -f docker-compose-dev.yml up -d --wait postgres redis blnk-postgres blnk-redis blnk blnk-worker
+	@echo "Postgres, Redis and Blnk started. Run 'make seed-blnk' once, then 'make air' or 'make run'."
 
 local-down: ## Stop local development services
 	docker compose -f docker-compose-dev.yml down

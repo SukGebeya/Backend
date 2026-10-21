@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
+	"time"
 
 	"github.com/SukGebeya/Backend/internal/blnk"
 	"github.com/SukGebeya/Backend/internal/domain"
@@ -12,19 +14,35 @@ import (
 	"github.com/SukGebeya/Backend/internal/repository"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/riverqueue/river"
 )
 
 var _ OrderManager = (*OrderService)(nil)
+var _ jobs.OrderSettler = (*OrderService)(nil)
+
+const (
+	CancelledByBuyer    = "buyer"
+	CancelledByMerchant = "merchant"
+)
 
 type OrderService struct {
 	orderRepo     repository.OrderRepository
 	merchantRepo  repository.MerchantRepository
 	shipmentRepo  repository.ShipmentRepository
 	walletRepo    repository.WalletTransactionRepository
+	paymentRepo   repository.PaymentRepository
 	blnkClient    blnk.BlnkClient
 	inventoryRepo repository.InventoryRepository
-	userRepo      repository.UserRepository
 	txManager     repository.TransactionManager
+	enqueuer      jobs.Enqueuer
+	autoConfirm   time.Duration
+}
+
+// WithAutoConfirm sets how long after shipping a delivery is confirmed on the
+// buyer's behalf if they neither confirm nor dispute it.
+func (s *OrderService) WithAutoConfirm(after time.Duration) *OrderService {
+	s.autoConfirm = after
+	return s
 }
 
 func NewOrderService(
@@ -32,20 +50,23 @@ func NewOrderService(
 	merchantRepo repository.MerchantRepository,
 	shipmentRepo repository.ShipmentRepository,
 	walletRepo repository.WalletTransactionRepository,
+	paymentRepo repository.PaymentRepository,
 	blnkClient blnk.BlnkClient,
 	inventoryRepo repository.InventoryRepository,
-	userRepo repository.UserRepository,
 	txManager repository.TransactionManager,
+	enqueuer jobs.Enqueuer,
 ) *OrderService {
 	return &OrderService{
 		orderRepo:     orderRepo,
 		merchantRepo:  merchantRepo,
 		shipmentRepo:  shipmentRepo,
 		walletRepo:    walletRepo,
+		paymentRepo:   paymentRepo,
 		blnkClient:    blnkClient,
 		inventoryRepo: inventoryRepo,
-		userRepo:      userRepo,
 		txManager:     txManager,
+		enqueuer:      enqueuer,
+		autoConfirm:   7 * 24 * time.Hour,
 	}
 }
 
@@ -68,13 +89,7 @@ func (s *OrderService) ListByBuyerID(ctx context.Context, buyerID uuid.UUID, pag
 		return nil, err
 	}
 
-	return &domain.PaginatedResult[domain.Order]{
-		Items:      orders,
-		Total:      total,
-		Page:       page,
-		PerPage:    pageSize,
-		TotalPages: int((total + int64(pageSize) - 1) / int64(pageSize)),
-	}, nil
+	return paginate(orders, total, page, pageSize), nil
 }
 
 func (s *OrderService) ListByMerchantID(ctx context.Context, merchantID uuid.UUID, page, pageSize int) (*domain.PaginatedResult[domain.Order], error) {
@@ -88,13 +103,7 @@ func (s *OrderService) ListByMerchantID(ctx context.Context, merchantID uuid.UUI
 		return nil, err
 	}
 
-	return &domain.PaginatedResult[domain.Order]{
-		Items:      orders,
-		Total:      total,
-		Page:       page,
-		PerPage:    pageSize,
-		TotalPages: int((total + int64(pageSize) - 1) / int64(pageSize)),
-	}, nil
+	return paginate(orders, total, page, pageSize), nil
 }
 
 func (s *OrderService) ListByStatus(ctx context.Context, status domain.OrderStatus, page, pageSize int) (*domain.PaginatedResult[domain.Order], error) {
@@ -108,6 +117,20 @@ func (s *OrderService) ListByStatus(ctx context.Context, status domain.OrderStat
 		Page:    page,
 		PerPage: pageSize,
 	}, nil
+}
+
+func paginate[T any](items []T, total int64, page, pageSize int) *domain.PaginatedResult[T] {
+	totalPages := 0
+	if pageSize > 0 {
+		totalPages = int((total + int64(pageSize) - 1) / int64(pageSize))
+	}
+	return &domain.PaginatedResult[T]{
+		Items:      items,
+		Total:      total,
+		Page:       page,
+		PerPage:    pageSize,
+		TotalPages: totalPages,
+	}
 }
 
 func (s *OrderService) Create(ctx context.Context, input CreateOrderInput) (*domain.Order, error) {
@@ -125,80 +148,71 @@ func (s *OrderService) Create(ctx context.Context, input CreateOrderInput) (*dom
 		ChapaTxRef:        &input.ChapaTxRef,
 	}
 
-	created, err := s.orderRepo.Create(ctx, order)
+	var created *domain.Order
+	err := s.txManager.Run(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		txOrderRepo := s.orderRepo.WithTx(tx)
+		var err error
+		created, err = txOrderRepo.Create(ctx, order)
+		if err != nil {
+			return err
+		}
+		for _, item := range input.Items {
+			if _, err := txOrderRepo.CreateItem(ctx, &domain.OrderItem{
+				ID:              uuid.New(),
+				OrderID:         created.ID,
+				VariantID:       item.VariantID,
+				ProductName:     item.ProductName,
+				VariantTitle:    item.VariantTitle,
+				Quantity:        item.Quantity,
+				UnitPriceCents:  item.UnitPriceCents,
+				TotalPriceCents: item.TotalPriceCents,
+			}); err != nil {
+				return fmt.Errorf("failed to create order item: %w", err)
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	for _, item := range input.Items {
-		orderItem := &domain.OrderItem{
-			ID:              uuid.New(),
-			OrderID:         created.ID,
-			VariantID:       item.VariantID,
-			ProductName:     item.ProductName,
-			VariantTitle:    item.VariantTitle,
-			Quantity:        item.Quantity,
-			UnitPriceCents:  item.UnitPriceCents,
-			TotalPriceCents: item.TotalPriceCents,
-		}
-		if _, err := s.orderRepo.CreateItem(ctx, orderItem); err != nil {
-			return nil, fmt.Errorf("failed to create order item: %w", err)
-		}
-	}
-
 	return created, nil
 }
 
+// UpdateStatus is the merchant-facing status endpoint. Only side-effect-free
+// transitions are allowed here; shipping, delivery, cancellation and payment
+// each have dedicated flows that move money and stock.
 func (s *OrderService) UpdateStatus(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) (*domain.Order, error) {
-	order, err := s.orderRepo.GetByID(ctx, orderID)
-	if err != nil {
-		return nil, err
+	switch status {
+	case domain.OrderStatusProcessing:
+		return s.startProcessing(ctx, orderID)
+	case domain.OrderStatusShipped:
+		return s.MarkOrderShipped(ctx, MarkOrderShippedInput{OrderID: orderID})
+	case domain.OrderStatusCancelled:
+		return s.CancelOrder(ctx, orderID, CancelledByMerchant)
+	default:
+		return nil, domainerrors.BadRequest(fmt.Sprintf("status %s cannot be set directly", status))
 	}
+}
 
-	if !s.isValidStatusTransition(order.Status, status) {
-		return nil, domainerrors.BadRequest(fmt.Sprintf("cannot transition from %s to %s", order.Status, status))
-	}
-
-	updated, err := s.orderRepo.UpdateStatus(ctx, orderID, status)
-	if err != nil {
-		return nil, err
-	}
-
-	if status == domain.OrderStatusProcessing {
-		if _, err := s.shipmentRepo.Create(ctx, &domain.Shipment{
+func (s *OrderService) startProcessing(ctx context.Context, orderID uuid.UUID) (*domain.Order, error) {
+	var updated *domain.Order
+	err := s.txManager.Run(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		var err error
+		updated, err = s.orderRepo.WithTx(tx).Transition(ctx, orderID, domain.OrderStatusProcessing, domain.OrderStatusPaid)
+		if err != nil {
+			return err
+		}
+		_, err = s.shipmentRepo.WithTx(tx).Create(ctx, &domain.Shipment{
 			ID:      uuid.New(),
 			OrderID: orderID,
 			Status:  domain.ShipmentStatusPreparing,
-		}); err != nil {
-			return nil, fmt.Errorf("failed to create shipment: %w", err)
-		}
+		})
+		return err
+	})
+	if err != nil {
+		return nil, err
 	}
-
 	return updated, nil
-}
-
-func (s *OrderService) isValidStatusTransition(from, to domain.OrderStatus) bool {
-	validTransitions := map[domain.OrderStatus][]domain.OrderStatus{
-		domain.OrderStatusPendingPayment: {domain.OrderStatusPaid, domain.OrderStatusCancelled},
-		domain.OrderStatusPaid:           {domain.OrderStatusProcessing, domain.OrderStatusCancelled},
-		domain.OrderStatusProcessing:     {domain.OrderStatusShipped, domain.OrderStatusCancelled},
-		domain.OrderStatusShipped:        {domain.OrderStatusDelivered, domain.OrderStatusCancelled},
-		domain.OrderStatusDelivered:      {},
-		domain.OrderStatusCancelled:      {domain.OrderStatusRefunded},
-		domain.OrderStatusRefunded:       {},
-	}
-
-	allowed, exists := validTransitions[from]
-	if !exists {
-		return false
-	}
-
-	for _, s := range allowed {
-		if s == to {
-			return true
-		}
-	}
-	return false
 }
 
 func (s *OrderService) UpdateBlnkTransaction(ctx context.Context, orderID uuid.UUID, blnkTxID string) (*domain.Order, error) {
@@ -247,179 +261,277 @@ func (s *OrderService) GetOrderWithDetails(ctx context.Context, orderID uuid.UUI
 	}, nil
 }
 
+// ConfirmDelivery records the buyer's confirmation and schedules settlement in
+// the same transaction, so escrow release cannot be lost or applied twice.
 func (s *OrderService) ConfirmDelivery(ctx context.Context, orderID uuid.UUID) (*domain.Order, error) {
-	order, err := s.orderRepo.GetByID(ctx, orderID)
+	var updated *domain.Order
+	err := s.txManager.Run(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		var err error
+		updated, err = s.orderRepo.WithTx(tx).Transition(ctx, orderID, domain.OrderStatusDelivered, domain.OrderStatusShipped)
+		if err != nil {
+			if appErr, ok := domainerrors.IsAppError(err); ok && appErr.Code == domainerrors.CodeConflict {
+				return domainerrors.BadRequest("order must be shipped before confirming delivery")
+			}
+			return err
+		}
+
+		txShipmentRepo := s.shipmentRepo.WithTx(tx)
+		if shipment, err := txShipmentRepo.GetByOrderID(ctx, orderID); err == nil {
+			if _, err := txShipmentRepo.UpdateDelivered(ctx, shipment.ID); err != nil {
+				return err
+			}
+		}
+
+		if err := s.enqueuer.EnqueueTx(ctx, tx, jobs.SettleOrderArgs{OrderID: orderID}, nil); err != nil {
+			return err
+		}
+		return s.enqueuer.EnqueueTx(ctx, tx, jobs.SendOrderNotificationArgs{OrderID: orderID, Event: jobs.NotificationEventDelivered}, nil)
+	})
 	if err != nil {
 		return nil, err
 	}
+	return updated, nil
+}
 
-	if order.Status != domain.OrderStatusShipped {
-		return nil, domainerrors.BadRequest("order must be shipped before confirming delivery")
+// SettleOrder releases escrow for a delivered order: the inflight hold is committed,
+// the merchant is credited the net amount and the platform keeps its fee. Every
+// Blnk call is keyed by an order-derived reference, so retries never double-pay.
+func (s *OrderService) SettleOrder(ctx context.Context, orderID uuid.UUID) error {
+	order, err := s.orderRepo.GetByID(ctx, orderID)
+	if err != nil {
+		return err
+	}
+	if order.Status != domain.OrderStatusDelivered {
+		return domainerrors.BadRequest("only delivered orders can be settled")
+	}
+	if order.BlnkTransactionID == nil || *order.BlnkTransactionID == "" {
+		return domainerrors.BadRequest("order has no escrow transaction")
 	}
 
-	if order.BlnkTransactionID == nil || *order.BlnkTransactionID == "" {
-		return nil, domainerrors.BadRequest("order has no escrow transaction")
+	if existing, err := s.walletRepo.GetByOrderID(ctx, orderID); err == nil && existing != nil {
+		return nil
 	}
 
 	merchant, err := s.merchantRepo.GetByID(ctx, order.MerchantID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get merchant: %w", err)
+		return err
 	}
-
 	if merchant.BlnkBalanceID == nil || *merchant.BlnkBalanceID == "" {
-		return nil, domainerrors.BadRequest("merchant has no Blnk wallet")
+		return domainerrors.BadRequest("merchant has no wallet")
 	}
 
-	if err := s.blnkClient.CommitEscrow(ctx, *order.BlnkTransactionID); err != nil {
-		slog.Error("ConfirmDelivery: failed to commit escrow",
-			"order_id", orderID,
-			"blnk_txn_id", *order.BlnkTransactionID,
-			"error", err)
-		return nil, fmt.Errorf("failed to commit escrow: %w", err)
+	if err := s.blnkClient.CommitInflight(ctx, *order.BlnkTransactionID); err != nil {
+		return err
 	}
 
-	slog.Info("ConfirmDelivery: escrow committed",
-		"order_id", orderID,
-		"blnk_txn_id", *order.BlnkTransactionID)
-
-	merchantCreditReq := blnk.MerchantCreditRequest{
-		OrderID:        order.ID,
-		MerchantID:     order.MerchantID,
-		SubtotalCents:  order.SubtotalCents,
-		FeeCents:       order.PlatformFeeCents,
-		MerchantBlnkID: *merchant.BlnkBalanceID,
-	}
-
-	merchantTxnID, err := s.blnkClient.CreditMerchant(ctx, merchantCreditReq)
+	merchantTxnID, err := s.blnkClient.CreditMerchant(ctx, blnk.MerchantCreditRequest{
+		OrderID:          order.ID,
+		MerchantID:       order.MerchantID,
+		SubtotalCents:    order.SubtotalCents,
+		FeeCents:         order.PlatformFeeCents,
+		DeliveryFeeCents: order.DeliveryFeeCents,
+		MerchantBlnkID:   *merchant.BlnkBalanceID,
+	})
 	if err != nil {
-		slog.Error("ConfirmDelivery: CRITICAL - escrow committed but merchant credit failed",
-			"order_id", orderID,
-			"merchant_id", order.MerchantID,
-			"subtotal_cents", order.SubtotalCents,
-			"error", err)
-		return nil, fmt.Errorf("failed to credit merchant (escrow already committed - requires manual reconciliation): %w", err)
+		return err
 	}
-
-	slog.Info("ConfirmDelivery: merchant credited",
-		"order_id", orderID,
-		"merchant_id", order.MerchantID,
-		"blnk_txn_id", merchantTxnID)
 
 	if order.PlatformFeeCents > 0 {
-		platformFeeTxnID, err := s.blnkClient.CreditPlatformFee(ctx, blnk.PlatformFeeRequest{
+		if _, err := s.blnkClient.CreditPlatformFee(ctx, blnk.PlatformFeeRequest{
 			OrderID:  order.ID,
 			FeeCents: order.PlatformFeeCents,
-		})
-		if err != nil {
-			slog.Error("ConfirmDelivery: CRITICAL - merchant credited but platform fee transfer failed",
-				"order_id", orderID,
-				"fee_cents", order.PlatformFeeCents,
-				"error", err)
-		} else {
-			slog.Info("ConfirmDelivery: platform fee credited",
-				"order_id", orderID,
-				"fee_cents", order.PlatformFeeCents,
-				"blnk_txn_id", platformFeeTxnID)
+		}); err != nil {
+			return err
 		}
 	}
 
-	var updatedOrder *domain.Order
-	var shipment *domain.Shipment
-
-	err = s.txManager.Run(ctx, func(ctx context.Context, tx pgx.Tx) error {
-		txOrderRepo := s.orderRepo.WithTx(tx)
-		txShipmentRepo := s.shipmentRepo.WithTx(tx)
-		txWalletRepo := s.walletRepo.WithTx(tx)
-
-		netAmountCents := order.SubtotalCents - order.PlatformFeeCents
-		description := fmt.Sprintf("Sale credit for order %s", order.ID.String())
-
-		walletTxn := &domain.WalletTransaction{
-			ID:                uuid.New(),
-			MerchantID:        order.MerchantID,
-			OrderID:           &order.ID,
-			Type:              domain.WalletTransactionTypeSaleCredit,
-			AmountCents:       netAmountCents,
-			Currency:          order.Currency,
-			BlnkTransactionID: merchantTxnID,
-			Status:            domain.WalletTransactionStatusApplied,
-			Description:       &description,
-		}
-
-		if _, err := txWalletRepo.Create(ctx, walletTxn); err != nil {
-			return fmt.Errorf("failed to create wallet transaction: %w", err)
-		}
-
-		shipment, err = txShipmentRepo.GetByOrderID(ctx, orderID)
-		if err == nil && shipment != nil {
-			if _, err := txShipmentRepo.UpdateDelivered(ctx, shipment.ID); err != nil {
-				return fmt.Errorf("failed to update shipment status: %w", err)
-			}
-		}
-
-		updatedOrder, err = txOrderRepo.UpdateStatus(ctx, orderID, domain.OrderStatusDelivered)
-		if err != nil {
-			return fmt.Errorf("failed to update order status: %w", err)
-		}
-
-		return nil
-	})
-
+	payment, err := s.paymentRepo.GetByOrderID(ctx, order.ID)
 	if err != nil {
-		slog.Error("ConfirmDelivery: CRITICAL - Blnk operations succeeded but DB transaction failed",
-			"order_id", orderID,
-			"merchant_txn_id", merchantTxnID,
-			"error", err)
-		return nil, err
+		return err
+	}
+	if err := bookProcessingFee(ctx, s.blnkClient, order.ID, payment.ChargeCents); err != nil {
+		return err
 	}
 
-	jobs.EnqueueOrderNotification(ctx, orderID, order.BuyerID, "delivered", s.userRepo)
+	netAmountCents := domain.CalculateMerchantPayout(order.SubtotalCents, order.PlatformFeeCents, order.DeliveryFeeCents)
+	description := fmt.Sprintf("Sale credit for order %s", order.ID)
+	if err := s.merchantRepo.IncrementTotalSales(ctx, order.MerchantID, order.SubtotalCents); err != nil {
+		return err
+	}
+	if _, err := s.walletRepo.Create(ctx, &domain.WalletTransaction{
+		ID:                uuid.New(),
+		MerchantID:        order.MerchantID,
+		OrderID:           &order.ID,
+		Type:              domain.WalletTransactionTypeSaleCredit,
+		AmountCents:       netAmountCents,
+		Currency:          order.Currency,
+		BlnkTransactionID: merchantTxnID,
+		Status:            domain.WalletTransactionStatusApplied,
+		Description:       &description,
+	}); err != nil {
+		return err
+	}
 
-	return updatedOrder, nil
+	slog.Info("order settled", "order_id", order.ID, "merchant_id", order.MerchantID, "net_cents", netAmountCents, "fee_cents", order.PlatformFeeCents)
+	return nil
 }
 
-func (s *OrderService) MarkOrderShipped(ctx context.Context, input MarkOrderShippedInput) (*domain.Order, error) {
-	order, err := s.orderRepo.GetByID(ctx, input.OrderID)
+// AutoConfirmDelivery runs when the buyer neither confirmed nor disputed a shipped
+// order in time; the delivery is confirmed so the merchant gets paid.
+func (s *OrderService) AutoConfirmDelivery(ctx context.Context, orderID uuid.UUID) error {
+	order, err := s.orderRepo.GetByID(ctx, orderID)
+	if err != nil {
+		if domainerrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if order.Status != domain.OrderStatusShipped {
+		return nil
+	}
+	if _, err := s.ConfirmDelivery(ctx, orderID); err != nil {
+		return err
+	}
+	slog.Info("delivery auto-confirmed", "order_id", orderID)
+	return nil
+}
+
+// OpenDispute freezes an order the buyer has a problem with (never delivered,
+// wrong or damaged goods). Escrow stays held until an admin resolves it.
+func (s *OrderService) OpenDispute(ctx context.Context, orderID uuid.UUID, reason string) (*domain.Order, error) {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return nil, domainerrors.BadRequest("a reason is required to open a dispute")
+	}
+	order, err := s.orderRepo.OpenDispute(ctx, orderID, reason, domain.OrderStatusProcessing, domain.OrderStatusShipped)
 	if err != nil {
 		return nil, err
 	}
+	slog.Warn("order dispute opened", "order_id", orderID)
+	return order, nil
+}
 
-	if order.Status != domain.OrderStatusProcessing {
-		return nil, domainerrors.BadRequest("order must be in processing status to ship")
-	}
+type DisputeOutcome string
 
-	shipment, err := s.shipmentRepo.GetByOrderID(ctx, input.OrderID)
+const (
+	DisputeRelease DisputeOutcome = "release"
+	DisputeRefund  DisputeOutcome = "refund"
+)
+
+// ResolveDispute settles a disputed order: release pays the merchant as if the
+// delivery were confirmed; refund cancels the order and returns the buyer's money.
+func (s *OrderService) ResolveDispute(ctx context.Context, orderID uuid.UUID, outcome DisputeOutcome, restock bool) (*domain.Order, error) {
+	var updated *domain.Order
+	err := s.txManager.Run(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		var err error
+		switch outcome {
+		case DisputeRelease:
+			updated, err = s.orderRepo.WithTx(tx).Transition(ctx, orderID, domain.OrderStatusDelivered, domain.OrderStatusDisputed)
+			if err != nil {
+				return err
+			}
+			txShipmentRepo := s.shipmentRepo.WithTx(tx)
+			if shipment, err := txShipmentRepo.GetByOrderID(ctx, orderID); err == nil {
+				if _, err := txShipmentRepo.UpdateDelivered(ctx, shipment.ID); err != nil {
+					return err
+				}
+			}
+			return s.enqueuer.EnqueueTx(ctx, tx, jobs.SettleOrderArgs{OrderID: orderID}, nil)
+		case DisputeRefund:
+			updated, err = s.orderRepo.WithTx(tx).Transition(ctx, orderID, domain.OrderStatusCancelled, domain.OrderStatusDisputed)
+			if err != nil {
+				return err
+			}
+			if restock {
+				items, err := s.orderRepo.WithTx(tx).ListItemsByOrderID(ctx, orderID)
+				if err != nil {
+					return err
+				}
+				restockItems(ctx, s.inventoryRepo.WithTx(tx), orderID, items)
+			}
+			return s.enqueuer.EnqueueTx(ctx, tx, jobs.RefundOrderArgs{OrderID: orderID}, nil)
+		default:
+			return domainerrors.BadRequest("outcome must be release or refund")
+		}
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get shipment: %w", err)
+		return nil, err
 	}
-
-	if _, err := s.shipmentRepo.UpdateShipped(ctx, shipment.ID, input.Carrier, input.TrackingNumber, input.EstimatedDelivery); err != nil {
-		return nil, fmt.Errorf("failed to update shipment: %w", err)
-	}
-
-	updated, err := s.orderRepo.UpdateStatus(ctx, input.OrderID, domain.OrderStatusShipped)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update order status: %w", err)
-	}
-
-	jobs.EnqueueOrderNotification(ctx, input.OrderID, updated.BuyerID, "shipped", s.userRepo)
-
+	slog.Info("order dispute resolved", "order_id", orderID, "outcome", outcome)
 	return updated, nil
 }
 
+func (s *OrderService) MerchantOrderCounts(ctx context.Context, merchantID uuid.UUID) (map[domain.OrderStatus]int64, error) {
+	return s.orderRepo.CountByStatusForMerchant(ctx, merchantID)
+}
+
+func (s *OrderService) MarkOrderShipped(ctx context.Context, input MarkOrderShippedInput) (*domain.Order, error) {
+	var updated *domain.Order
+	err := s.txManager.Run(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		var err error
+		updated, err = s.orderRepo.WithTx(tx).Transition(ctx, input.OrderID, domain.OrderStatusShipped, domain.OrderStatusProcessing)
+		if err != nil {
+			if appErr, ok := domainerrors.IsAppError(err); ok && appErr.Code == domainerrors.CodeConflict {
+				return domainerrors.BadRequest("order must be in processing status to ship")
+			}
+			return err
+		}
+
+		txShipmentRepo := s.shipmentRepo.WithTx(tx)
+		shipment, err := txShipmentRepo.GetByOrderID(ctx, input.OrderID)
+		if err != nil {
+			if !domainerrors.IsNotFound(err) {
+				return err
+			}
+			shipment, err = txShipmentRepo.Create(ctx, &domain.Shipment{
+				ID:      uuid.New(),
+				OrderID: input.OrderID,
+				Status:  domain.ShipmentStatusPreparing,
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		if _, err := txShipmentRepo.UpdateShipped(ctx, shipment.ID, input.Carrier, input.TrackingNumber, input.EstimatedDelivery); err != nil {
+			return err
+		}
+
+		if err := s.enqueuer.EnqueueTx(ctx, tx, jobs.AutoConfirmDeliveryArgs{OrderID: input.OrderID}, &river.InsertOpts{
+			ScheduledAt: time.Now().Add(s.autoConfirm),
+		}); err != nil {
+			return err
+		}
+
+		return s.enqueuer.EnqueueTx(ctx, tx, jobs.SendOrderNotificationArgs{OrderID: input.OrderID, Event: jobs.NotificationEventShipped}, nil)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return updated, nil
+}
+
+// CancelOrder cancels an order on behalf of the buyer or merchant. Unpaid orders
+// release their stock reservation; paid orders are restocked and refunded.
 func (s *OrderService) CancelOrder(ctx context.Context, orderID uuid.UUID, cancelledBy string) (*domain.Order, error) {
 	order, err := s.orderRepo.GetByID(ctx, orderID)
 	if err != nil {
 		return nil, err
 	}
 
-	cancellableStatuses := map[domain.OrderStatus]bool{
-		domain.OrderStatusPendingPayment: true,
-		domain.OrderStatusPaid:           true,
-		domain.OrderStatusProcessing:     true,
-	}
+	allowed := map[string][]domain.OrderStatus{
+		CancelledByBuyer:    {domain.OrderStatusPendingPayment, domain.OrderStatusPaid},
+		CancelledByMerchant: {domain.OrderStatusPendingPayment, domain.OrderStatusPaid, domain.OrderStatusProcessing},
+	}[cancelledBy]
 
-	if !cancellableStatuses[order.Status] {
+	cancellable := false
+	for _, st := range allowed {
+		if order.Status == st {
+			cancellable = true
+			break
+		}
+	}
+	if !cancellable {
 		return nil, domainerrors.BadRequest(fmt.Sprintf("cannot cancel order in %s status", order.Status))
 	}
 
@@ -428,33 +540,36 @@ func (s *OrderService) CancelOrder(ctx context.Context, orderID uuid.UUID, cance
 		return nil, fmt.Errorf("failed to get order items: %w", err)
 	}
 
-	if order.BlnkTransactionID != nil && *order.BlnkTransactionID != "" {
-		if err := s.blnkClient.VoidEscrow(ctx, *order.BlnkTransactionID); err != nil {
-			slog.Error("CancelOrder: failed to void escrow",
-				"order_id", orderID,
-				"blnk_txn_id", *order.BlnkTransactionID,
-				"error", err)
-			return nil, fmt.Errorf("failed to void escrow: %w", err)
+	var updated *domain.Order
+	err = s.txManager.Run(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		var err error
+		updated, err = s.orderRepo.WithTx(tx).Transition(ctx, orderID, domain.OrderStatusCancelled, order.Status)
+		if err != nil {
+			return err
 		}
-		slog.Info("CancelOrder: escrow voided",
-			"order_id", orderID,
-			"blnk_txn_id", *order.BlnkTransactionID)
-	}
 
-	for _, item := range items {
-		if err := s.inventoryRepo.Release(ctx, item.VariantID, item.Quantity); err != nil {
-			slog.Error("CancelOrder: failed to release inventory",
-				"order_id", orderID,
-				"variant_id", item.VariantID,
-				"quantity", item.Quantity,
-				"error", err)
+		txInventoryRepo := s.inventoryRepo.WithTx(tx)
+		if order.Status == domain.OrderStatusPendingPayment {
+			releaseItems(ctx, txInventoryRepo, orderID, items)
+			payment, err := s.paymentRepo.WithTx(tx).GetByOrderID(ctx, orderID)
+			if err == nil {
+				if _, err := s.paymentRepo.WithTx(tx).UpdateStatus(ctx, payment.ID, domain.PaymentStatusFailed); err != nil {
+					return err
+				}
+			}
+		} else {
+			restockItems(ctx, txInventoryRepo, orderID, items)
+			if err := s.enqueuer.EnqueueTx(ctx, tx, jobs.RefundOrderArgs{OrderID: orderID}, nil); err != nil {
+				return err
+			}
 		}
-	}
 
-	updated, err := s.orderRepo.UpdateStatus(ctx, orderID, domain.OrderStatusCancelled)
+		return s.enqueuer.EnqueueTx(ctx, tx, jobs.SendOrderNotificationArgs{OrderID: orderID, Event: jobs.NotificationEventCancelled}, nil)
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to update order status: %w", err)
+		return nil, err
 	}
 
+	slog.Info("order cancelled", "order_id", orderID, "by", cancelledBy, "previous_status", order.Status)
 	return updated, nil
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/SukGebeya/Backend/internal/domain"
 	domainerrors "github.com/SukGebeya/Backend/internal/errors"
 	"github.com/SukGebeya/Backend/internal/repository"
+	"github.com/SukGebeya/Backend/pkg/phone"
 	"github.com/google/uuid"
 )
 
@@ -32,6 +33,11 @@ func (s *AddressService) GetDefault(ctx context.Context, userID uuid.UUID) (*dom
 }
 
 func (s *AddressService) Create(ctx context.Context, input CreateAddressInput) (*domain.Address, error) {
+	normalizedPhone, err := phone.Normalize(input.Phone)
+	if err != nil {
+		return nil, domainerrors.Validation("phone must be an Ethiopian mobile number")
+	}
+
 	count, err := s.repo.CountByUserID(ctx, input.UserID)
 	if err != nil {
 		return nil, domainerrors.Internal("failed to count addresses", err)
@@ -51,7 +57,7 @@ func (s *AddressService) Create(ctx context.Context, input CreateAddressInput) (
 		ID:        uuid.New(),
 		UserID:    input.UserID,
 		FullName:  input.FullName,
-		Phone:     input.Phone,
+		Phone:     normalizedPhone,
 		Line1:     input.Line1,
 		Line2:     input.Line2,
 		City:      input.City,
@@ -78,7 +84,11 @@ func (s *AddressService) Update(ctx context.Context, id uuid.UUID, input UpdateA
 		address.FullName = *input.FullName
 	}
 	if input.Phone != nil {
-		address.Phone = *input.Phone
+		normalized, err := phone.Normalize(*input.Phone)
+		if err != nil {
+			return nil, domainerrors.Validation("phone must be an Ethiopian mobile number")
+		}
+		address.Phone = normalized
 	}
 	if input.Line1 != nil {
 		address.Line1 = *input.Line1

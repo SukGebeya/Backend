@@ -13,11 +13,12 @@ const (
 	PaymentStatusSucceeded PaymentStatus = "succeeded"
 	PaymentStatusFailed    PaymentStatus = "failed"
 	PaymentStatusRefunded  PaymentStatus = "refunded"
+	PaymentStatusReversed  PaymentStatus = "reversed"
 )
 
 func (s PaymentStatus) IsValid() bool {
 	switch s {
-	case PaymentStatusPending, PaymentStatusSucceeded, PaymentStatusFailed, PaymentStatusRefunded:
+	case PaymentStatusPending, PaymentStatusSucceeded, PaymentStatusFailed, PaymentStatusRefunded, PaymentStatusReversed:
 		return true
 	default:
 		return false
@@ -38,6 +39,7 @@ type Payment struct {
 	ProviderTxRef     *string        `db:"provider_tx_ref" json:"provider_tx_ref,omitempty"`
 	ProviderResponse  map[string]any `db:"provider_response" json:"provider_response,omitempty"`
 	BlnkTransactionID *string        `db:"blnk_transaction_id" json:"blnk_transaction_id,omitempty"`
+	ChargeCents       int64          `db:"charge_cents" json:"charge_cents"`
 	CreatedAt         time.Time      `db:"created_at" json:"created_at"`
 	UpdatedAt         time.Time      `db:"updated_at" json:"updated_at"`
 }

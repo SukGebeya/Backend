@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/SukGebeya/Backend/internal/domain"
 	domainerrors "github.com/SukGebeya/Backend/internal/errors"
@@ -39,6 +40,31 @@ func (s *InventoryService) Create(ctx context.Context, input CreateInventoryInpu
 
 func (s *InventoryService) UpdateQuantity(ctx context.Context, id uuid.UUID, quantity int) (*domain.Inventory, error) {
 	return s.inventoryRepo.UpdateQuantity(ctx, id, quantity)
+}
+
+// SetStock sets the on-hand quantity for a variant, creating the inventory record
+// if needed. Stock cannot drop below what carts and orders already hold.
+func (s *InventoryService) SetStock(ctx context.Context, variantID uuid.UUID, quantity int) (*domain.Inventory, error) {
+	if quantity < 0 {
+		return nil, domainerrors.BadRequest("quantity cannot be negative")
+	}
+
+	inv, err := s.inventoryRepo.GetByVariantID(ctx, variantID)
+	if err != nil {
+		if !domainerrors.IsNotFound(err) {
+			return nil, err
+		}
+		return s.inventoryRepo.Create(ctx, &domain.Inventory{
+			ID:        uuid.New(),
+			VariantID: variantID,
+			Quantity:  quantity,
+		})
+	}
+
+	if quantity < inv.Reserved {
+		return nil, domainerrors.BadRequest(fmt.Sprintf("quantity cannot be lower than the %d units currently reserved", inv.Reserved))
+	}
+	return s.inventoryRepo.UpdateQuantity(ctx, inv.ID, quantity)
 }
 
 func (s *InventoryService) Reserve(ctx context.Context, variantID uuid.UUID, qty int) error {

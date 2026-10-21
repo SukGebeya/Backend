@@ -31,9 +31,7 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 
 func (rw *responseWriter) WriteString(s string) (int, error) {
 	rw.body.WriteString(s)
-	return rw.ResponseWriter.(interface {
-		WriteString(string) (int, error)
-	}).WriteString(s)
+	return io.WriteString(rw.ResponseWriter, s)
 }
 
 func RequestLogger(logger *Logger) func(next http.Handler) http.Handler {

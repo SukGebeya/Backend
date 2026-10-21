@@ -12,10 +12,11 @@ package mocks
 import (
 	context "context"
 	reflect "reflect"
+	time "time"
 
-	uuid "github.com/google/uuid"
 	domain "github.com/SukGebeya/Backend/internal/domain"
 	service "github.com/SukGebeya/Backend/internal/service"
+	uuid "github.com/google/uuid"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -199,6 +200,21 @@ func (mr *MockUserManagerMockRecorder) List(ctx, opts any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockUserManager)(nil).List), ctx, opts)
 }
 
+// UpdateKYCStatus mocks base method.
+func (m *MockUserManager) UpdateKYCStatus(ctx context.Context, userID uuid.UUID, kycStatus domain.KYCStatus) (*domain.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateKYCStatus", ctx, userID, kycStatus)
+	ret0, _ := ret[0].(*domain.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateKYCStatus indicates an expected call of UpdateKYCStatus.
+func (mr *MockUserManagerMockRecorder) UpdateKYCStatus(ctx, userID, kycStatus any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateKYCStatus", reflect.TypeOf((*MockUserManager)(nil).UpdateKYCStatus), ctx, userID, kycStatus)
+}
+
 // UpdateProfile mocks base method.
 func (m *MockUserManager) UpdateProfile(ctx context.Context, userID uuid.UUID, input service.UpdateProfileInput) (*domain.User, error) {
 	m.ctrl.T.Helper()
@@ -296,4 +312,1471 @@ func (m *MockMerchantOnboarder) Update(ctx context.Context, merchantID uuid.UUID
 func (mr *MockMerchantOnboarderMockRecorder) Update(ctx, merchantID, input any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockMerchantOnboarder)(nil).Update), ctx, merchantID, input)
+}
+
+// Verify mocks base method.
+func (m *MockMerchantOnboarder) Verify(ctx context.Context, merchantID uuid.UUID, isVerified bool) (*domain.MerchantProfile, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Verify", ctx, merchantID, isVerified)
+	ret0, _ := ret[0].(*domain.MerchantProfile)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Verify indicates an expected call of Verify.
+func (mr *MockMerchantOnboarderMockRecorder) Verify(ctx, merchantID, isVerified any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockMerchantOnboarder)(nil).Verify), ctx, merchantID, isVerified)
+}
+
+// MockCategoryManager is a mock of CategoryManager interface.
+type MockCategoryManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockCategoryManagerMockRecorder
+	isgomock struct{}
+}
+
+// MockCategoryManagerMockRecorder is the mock recorder for MockCategoryManager.
+type MockCategoryManagerMockRecorder struct {
+	mock *MockCategoryManager
+}
+
+// NewMockCategoryManager creates a new mock instance.
+func NewMockCategoryManager(ctrl *gomock.Controller) *MockCategoryManager {
+	mock := &MockCategoryManager{ctrl: ctrl}
+	mock.recorder = &MockCategoryManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockCategoryManager) EXPECT() *MockCategoryManagerMockRecorder {
+	return m.recorder
+}
+
+// Create mocks base method.
+func (m *MockCategoryManager) Create(ctx context.Context, input service.CreateCategoryInput) (*domain.Category, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Create", ctx, input)
+	ret0, _ := ret[0].(*domain.Category)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Create indicates an expected call of Create.
+func (mr *MockCategoryManagerMockRecorder) Create(ctx, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockCategoryManager)(nil).Create), ctx, input)
+}
+
+// Delete mocks base method.
+func (m *MockCategoryManager) Delete(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Delete", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Delete indicates an expected call of Delete.
+func (mr *MockCategoryManagerMockRecorder) Delete(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockCategoryManager)(nil).Delete), ctx, id)
+}
+
+// GetByID mocks base method.
+func (m *MockCategoryManager) GetByID(ctx context.Context, id uuid.UUID) (*domain.Category, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByID", ctx, id)
+	ret0, _ := ret[0].(*domain.Category)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByID indicates an expected call of GetByID.
+func (mr *MockCategoryManagerMockRecorder) GetByID(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockCategoryManager)(nil).GetByID), ctx, id)
+}
+
+// GetBySlug mocks base method.
+func (m *MockCategoryManager) GetBySlug(ctx context.Context, slug string) (*domain.Category, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBySlug", ctx, slug)
+	ret0, _ := ret[0].(*domain.Category)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBySlug indicates an expected call of GetBySlug.
+func (mr *MockCategoryManagerMockRecorder) GetBySlug(ctx, slug any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBySlug", reflect.TypeOf((*MockCategoryManager)(nil).GetBySlug), ctx, slug)
+}
+
+// List mocks base method.
+func (m *MockCategoryManager) List(ctx context.Context) ([]domain.Category, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "List", ctx)
+	ret0, _ := ret[0].([]domain.Category)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// List indicates an expected call of List.
+func (mr *MockCategoryManagerMockRecorder) List(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockCategoryManager)(nil).List), ctx)
+}
+
+// ListByParent mocks base method.
+func (m *MockCategoryManager) ListByParent(ctx context.Context, parentID uuid.UUID) ([]domain.Category, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListByParent", ctx, parentID)
+	ret0, _ := ret[0].([]domain.Category)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListByParent indicates an expected call of ListByParent.
+func (mr *MockCategoryManagerMockRecorder) ListByParent(ctx, parentID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListByParent", reflect.TypeOf((*MockCategoryManager)(nil).ListByParent), ctx, parentID)
+}
+
+// ListTopLevel mocks base method.
+func (m *MockCategoryManager) ListTopLevel(ctx context.Context) ([]domain.Category, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListTopLevel", ctx)
+	ret0, _ := ret[0].([]domain.Category)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListTopLevel indicates an expected call of ListTopLevel.
+func (mr *MockCategoryManagerMockRecorder) ListTopLevel(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTopLevel", reflect.TypeOf((*MockCategoryManager)(nil).ListTopLevel), ctx)
+}
+
+// Update mocks base method.
+func (m *MockCategoryManager) Update(ctx context.Context, id uuid.UUID, input service.UpdateCategoryInput) (*domain.Category, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Update", ctx, id, input)
+	ret0, _ := ret[0].(*domain.Category)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Update indicates an expected call of Update.
+func (mr *MockCategoryManagerMockRecorder) Update(ctx, id, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockCategoryManager)(nil).Update), ctx, id, input)
+}
+
+// MockProductManager is a mock of ProductManager interface.
+type MockProductManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockProductManagerMockRecorder
+	isgomock struct{}
+}
+
+// MockProductManagerMockRecorder is the mock recorder for MockProductManager.
+type MockProductManagerMockRecorder struct {
+	mock *MockProductManager
+}
+
+// NewMockProductManager creates a new mock instance.
+func NewMockProductManager(ctrl *gomock.Controller) *MockProductManager {
+	mock := &MockProductManager{ctrl: ctrl}
+	mock.recorder = &MockProductManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockProductManager) EXPECT() *MockProductManagerMockRecorder {
+	return m.recorder
+}
+
+// Create mocks base method.
+func (m *MockProductManager) Create(ctx context.Context, input service.CreateProductInput) (*domain.Product, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Create", ctx, input)
+	ret0, _ := ret[0].(*domain.Product)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Create indicates an expected call of Create.
+func (mr *MockProductManagerMockRecorder) Create(ctx, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockProductManager)(nil).Create), ctx, input)
+}
+
+// Delete mocks base method.
+func (m *MockProductManager) Delete(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Delete", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Delete indicates an expected call of Delete.
+func (mr *MockProductManagerMockRecorder) Delete(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockProductManager)(nil).Delete), ctx, id)
+}
+
+// GetByID mocks base method.
+func (m *MockProductManager) GetByID(ctx context.Context, id uuid.UUID) (*domain.Product, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByID", ctx, id)
+	ret0, _ := ret[0].(*domain.Product)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByID indicates an expected call of GetByID.
+func (mr *MockProductManagerMockRecorder) GetByID(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockProductManager)(nil).GetByID), ctx, id)
+}
+
+// GetBySlug mocks base method.
+func (m *MockProductManager) GetBySlug(ctx context.Context, slug string) (*domain.Product, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBySlug", ctx, slug)
+	ret0, _ := ret[0].(*domain.Product)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBySlug indicates an expected call of GetBySlug.
+func (mr *MockProductManagerMockRecorder) GetBySlug(ctx, slug any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBySlug", reflect.TypeOf((*MockProductManager)(nil).GetBySlug), ctx, slug)
+}
+
+// GetBySlugAndMerchant mocks base method.
+func (m *MockProductManager) GetBySlugAndMerchant(ctx context.Context, slug string, merchantID uuid.UUID) (*domain.Product, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBySlugAndMerchant", ctx, slug, merchantID)
+	ret0, _ := ret[0].(*domain.Product)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBySlugAndMerchant indicates an expected call of GetBySlugAndMerchant.
+func (mr *MockProductManagerMockRecorder) GetBySlugAndMerchant(ctx, slug, merchantID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBySlugAndMerchant", reflect.TypeOf((*MockProductManager)(nil).GetBySlugAndMerchant), ctx, slug, merchantID)
+}
+
+// List mocks base method.
+func (m *MockProductManager) List(ctx context.Context, opts domain.ListOptions) (*domain.PaginatedResult[domain.Product], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "List", ctx, opts)
+	ret0, _ := ret[0].(*domain.PaginatedResult[domain.Product])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// List indicates an expected call of List.
+func (mr *MockProductManagerMockRecorder) List(ctx, opts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockProductManager)(nil).List), ctx, opts)
+}
+
+// ListByCategory mocks base method.
+func (m *MockProductManager) ListByCategory(ctx context.Context, categoryID uuid.UUID, opts domain.ListOptions) (*domain.PaginatedResult[domain.Product], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListByCategory", ctx, categoryID, opts)
+	ret0, _ := ret[0].(*domain.PaginatedResult[domain.Product])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListByCategory indicates an expected call of ListByCategory.
+func (mr *MockProductManagerMockRecorder) ListByCategory(ctx, categoryID, opts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListByCategory", reflect.TypeOf((*MockProductManager)(nil).ListByCategory), ctx, categoryID, opts)
+}
+
+// ListByMerchant mocks base method.
+func (m *MockProductManager) ListByMerchant(ctx context.Context, merchantID uuid.UUID, opts domain.ListOptions) (*domain.PaginatedResult[domain.Product], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListByMerchant", ctx, merchantID, opts)
+	ret0, _ := ret[0].(*domain.PaginatedResult[domain.Product])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListByMerchant indicates an expected call of ListByMerchant.
+func (mr *MockProductManagerMockRecorder) ListByMerchant(ctx, merchantID, opts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListByMerchant", reflect.TypeOf((*MockProductManager)(nil).ListByMerchant), ctx, merchantID, opts)
+}
+
+// Update mocks base method.
+func (m *MockProductManager) Update(ctx context.Context, id uuid.UUID, input service.UpdateProductInput) (*domain.Product, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Update", ctx, id, input)
+	ret0, _ := ret[0].(*domain.Product)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Update indicates an expected call of Update.
+func (mr *MockProductManagerMockRecorder) Update(ctx, id, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockProductManager)(nil).Update), ctx, id, input)
+}
+
+// MockProductVariantManager is a mock of ProductVariantManager interface.
+type MockProductVariantManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockProductVariantManagerMockRecorder
+	isgomock struct{}
+}
+
+// MockProductVariantManagerMockRecorder is the mock recorder for MockProductVariantManager.
+type MockProductVariantManagerMockRecorder struct {
+	mock *MockProductVariantManager
+}
+
+// NewMockProductVariantManager creates a new mock instance.
+func NewMockProductVariantManager(ctrl *gomock.Controller) *MockProductVariantManager {
+	mock := &MockProductVariantManager{ctrl: ctrl}
+	mock.recorder = &MockProductVariantManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockProductVariantManager) EXPECT() *MockProductVariantManagerMockRecorder {
+	return m.recorder
+}
+
+// Create mocks base method.
+func (m *MockProductVariantManager) Create(ctx context.Context, input service.CreateVariantInput) (*domain.ProductVariant, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Create", ctx, input)
+	ret0, _ := ret[0].(*domain.ProductVariant)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Create indicates an expected call of Create.
+func (mr *MockProductVariantManagerMockRecorder) Create(ctx, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockProductVariantManager)(nil).Create), ctx, input)
+}
+
+// Delete mocks base method.
+func (m *MockProductVariantManager) Delete(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Delete", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Delete indicates an expected call of Delete.
+func (mr *MockProductVariantManagerMockRecorder) Delete(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockProductVariantManager)(nil).Delete), ctx, id)
+}
+
+// GetActiveByProduct mocks base method.
+func (m *MockProductVariantManager) GetActiveByProduct(ctx context.Context, productID uuid.UUID) ([]domain.ProductVariant, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetActiveByProduct", ctx, productID)
+	ret0, _ := ret[0].([]domain.ProductVariant)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetActiveByProduct indicates an expected call of GetActiveByProduct.
+func (mr *MockProductVariantManagerMockRecorder) GetActiveByProduct(ctx, productID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveByProduct", reflect.TypeOf((*MockProductVariantManager)(nil).GetActiveByProduct), ctx, productID)
+}
+
+// GetByID mocks base method.
+func (m *MockProductVariantManager) GetByID(ctx context.Context, id uuid.UUID) (*domain.ProductVariant, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByID", ctx, id)
+	ret0, _ := ret[0].(*domain.ProductVariant)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByID indicates an expected call of GetByID.
+func (mr *MockProductVariantManagerMockRecorder) GetByID(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockProductVariantManager)(nil).GetByID), ctx, id)
+}
+
+// GetByProduct mocks base method.
+func (m *MockProductVariantManager) GetByProduct(ctx context.Context, productID uuid.UUID) ([]domain.ProductVariant, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByProduct", ctx, productID)
+	ret0, _ := ret[0].([]domain.ProductVariant)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByProduct indicates an expected call of GetByProduct.
+func (mr *MockProductVariantManagerMockRecorder) GetByProduct(ctx, productID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByProduct", reflect.TypeOf((*MockProductVariantManager)(nil).GetByProduct), ctx, productID)
+}
+
+// GetBySKU mocks base method.
+func (m *MockProductVariantManager) GetBySKU(ctx context.Context, sku string) (*domain.ProductVariant, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBySKU", ctx, sku)
+	ret0, _ := ret[0].(*domain.ProductVariant)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBySKU indicates an expected call of GetBySKU.
+func (mr *MockProductVariantManagerMockRecorder) GetBySKU(ctx, sku any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBySKU", reflect.TypeOf((*MockProductVariantManager)(nil).GetBySKU), ctx, sku)
+}
+
+// Update mocks base method.
+func (m *MockProductVariantManager) Update(ctx context.Context, id uuid.UUID, input service.UpdateVariantInput) (*domain.ProductVariant, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Update", ctx, id, input)
+	ret0, _ := ret[0].(*domain.ProductVariant)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Update indicates an expected call of Update.
+func (mr *MockProductVariantManagerMockRecorder) Update(ctx, id, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockProductVariantManager)(nil).Update), ctx, id, input)
+}
+
+// MockInventoryManager is a mock of InventoryManager interface.
+type MockInventoryManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockInventoryManagerMockRecorder
+	isgomock struct{}
+}
+
+// MockInventoryManagerMockRecorder is the mock recorder for MockInventoryManager.
+type MockInventoryManagerMockRecorder struct {
+	mock *MockInventoryManager
+}
+
+// NewMockInventoryManager creates a new mock instance.
+func NewMockInventoryManager(ctrl *gomock.Controller) *MockInventoryManager {
+	mock := &MockInventoryManager{ctrl: ctrl}
+	mock.recorder = &MockInventoryManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockInventoryManager) EXPECT() *MockInventoryManagerMockRecorder {
+	return m.recorder
+}
+
+// Commit mocks base method.
+func (m *MockInventoryManager) Commit(ctx context.Context, variantID uuid.UUID, qty int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Commit", ctx, variantID, qty)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Commit indicates an expected call of Commit.
+func (mr *MockInventoryManagerMockRecorder) Commit(ctx, variantID, qty any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockInventoryManager)(nil).Commit), ctx, variantID, qty)
+}
+
+// Create mocks base method.
+func (m *MockInventoryManager) Create(ctx context.Context, input service.CreateInventoryInput) (*domain.Inventory, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Create", ctx, input)
+	ret0, _ := ret[0].(*domain.Inventory)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Create indicates an expected call of Create.
+func (mr *MockInventoryManagerMockRecorder) Create(ctx, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockInventoryManager)(nil).Create), ctx, input)
+}
+
+// GetByProductID mocks base method.
+func (m *MockInventoryManager) GetByProductID(ctx context.Context, productID uuid.UUID) ([]domain.Inventory, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByProductID", ctx, productID)
+	ret0, _ := ret[0].([]domain.Inventory)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByProductID indicates an expected call of GetByProductID.
+func (mr *MockInventoryManagerMockRecorder) GetByProductID(ctx, productID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByProductID", reflect.TypeOf((*MockInventoryManager)(nil).GetByProductID), ctx, productID)
+}
+
+// GetByVariantID mocks base method.
+func (m *MockInventoryManager) GetByVariantID(ctx context.Context, variantID uuid.UUID) (*domain.Inventory, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByVariantID", ctx, variantID)
+	ret0, _ := ret[0].(*domain.Inventory)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByVariantID indicates an expected call of GetByVariantID.
+func (mr *MockInventoryManagerMockRecorder) GetByVariantID(ctx, variantID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByVariantID", reflect.TypeOf((*MockInventoryManager)(nil).GetByVariantID), ctx, variantID)
+}
+
+// Release mocks base method.
+func (m *MockInventoryManager) Release(ctx context.Context, variantID uuid.UUID, qty int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Release", ctx, variantID, qty)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Release indicates an expected call of Release.
+func (mr *MockInventoryManagerMockRecorder) Release(ctx, variantID, qty any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Release", reflect.TypeOf((*MockInventoryManager)(nil).Release), ctx, variantID, qty)
+}
+
+// Reserve mocks base method.
+func (m *MockInventoryManager) Reserve(ctx context.Context, variantID uuid.UUID, qty int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Reserve", ctx, variantID, qty)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Reserve indicates an expected call of Reserve.
+func (mr *MockInventoryManagerMockRecorder) Reserve(ctx, variantID, qty any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reserve", reflect.TypeOf((*MockInventoryManager)(nil).Reserve), ctx, variantID, qty)
+}
+
+// SetStock mocks base method.
+func (m *MockInventoryManager) SetStock(ctx context.Context, variantID uuid.UUID, quantity int) (*domain.Inventory, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetStock", ctx, variantID, quantity)
+	ret0, _ := ret[0].(*domain.Inventory)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SetStock indicates an expected call of SetStock.
+func (mr *MockInventoryManagerMockRecorder) SetStock(ctx, variantID, quantity any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetStock", reflect.TypeOf((*MockInventoryManager)(nil).SetStock), ctx, variantID, quantity)
+}
+
+// UpdateQuantity mocks base method.
+func (m *MockInventoryManager) UpdateQuantity(ctx context.Context, id uuid.UUID, quantity int) (*domain.Inventory, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateQuantity", ctx, id, quantity)
+	ret0, _ := ret[0].(*domain.Inventory)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateQuantity indicates an expected call of UpdateQuantity.
+func (mr *MockInventoryManagerMockRecorder) UpdateQuantity(ctx, id, quantity any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateQuantity", reflect.TypeOf((*MockInventoryManager)(nil).UpdateQuantity), ctx, id, quantity)
+}
+
+// MockAddressManager is a mock of AddressManager interface.
+type MockAddressManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockAddressManagerMockRecorder
+	isgomock struct{}
+}
+
+// MockAddressManagerMockRecorder is the mock recorder for MockAddressManager.
+type MockAddressManagerMockRecorder struct {
+	mock *MockAddressManager
+}
+
+// NewMockAddressManager creates a new mock instance.
+func NewMockAddressManager(ctrl *gomock.Controller) *MockAddressManager {
+	mock := &MockAddressManager{ctrl: ctrl}
+	mock.recorder = &MockAddressManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockAddressManager) EXPECT() *MockAddressManagerMockRecorder {
+	return m.recorder
+}
+
+// Create mocks base method.
+func (m *MockAddressManager) Create(ctx context.Context, input service.CreateAddressInput) (*domain.Address, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Create", ctx, input)
+	ret0, _ := ret[0].(*domain.Address)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Create indicates an expected call of Create.
+func (mr *MockAddressManagerMockRecorder) Create(ctx, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockAddressManager)(nil).Create), ctx, input)
+}
+
+// Delete mocks base method.
+func (m *MockAddressManager) Delete(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Delete", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Delete indicates an expected call of Delete.
+func (mr *MockAddressManagerMockRecorder) Delete(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockAddressManager)(nil).Delete), ctx, id)
+}
+
+// GetByID mocks base method.
+func (m *MockAddressManager) GetByID(ctx context.Context, id uuid.UUID) (*domain.Address, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByID", ctx, id)
+	ret0, _ := ret[0].(*domain.Address)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByID indicates an expected call of GetByID.
+func (mr *MockAddressManagerMockRecorder) GetByID(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockAddressManager)(nil).GetByID), ctx, id)
+}
+
+// GetDefault mocks base method.
+func (m *MockAddressManager) GetDefault(ctx context.Context, userID uuid.UUID) (*domain.Address, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDefault", ctx, userID)
+	ret0, _ := ret[0].(*domain.Address)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDefault indicates an expected call of GetDefault.
+func (mr *MockAddressManagerMockRecorder) GetDefault(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDefault", reflect.TypeOf((*MockAddressManager)(nil).GetDefault), ctx, userID)
+}
+
+// ListByUserID mocks base method.
+func (m *MockAddressManager) ListByUserID(ctx context.Context, userID uuid.UUID) ([]domain.Address, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListByUserID", ctx, userID)
+	ret0, _ := ret[0].([]domain.Address)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListByUserID indicates an expected call of ListByUserID.
+func (mr *MockAddressManagerMockRecorder) ListByUserID(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListByUserID", reflect.TypeOf((*MockAddressManager)(nil).ListByUserID), ctx, userID)
+}
+
+// SetDefault mocks base method.
+func (m *MockAddressManager) SetDefault(ctx context.Context, userID, addressID uuid.UUID) (*domain.Address, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetDefault", ctx, userID, addressID)
+	ret0, _ := ret[0].(*domain.Address)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SetDefault indicates an expected call of SetDefault.
+func (mr *MockAddressManagerMockRecorder) SetDefault(ctx, userID, addressID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDefault", reflect.TypeOf((*MockAddressManager)(nil).SetDefault), ctx, userID, addressID)
+}
+
+// Update mocks base method.
+func (m *MockAddressManager) Update(ctx context.Context, id uuid.UUID, input service.UpdateAddressInput) (*domain.Address, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Update", ctx, id, input)
+	ret0, _ := ret[0].(*domain.Address)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Update indicates an expected call of Update.
+func (mr *MockAddressManagerMockRecorder) Update(ctx, id, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockAddressManager)(nil).Update), ctx, id, input)
+}
+
+// MockCartManager is a mock of CartManager interface.
+type MockCartManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockCartManagerMockRecorder
+	isgomock struct{}
+}
+
+// MockCartManagerMockRecorder is the mock recorder for MockCartManager.
+type MockCartManagerMockRecorder struct {
+	mock *MockCartManager
+}
+
+// NewMockCartManager creates a new mock instance.
+func NewMockCartManager(ctrl *gomock.Controller) *MockCartManager {
+	mock := &MockCartManager{ctrl: ctrl}
+	mock.recorder = &MockCartManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockCartManager) EXPECT() *MockCartManagerMockRecorder {
+	return m.recorder
+}
+
+// AddItem mocks base method.
+func (m *MockCartManager) AddItem(ctx context.Context, cartID, variantID uuid.UUID, quantity int, priceCents int64) (*domain.CartItem, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddItem", ctx, cartID, variantID, quantity, priceCents)
+	ret0, _ := ret[0].(*domain.CartItem)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddItem indicates an expected call of AddItem.
+func (mr *MockCartManagerMockRecorder) AddItem(ctx, cartID, variantID, quantity, priceCents any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddItem", reflect.TypeOf((*MockCartManager)(nil).AddItem), ctx, cartID, variantID, quantity, priceCents)
+}
+
+// ClearCart mocks base method.
+func (m *MockCartManager) ClearCart(ctx context.Context, cartID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ClearCart", ctx, cartID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ClearCart indicates an expected call of ClearCart.
+func (mr *MockCartManagerMockRecorder) ClearCart(ctx, cartID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearCart", reflect.TypeOf((*MockCartManager)(nil).ClearCart), ctx, cartID)
+}
+
+// GetCart mocks base method.
+func (m *MockCartManager) GetCart(ctx context.Context, cartID uuid.UUID) (*domain.Cart, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCart", ctx, cartID)
+	ret0, _ := ret[0].(*domain.Cart)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCart indicates an expected call of GetCart.
+func (mr *MockCartManagerMockRecorder) GetCart(ctx, cartID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCart", reflect.TypeOf((*MockCartManager)(nil).GetCart), ctx, cartID)
+}
+
+// GetCartWithItems mocks base method.
+func (m *MockCartManager) GetCartWithItems(ctx context.Context, cartID uuid.UUID) (*domain.CartWithDetails, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCartWithItems", ctx, cartID)
+	ret0, _ := ret[0].(*domain.CartWithDetails)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCartWithItems indicates an expected call of GetCartWithItems.
+func (mr *MockCartManagerMockRecorder) GetCartWithItems(ctx, cartID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCartWithItems", reflect.TypeOf((*MockCartManager)(nil).GetCartWithItems), ctx, cartID)
+}
+
+// GetOrCreateCart mocks base method.
+func (m *MockCartManager) GetOrCreateCart(ctx context.Context, userID *uuid.UUID, sessionID *string) (*domain.Cart, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOrCreateCart", ctx, userID, sessionID)
+	ret0, _ := ret[0].(*domain.Cart)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetOrCreateCart indicates an expected call of GetOrCreateCart.
+func (mr *MockCartManagerMockRecorder) GetOrCreateCart(ctx, userID, sessionID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrCreateCart", reflect.TypeOf((*MockCartManager)(nil).GetOrCreateCart), ctx, userID, sessionID)
+}
+
+// MergeCart mocks base method.
+func (m *MockCartManager) MergeCart(ctx context.Context, userID uuid.UUID, sessionID string) (*domain.Cart, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MergeCart", ctx, userID, sessionID)
+	ret0, _ := ret[0].(*domain.Cart)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MergeCart indicates an expected call of MergeCart.
+func (mr *MockCartManagerMockRecorder) MergeCart(ctx, userID, sessionID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MergeCart", reflect.TypeOf((*MockCartManager)(nil).MergeCart), ctx, userID, sessionID)
+}
+
+// RemoveItem mocks base method.
+func (m *MockCartManager) RemoveItem(ctx context.Context, cartID, itemID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveItem", ctx, cartID, itemID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveItem indicates an expected call of RemoveItem.
+func (mr *MockCartManagerMockRecorder) RemoveItem(ctx, cartID, itemID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveItem", reflect.TypeOf((*MockCartManager)(nil).RemoveItem), ctx, cartID, itemID)
+}
+
+// RemoveItemByVariant mocks base method.
+func (m *MockCartManager) RemoveItemByVariant(ctx context.Context, cartID, variantID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemoveItemByVariant", ctx, cartID, variantID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RemoveItemByVariant indicates an expected call of RemoveItemByVariant.
+func (mr *MockCartManagerMockRecorder) RemoveItemByVariant(ctx, cartID, variantID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveItemByVariant", reflect.TypeOf((*MockCartManager)(nil).RemoveItemByVariant), ctx, cartID, variantID)
+}
+
+// UpdateItemQuantity mocks base method.
+func (m *MockCartManager) UpdateItemQuantity(ctx context.Context, cartID, itemID uuid.UUID, quantity int) (*domain.CartItem, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateItemQuantity", ctx, cartID, itemID, quantity)
+	ret0, _ := ret[0].(*domain.CartItem)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateItemQuantity indicates an expected call of UpdateItemQuantity.
+func (mr *MockCartManagerMockRecorder) UpdateItemQuantity(ctx, cartID, itemID, quantity any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateItemQuantity", reflect.TypeOf((*MockCartManager)(nil).UpdateItemQuantity), ctx, cartID, itemID, quantity)
+}
+
+// UpdateItemQuantityByVariant mocks base method.
+func (m *MockCartManager) UpdateItemQuantityByVariant(ctx context.Context, cartID, variantID uuid.UUID, quantity int) (*domain.CartItem, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateItemQuantityByVariant", ctx, cartID, variantID, quantity)
+	ret0, _ := ret[0].(*domain.CartItem)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateItemQuantityByVariant indicates an expected call of UpdateItemQuantityByVariant.
+func (mr *MockCartManagerMockRecorder) UpdateItemQuantityByVariant(ctx, cartID, variantID, quantity any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateItemQuantityByVariant", reflect.TypeOf((*MockCartManager)(nil).UpdateItemQuantityByVariant), ctx, cartID, variantID, quantity)
+}
+
+// MockSessionManager is a mock of SessionManager interface.
+type MockSessionManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockSessionManagerMockRecorder
+	isgomock struct{}
+}
+
+// MockSessionManagerMockRecorder is the mock recorder for MockSessionManager.
+type MockSessionManagerMockRecorder struct {
+	mock *MockSessionManager
+}
+
+// NewMockSessionManager creates a new mock instance.
+func NewMockSessionManager(ctrl *gomock.Controller) *MockSessionManager {
+	mock := &MockSessionManager{ctrl: ctrl}
+	mock.recorder = &MockSessionManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockSessionManager) EXPECT() *MockSessionManagerMockRecorder {
+	return m.recorder
+}
+
+// CreateSession mocks base method.
+func (m *MockSessionManager) CreateSession(ctx context.Context) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateSession", ctx)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateSession indicates an expected call of CreateSession.
+func (mr *MockSessionManagerMockRecorder) CreateSession(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSession", reflect.TypeOf((*MockSessionManager)(nil).CreateSession), ctx)
+}
+
+// DeleteSession mocks base method.
+func (m *MockSessionManager) DeleteSession(ctx context.Context, sessionID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteSession", ctx, sessionID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteSession indicates an expected call of DeleteSession.
+func (mr *MockSessionManagerMockRecorder) DeleteSession(ctx, sessionID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteSession", reflect.TypeOf((*MockSessionManager)(nil).DeleteSession), ctx, sessionID)
+}
+
+// ValidateSession mocks base method.
+func (m *MockSessionManager) ValidateSession(ctx context.Context, sessionID string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ValidateSession", ctx, sessionID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ValidateSession indicates an expected call of ValidateSession.
+func (mr *MockSessionManagerMockRecorder) ValidateSession(ctx, sessionID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ValidateSession", reflect.TypeOf((*MockSessionManager)(nil).ValidateSession), ctx, sessionID)
+}
+
+// MockJobScheduler is a mock of JobScheduler interface.
+type MockJobScheduler struct {
+	ctrl     *gomock.Controller
+	recorder *MockJobSchedulerMockRecorder
+	isgomock struct{}
+}
+
+// MockJobSchedulerMockRecorder is the mock recorder for MockJobScheduler.
+type MockJobSchedulerMockRecorder struct {
+	mock *MockJobScheduler
+}
+
+// NewMockJobScheduler creates a new mock instance.
+func NewMockJobScheduler(ctrl *gomock.Controller) *MockJobScheduler {
+	mock := &MockJobScheduler{ctrl: ctrl}
+	mock.recorder = &MockJobSchedulerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockJobScheduler) EXPECT() *MockJobSchedulerMockRecorder {
+	return m.recorder
+}
+
+// ScheduleCartExpiry mocks base method.
+func (m *MockJobScheduler) ScheduleCartExpiry(ctx context.Context, cartID uuid.UUID, expiresAt time.Time) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ScheduleCartExpiry", ctx, cartID, expiresAt)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ScheduleCartExpiry indicates an expected call of ScheduleCartExpiry.
+func (mr *MockJobSchedulerMockRecorder) ScheduleCartExpiry(ctx, cartID, expiresAt any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ScheduleCartExpiry", reflect.TypeOf((*MockJobScheduler)(nil).ScheduleCartExpiry), ctx, cartID, expiresAt)
+}
+
+// MockPaymentManager is a mock of PaymentManager interface.
+type MockPaymentManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockPaymentManagerMockRecorder
+	isgomock struct{}
+}
+
+// MockPaymentManagerMockRecorder is the mock recorder for MockPaymentManager.
+type MockPaymentManagerMockRecorder struct {
+	mock *MockPaymentManager
+}
+
+// NewMockPaymentManager creates a new mock instance.
+func NewMockPaymentManager(ctrl *gomock.Controller) *MockPaymentManager {
+	mock := &MockPaymentManager{ctrl: ctrl}
+	mock.recorder = &MockPaymentManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockPaymentManager) EXPECT() *MockPaymentManagerMockRecorder {
+	return m.recorder
+}
+
+// ExpireUnpaidOrder mocks base method.
+func (m *MockPaymentManager) ExpireUnpaidOrder(ctx context.Context, orderID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExpireUnpaidOrder", ctx, orderID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ExpireUnpaidOrder indicates an expected call of ExpireUnpaidOrder.
+func (mr *MockPaymentManagerMockRecorder) ExpireUnpaidOrder(ctx, orderID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExpireUnpaidOrder", reflect.TypeOf((*MockPaymentManager)(nil).ExpireUnpaidOrder), ctx, orderID)
+}
+
+// ProcessPayment mocks base method.
+func (m *MockPaymentManager) ProcessPayment(ctx context.Context, txRef string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ProcessPayment", ctx, txRef)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ProcessPayment indicates an expected call of ProcessPayment.
+func (mr *MockPaymentManagerMockRecorder) ProcessPayment(ctx, txRef any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProcessPayment", reflect.TypeOf((*MockPaymentManager)(nil).ProcessPayment), ctx, txRef)
+}
+
+// RefundOrder mocks base method.
+func (m *MockPaymentManager) RefundOrder(ctx context.Context, orderID uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RefundOrder", ctx, orderID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RefundOrder indicates an expected call of RefundOrder.
+func (mr *MockPaymentManagerMockRecorder) RefundOrder(ctx, orderID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefundOrder", reflect.TypeOf((*MockPaymentManager)(nil).RefundOrder), ctx, orderID)
+}
+
+// MockOrderManager is a mock of OrderManager interface.
+type MockOrderManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockOrderManagerMockRecorder
+	isgomock struct{}
+}
+
+// MockOrderManagerMockRecorder is the mock recorder for MockOrderManager.
+type MockOrderManagerMockRecorder struct {
+	mock *MockOrderManager
+}
+
+// NewMockOrderManager creates a new mock instance.
+func NewMockOrderManager(ctrl *gomock.Controller) *MockOrderManager {
+	mock := &MockOrderManager{ctrl: ctrl}
+	mock.recorder = &MockOrderManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockOrderManager) EXPECT() *MockOrderManagerMockRecorder {
+	return m.recorder
+}
+
+// CancelOrder mocks base method.
+func (m *MockOrderManager) CancelOrder(ctx context.Context, orderID uuid.UUID, cancelledBy string) (*domain.Order, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CancelOrder", ctx, orderID, cancelledBy)
+	ret0, _ := ret[0].(*domain.Order)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CancelOrder indicates an expected call of CancelOrder.
+func (mr *MockOrderManagerMockRecorder) CancelOrder(ctx, orderID, cancelledBy any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelOrder", reflect.TypeOf((*MockOrderManager)(nil).CancelOrder), ctx, orderID, cancelledBy)
+}
+
+// ConfirmDelivery mocks base method.
+func (m *MockOrderManager) ConfirmDelivery(ctx context.Context, orderID uuid.UUID) (*domain.Order, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ConfirmDelivery", ctx, orderID)
+	ret0, _ := ret[0].(*domain.Order)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ConfirmDelivery indicates an expected call of ConfirmDelivery.
+func (mr *MockOrderManagerMockRecorder) ConfirmDelivery(ctx, orderID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConfirmDelivery", reflect.TypeOf((*MockOrderManager)(nil).ConfirmDelivery), ctx, orderID)
+}
+
+// Create mocks base method.
+func (m *MockOrderManager) Create(ctx context.Context, input service.CreateOrderInput) (*domain.Order, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Create", ctx, input)
+	ret0, _ := ret[0].(*domain.Order)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Create indicates an expected call of Create.
+func (mr *MockOrderManagerMockRecorder) Create(ctx, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockOrderManager)(nil).Create), ctx, input)
+}
+
+// GetByChapaTxRef mocks base method.
+func (m *MockOrderManager) GetByChapaTxRef(ctx context.Context, chapaTxRef string) (*domain.Order, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByChapaTxRef", ctx, chapaTxRef)
+	ret0, _ := ret[0].(*domain.Order)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByChapaTxRef indicates an expected call of GetByChapaTxRef.
+func (mr *MockOrderManagerMockRecorder) GetByChapaTxRef(ctx, chapaTxRef any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByChapaTxRef", reflect.TypeOf((*MockOrderManager)(nil).GetByChapaTxRef), ctx, chapaTxRef)
+}
+
+// GetByID mocks base method.
+func (m *MockOrderManager) GetByID(ctx context.Context, orderID uuid.UUID) (*domain.Order, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByID", ctx, orderID)
+	ret0, _ := ret[0].(*domain.Order)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByID indicates an expected call of GetByID.
+func (mr *MockOrderManagerMockRecorder) GetByID(ctx, orderID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockOrderManager)(nil).GetByID), ctx, orderID)
+}
+
+// GetOrderWithDetails mocks base method.
+func (m *MockOrderManager) GetOrderWithDetails(ctx context.Context, orderID uuid.UUID) (*service.OrderWithDetails, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOrderWithDetails", ctx, orderID)
+	ret0, _ := ret[0].(*service.OrderWithDetails)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetOrderWithDetails indicates an expected call of GetOrderWithDetails.
+func (mr *MockOrderManagerMockRecorder) GetOrderWithDetails(ctx, orderID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrderWithDetails", reflect.TypeOf((*MockOrderManager)(nil).GetOrderWithDetails), ctx, orderID)
+}
+
+// GetOrderWithItems mocks base method.
+func (m *MockOrderManager) GetOrderWithItems(ctx context.Context, orderID uuid.UUID) (*domain.OrderWithItems, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOrderWithItems", ctx, orderID)
+	ret0, _ := ret[0].(*domain.OrderWithItems)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetOrderWithItems indicates an expected call of GetOrderWithItems.
+func (mr *MockOrderManagerMockRecorder) GetOrderWithItems(ctx, orderID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrderWithItems", reflect.TypeOf((*MockOrderManager)(nil).GetOrderWithItems), ctx, orderID)
+}
+
+// ListByBuyerID mocks base method.
+func (m *MockOrderManager) ListByBuyerID(ctx context.Context, buyerID uuid.UUID, page, pageSize int) (*domain.PaginatedResult[domain.Order], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListByBuyerID", ctx, buyerID, page, pageSize)
+	ret0, _ := ret[0].(*domain.PaginatedResult[domain.Order])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListByBuyerID indicates an expected call of ListByBuyerID.
+func (mr *MockOrderManagerMockRecorder) ListByBuyerID(ctx, buyerID, page, pageSize any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListByBuyerID", reflect.TypeOf((*MockOrderManager)(nil).ListByBuyerID), ctx, buyerID, page, pageSize)
+}
+
+// ListByMerchantID mocks base method.
+func (m *MockOrderManager) ListByMerchantID(ctx context.Context, merchantID uuid.UUID, page, pageSize int) (*domain.PaginatedResult[domain.Order], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListByMerchantID", ctx, merchantID, page, pageSize)
+	ret0, _ := ret[0].(*domain.PaginatedResult[domain.Order])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListByMerchantID indicates an expected call of ListByMerchantID.
+func (mr *MockOrderManagerMockRecorder) ListByMerchantID(ctx, merchantID, page, pageSize any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListByMerchantID", reflect.TypeOf((*MockOrderManager)(nil).ListByMerchantID), ctx, merchantID, page, pageSize)
+}
+
+// ListByStatus mocks base method.
+func (m *MockOrderManager) ListByStatus(ctx context.Context, status domain.OrderStatus, page, pageSize int) (*domain.PaginatedResult[domain.Order], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListByStatus", ctx, status, page, pageSize)
+	ret0, _ := ret[0].(*domain.PaginatedResult[domain.Order])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListByStatus indicates an expected call of ListByStatus.
+func (mr *MockOrderManagerMockRecorder) ListByStatus(ctx, status, page, pageSize any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListByStatus", reflect.TypeOf((*MockOrderManager)(nil).ListByStatus), ctx, status, page, pageSize)
+}
+
+// MarkOrderShipped mocks base method.
+func (m *MockOrderManager) MarkOrderShipped(ctx context.Context, input service.MarkOrderShippedInput) (*domain.Order, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MarkOrderShipped", ctx, input)
+	ret0, _ := ret[0].(*domain.Order)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MarkOrderShipped indicates an expected call of MarkOrderShipped.
+func (mr *MockOrderManagerMockRecorder) MarkOrderShipped(ctx, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkOrderShipped", reflect.TypeOf((*MockOrderManager)(nil).MarkOrderShipped), ctx, input)
+}
+
+// UpdateBlnkTransaction mocks base method.
+func (m *MockOrderManager) UpdateBlnkTransaction(ctx context.Context, orderID uuid.UUID, blnkTxID string) (*domain.Order, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateBlnkTransaction", ctx, orderID, blnkTxID)
+	ret0, _ := ret[0].(*domain.Order)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateBlnkTransaction indicates an expected call of UpdateBlnkTransaction.
+func (mr *MockOrderManagerMockRecorder) UpdateBlnkTransaction(ctx, orderID, blnkTxID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateBlnkTransaction", reflect.TypeOf((*MockOrderManager)(nil).UpdateBlnkTransaction), ctx, orderID, blnkTxID)
+}
+
+// UpdateStatus mocks base method.
+func (m *MockOrderManager) UpdateStatus(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) (*domain.Order, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateStatus", ctx, orderID, status)
+	ret0, _ := ret[0].(*domain.Order)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateStatus indicates an expected call of UpdateStatus.
+func (mr *MockOrderManagerMockRecorder) UpdateStatus(ctx, orderID, status any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateStatus", reflect.TypeOf((*MockOrderManager)(nil).UpdateStatus), ctx, orderID, status)
+}
+
+// MockCheckoutManager is a mock of CheckoutManager interface.
+type MockCheckoutManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockCheckoutManagerMockRecorder
+	isgomock struct{}
+}
+
+// MockCheckoutManagerMockRecorder is the mock recorder for MockCheckoutManager.
+type MockCheckoutManagerMockRecorder struct {
+	mock *MockCheckoutManager
+}
+
+// NewMockCheckoutManager creates a new mock instance.
+func NewMockCheckoutManager(ctrl *gomock.Controller) *MockCheckoutManager {
+	mock := &MockCheckoutManager{ctrl: ctrl}
+	mock.recorder = &MockCheckoutManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockCheckoutManager) EXPECT() *MockCheckoutManagerMockRecorder {
+	return m.recorder
+}
+
+// Checkout mocks base method.
+func (m *MockCheckoutManager) Checkout(ctx context.Context, input service.CheckoutInput) (*service.CheckoutResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Checkout", ctx, input)
+	ret0, _ := ret[0].(*service.CheckoutResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Checkout indicates an expected call of Checkout.
+func (mr *MockCheckoutManagerMockRecorder) Checkout(ctx, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Checkout", reflect.TypeOf((*MockCheckoutManager)(nil).Checkout), ctx, input)
+}
+
+// MockWalletManager is a mock of WalletManager interface.
+type MockWalletManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockWalletManagerMockRecorder
+	isgomock struct{}
+}
+
+// MockWalletManagerMockRecorder is the mock recorder for MockWalletManager.
+type MockWalletManagerMockRecorder struct {
+	mock *MockWalletManager
+}
+
+// NewMockWalletManager creates a new mock instance.
+func NewMockWalletManager(ctrl *gomock.Controller) *MockWalletManager {
+	mock := &MockWalletManager{ctrl: ctrl}
+	mock.recorder = &MockWalletManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockWalletManager) EXPECT() *MockWalletManagerMockRecorder {
+	return m.recorder
+}
+
+// GetBalance mocks base method.
+func (m *MockWalletManager) GetBalance(ctx context.Context, merchantID uuid.UUID) (*service.WalletBalanceResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBalance", ctx, merchantID)
+	ret0, _ := ret[0].(*service.WalletBalanceResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBalance indicates an expected call of GetBalance.
+func (mr *MockWalletManagerMockRecorder) GetBalance(ctx, merchantID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalance", reflect.TypeOf((*MockWalletManager)(nil).GetBalance), ctx, merchantID)
+}
+
+// GetTransactionHistory mocks base method.
+func (m *MockWalletManager) GetTransactionHistory(ctx context.Context, merchantID uuid.UUID, page, pageSize int) (*domain.PaginatedResult[domain.WalletTransaction], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTransactionHistory", ctx, merchantID, page, pageSize)
+	ret0, _ := ret[0].(*domain.PaginatedResult[domain.WalletTransaction])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetTransactionHistory indicates an expected call of GetTransactionHistory.
+func (mr *MockWalletManagerMockRecorder) GetTransactionHistory(ctx, merchantID, page, pageSize any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTransactionHistory", reflect.TypeOf((*MockWalletManager)(nil).GetTransactionHistory), ctx, merchantID, page, pageSize)
+}
+
+// ListPayoutsByMerchant mocks base method.
+func (m *MockWalletManager) ListPayoutsByMerchant(ctx context.Context, merchantID uuid.UUID, page, pageSize int) (*domain.PaginatedResult[domain.Payout], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListPayoutsByMerchant", ctx, merchantID, page, pageSize)
+	ret0, _ := ret[0].(*domain.PaginatedResult[domain.Payout])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListPayoutsByMerchant indicates an expected call of ListPayoutsByMerchant.
+func (mr *MockWalletManagerMockRecorder) ListPayoutsByMerchant(ctx, merchantID, page, pageSize any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPayoutsByMerchant", reflect.TypeOf((*MockWalletManager)(nil).ListPayoutsByMerchant), ctx, merchantID, page, pageSize)
+}
+
+// RequestPayout mocks base method.
+func (m *MockWalletManager) RequestPayout(ctx context.Context, merchantID uuid.UUID, input domain.RequestPayoutInput) (*domain.Payout, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RequestPayout", ctx, merchantID, input)
+	ret0, _ := ret[0].(*domain.Payout)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RequestPayout indicates an expected call of RequestPayout.
+func (mr *MockWalletManagerMockRecorder) RequestPayout(ctx, merchantID, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RequestPayout", reflect.TypeOf((*MockWalletManager)(nil).RequestPayout), ctx, merchantID, input)
+}
+
+// MockAdminPayoutManager is a mock of AdminPayoutManager interface.
+type MockAdminPayoutManager struct {
+	ctrl     *gomock.Controller
+	recorder *MockAdminPayoutManagerMockRecorder
+	isgomock struct{}
+}
+
+// MockAdminPayoutManagerMockRecorder is the mock recorder for MockAdminPayoutManager.
+type MockAdminPayoutManagerMockRecorder struct {
+	mock *MockAdminPayoutManager
+}
+
+// NewMockAdminPayoutManager creates a new mock instance.
+func NewMockAdminPayoutManager(ctrl *gomock.Controller) *MockAdminPayoutManager {
+	mock := &MockAdminPayoutManager{ctrl: ctrl}
+	mock.recorder = &MockAdminPayoutManagerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockAdminPayoutManager) EXPECT() *MockAdminPayoutManagerMockRecorder {
+	return m.recorder
+}
+
+// ApprovePayout mocks base method.
+func (m *MockAdminPayoutManager) ApprovePayout(ctx context.Context, payoutID uuid.UUID) (*domain.Payout, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ApprovePayout", ctx, payoutID)
+	ret0, _ := ret[0].(*domain.Payout)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ApprovePayout indicates an expected call of ApprovePayout.
+func (mr *MockAdminPayoutManagerMockRecorder) ApprovePayout(ctx, payoutID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApprovePayout", reflect.TypeOf((*MockAdminPayoutManager)(nil).ApprovePayout), ctx, payoutID)
+}
+
+// ListPayouts mocks base method.
+func (m *MockAdminPayoutManager) ListPayouts(ctx context.Context, status *domain.PayoutStatus, page, pageSize int) (*domain.PaginatedResult[domain.Payout], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListPayouts", ctx, status, page, pageSize)
+	ret0, _ := ret[0].(*domain.PaginatedResult[domain.Payout])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListPayouts indicates an expected call of ListPayouts.
+func (mr *MockAdminPayoutManagerMockRecorder) ListPayouts(ctx, status, page, pageSize any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPayouts", reflect.TypeOf((*MockAdminPayoutManager)(nil).ListPayouts), ctx, status, page, pageSize)
+}
+
+// RejectPayout mocks base method.
+func (m *MockAdminPayoutManager) RejectPayout(ctx context.Context, payoutID uuid.UUID, reason string) (*domain.Payout, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RejectPayout", ctx, payoutID, reason)
+	ret0, _ := ret[0].(*domain.Payout)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RejectPayout indicates an expected call of RejectPayout.
+func (mr *MockAdminPayoutManagerMockRecorder) RejectPayout(ctx, payoutID, reason any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RejectPayout", reflect.TypeOf((*MockAdminPayoutManager)(nil).RejectPayout), ctx, payoutID, reason)
 }

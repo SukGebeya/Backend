@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/SukGebeya/Backend/internal/domain"
@@ -9,6 +10,7 @@ import (
 	"github.com/SukGebeya/Backend/internal/repository"
 	"github.com/SukGebeya/Backend/pkg/jwt"
 	"github.com/SukGebeya/Backend/pkg/password"
+	"github.com/SukGebeya/Backend/pkg/phone"
 	"github.com/google/uuid"
 )
 
@@ -20,6 +22,7 @@ type AuthService struct {
 	jwtManager       *jwt.Manager
 	passwordHasher   *password.Hasher
 	refreshTTL       time.Duration
+	otp              *OTPService
 }
 
 func NewAuthService(
@@ -36,6 +39,85 @@ func NewAuthService(
 		passwordHasher:   passwordHasher,
 		refreshTTL:       refreshTTL,
 	}
+}
+
+func (s *AuthService) WithOTP(otp *OTPService) *AuthService {
+	s.otp = otp
+	return s
+}
+
+// SendPhoneVerification texts a verification code to the user's phone on file.
+func (s *AuthService) SendPhoneVerification(ctx context.Context, userID uuid.UUID) error {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user.Phone == nil {
+		return domainerrors.BadRequest("add a phone number to your profile first")
+	}
+	if user.PhoneVerifiedAt != nil {
+		return domainerrors.BadRequest("phone number is already verified")
+	}
+	return s.otp.Send(ctx, *user.Phone, OTPPurposeVerifyPhone)
+}
+
+func (s *AuthService) VerifyPhone(ctx context.Context, userID uuid.UUID, code string) (*domain.User, error) {
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if user.Phone == nil {
+		return nil, domainerrors.BadRequest("add a phone number to your profile first")
+	}
+	if err := s.otp.Verify(ctx, *user.Phone, OTPPurposeVerifyPhone, code); err != nil {
+		return nil, err
+	}
+	if err := s.userRepo.MarkPhoneVerified(ctx, userID); err != nil {
+		return nil, err
+	}
+	return s.userRepo.GetByID(ctx, userID)
+}
+
+// RequestPasswordReset texts a reset code when the phone belongs to an account.
+// It reports success either way so the endpoint cannot be used to discover users.
+func (s *AuthService) RequestPasswordReset(ctx context.Context, rawPhone string) error {
+	normalized, err := phone.Normalize(rawPhone)
+	if err != nil {
+		return domainerrors.Validation("phone must be an Ethiopian mobile number")
+	}
+	user, err := s.userRepo.GetByPhone(ctx, normalized)
+	if err != nil || !user.IsActive {
+		return nil
+	}
+	return s.otp.Send(ctx, normalized, OTPPurposeResetPassword)
+}
+
+func (s *AuthService) ResetPassword(ctx context.Context, rawPhone, code, newPassword string) error {
+	normalized, err := phone.Normalize(rawPhone)
+	if err != nil {
+		return domainerrors.Validation("phone must be an Ethiopian mobile number")
+	}
+	if err := s.otp.Verify(ctx, normalized, OTPPurposeResetPassword, code); err != nil {
+		return err
+	}
+	user, err := s.userRepo.GetByPhone(ctx, normalized)
+	if err != nil {
+		return domainerrors.BadRequest("invalid code")
+	}
+
+	hash, err := s.passwordHasher.Hash(newPassword)
+	if err != nil {
+		return domainerrors.Internal("failed to hash password", err)
+	}
+	if err := s.userRepo.UpdatePassword(ctx, user.ID, hash); err != nil {
+		return err
+	}
+	if user.PhoneVerifiedAt == nil {
+		if err := s.userRepo.MarkPhoneVerified(ctx, user.ID); err != nil {
+			return err
+		}
+	}
+	return s.refreshTokenRepo.DeleteAllForUser(ctx, user.ID)
 }
 
 type RegisterInput struct {
@@ -62,6 +144,20 @@ type AuthResult struct {
 }
 
 func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*AuthResult, error) {
+	if input.Email != nil && strings.TrimSpace(*input.Email) == "" {
+		input.Email = nil
+	}
+	if input.Email != nil {
+		email := strings.ToLower(strings.TrimSpace(*input.Email))
+		input.Email = &email
+	}
+
+	normalizedPhone, err := phone.NormalizePtr(input.Phone)
+	if err != nil {
+		return nil, domainerrors.Validation("phone must be an Ethiopian mobile number")
+	}
+	input.Phone = normalizedPhone
+
 	if input.Email == nil && input.Phone == nil {
 		return nil, domainerrors.Validation("email or phone is required")
 	}
@@ -121,7 +217,7 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (*AuthResult,
 		return nil, domainerrors.Validation("identifier is required")
 	}
 
-	user, err := s.userRepo.GetByEmailOrPhone(ctx, input.Identifier)
+	user, err := s.userRepo.GetByEmailOrPhone(ctx, NormalizeIdentifier(input.Identifier))
 	if err != nil {
 		return nil, domainerrors.InvalidCredentials("invalid credentials")
 	}
@@ -129,6 +225,10 @@ func (s *AuthService) Login(ctx context.Context, input LoginInput) (*AuthResult,
 	valid, err := s.passwordHasher.Verify(input.Password, user.PasswordHash)
 	if err != nil || !valid {
 		return nil, domainerrors.InvalidCredentials("invalid credentials")
+	}
+
+	if !user.IsActive {
+		return nil, domainerrors.Forbidden("account is deactivated")
 	}
 
 	tokens, err := s.generateTokens(ctx, user)
@@ -158,6 +258,9 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*AuthTo
 	}
 
 	user, err := s.userRepo.GetByID(ctx, userID)
+	if err == nil && !user.IsActive {
+		return nil, domainerrors.Forbidden("account is deactivated")
+	}
 	if err != nil {
 		return nil, domainerrors.UserNotFound("user not found")
 	}
@@ -196,6 +299,16 @@ func (s *AuthService) generateTokens(ctx context.Context, user *domain.User) (*A
 	return &AuthTokens{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-		ExpiresIn:    int64(s.refreshTTL.Seconds()),
+		ExpiresIn:    int64(s.jwtManager.AccessTTL().Seconds()),
 	}, nil
+}
+
+// NormalizeIdentifier turns a login identifier into the stored form: Ethiopian
+// phone numbers become +251…, anything else is treated as a lowercase email.
+func NormalizeIdentifier(identifier string) string {
+	identifier = strings.TrimSpace(identifier)
+	if normalized, err := phone.Normalize(identifier); err == nil {
+		return normalized
+	}
+	return strings.ToLower(identifier)
 }

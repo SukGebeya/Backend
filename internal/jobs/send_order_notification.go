@@ -2,10 +2,13 @@ package jobs
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
-	"github.com/google/uuid"
+	domainerrors "github.com/SukGebeya/Backend/internal/errors"
+	"github.com/SukGebeya/Backend/internal/repository"
+	"github.com/SukGebeya/Backend/pkg/sms"
 	"github.com/riverqueue/river"
 )
 
@@ -13,87 +16,61 @@ const (
 	NotificationEventPaymentConfirmed = "payment_confirmed"
 	NotificationEventShipped          = "shipped"
 	NotificationEventDelivered        = "delivered"
+	NotificationEventCancelled        = "cancelled"
+	NotificationEventRefunded         = "refunded"
 )
+
+var notificationMessages = map[string]string{
+	NotificationEventPaymentConfirmed: "ገበያ፦ ክፍያዎ ተረጋግጧል፤ ነጋዴው ትዕዛዝዎን እያዘጋጀ ነው። Gebeya: payment confirmed, the merchant is preparing order %s.",
+	NotificationEventShipped:          "ገበያ፦ ትዕዛዝዎ ተልኳል። ሲደርስዎ በመተግበሪያው ያረጋግጡ። Gebeya: order %s has shipped. Confirm in the app when it arrives.",
+	NotificationEventDelivered:        "ገበያ፦ ትዕዛዝዎ ደርሷል። እናመሰግናለን! Gebeya: order %s delivered. Thank you!",
+	NotificationEventCancelled:        "ገበያ፦ ትዕዛዝዎ ተሰርዟል። Gebeya: order %s was cancelled. Any payment will be refunded.",
+	NotificationEventRefunded:         "ገበያ፦ ክፍያዎ ተመልሷል። Gebeya: the payment for order %s has been refunded.",
+}
 
 type SendOrderNotificationWorker struct {
 	river.WorkerDefaults[SendOrderNotificationArgs]
+	orderRepo repository.OrderRepository
+	userRepo  repository.UserRepository
+	sms       sms.Sender
 }
 
-func NewSendOrderNotificationWorker() *SendOrderNotificationWorker {
-	return &SendOrderNotificationWorker{}
-}
-
-func (w *SendOrderNotificationWorker) Timeout(job *river.Job[SendOrderNotificationArgs]) time.Duration {
+func (w *SendOrderNotificationWorker) Timeout(*river.Job[SendOrderNotificationArgs]) time.Duration {
 	return defaultJobTimeout
 }
 
+// Work texts the buyer about their order in Amharic and English.
 func (w *SendOrderNotificationWorker) Work(ctx context.Context, job *river.Job[SendOrderNotificationArgs]) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
+	message, ok := notificationMessages[job.Args.Event]
+	if !ok {
+		slog.Warn("unknown notification event", "event", job.Args.Event)
+		return nil
 	}
 
-	orderID := job.Args.OrderID
-	event := job.Args.Event
-	phone := job.Args.Phone
-
-	slog.Info("sending order notification",
-		"order_id", orderID,
-		"event", event,
-		"phone", phone,
-		"attempt", job.Attempt,
-	)
-
-	switch event {
-	case NotificationEventPaymentConfirmed:
-		w.sendPaymentConfirmation(ctx, orderID, phone)
-	case NotificationEventShipped:
-		w.sendShipmentNotification(ctx, orderID, phone)
-	case NotificationEventDelivered:
-		w.sendDeliveryConfirmation(ctx, orderID, phone)
-	default:
-		slog.Warn("unknown notification event", "event", event)
+	order, err := w.orderRepo.GetByID(ctx, job.Args.OrderID)
+	if err != nil {
+		if domainerrors.IsNotFound(err) {
+			return nil
+		}
+		return err
 	}
 
-	return nil
-}
+	user, err := w.userRepo.GetByID(ctx, order.BuyerID)
+	if err != nil {
+		if domainerrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
 
-func (w *SendOrderNotificationWorker) sendPaymentConfirmation(ctx context.Context, orderID uuid.UUID, phone string) {
-	slog.Info("[MOCK] SMS notification: Payment confirmed",
-		"order_id", orderID,
-		"phone", phone,
-		"message", "Your order payment has been confirmed. Your order is now being processed.",
-	)
+	if user.Phone == nil || *user.Phone == "" {
+		slog.Info("skipping notification: buyer has no phone", "order_id", order.ID)
+		return nil
+	}
 
-	slog.Info("[MOCK] TODO: Implement SMS sending via Africa's Talking or similar SMS provider",
-		"provider", "africas_talking",
-		"phone", phone,
-	)
-}
-
-func (w *SendOrderNotificationWorker) sendShipmentNotification(ctx context.Context, orderID uuid.UUID, phone string) {
-	slog.Info("[MOCK] SMS notification: Order shipped",
-		"order_id", orderID,
-		"phone", phone,
-		"message", "Your order has been shipped and is on its way.",
-	)
-
-	slog.Info("[MOCK] TODO: Implement SMS sending via Africa's Talking or similar SMS provider",
-		"provider", "africas_talking",
-		"phone", phone,
-	)
-}
-
-func (w *SendOrderNotificationWorker) sendDeliveryConfirmation(ctx context.Context, orderID uuid.UUID, phone string) {
-	slog.Info("[MOCK] SMS notification: Order delivered",
-		"order_id", orderID,
-		"phone", phone,
-		"message", "Your order has been delivered. Thank you for shopping with us!",
-	)
-
-	slog.Info("[MOCK] TODO: Implement SMS sending via Africa's Talking or similar SMS provider",
-		"provider", "africas_talking",
-		"phone", phone,
-	)
+	if w.sms == nil {
+		slog.Info("order notification (no SMS sender configured)", "order_id", order.ID, "event", job.Args.Event)
+		return nil
+	}
+	return w.sms.Send(ctx, *user.Phone, fmt.Sprintf(message, order.ID.String()[:8]))
 }

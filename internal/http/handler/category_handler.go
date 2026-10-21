@@ -4,11 +4,9 @@ import (
 	"net/http"
 
 	"github.com/SukGebeya/Backend/internal/domain"
-	apperrors "github.com/SukGebeya/Backend/internal/errors"
 	"github.com/SukGebeya/Backend/internal/service"
 	"github.com/SukGebeya/Backend/pkg/response"
 	"github.com/SukGebeya/Backend/pkg/validation"
-	"github.com/google/uuid"
 )
 
 type CategoryHandler struct {
@@ -299,18 +297,4 @@ func toCategoryResponse(c *domain.Category) CategoryResponse {
 		SortOrder: c.SortOrder,
 		CreatedAt: c.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
-}
-
-func parseUUIDParamFromQuery(r *http.Request, param string) (uuid.UUID, error) {
-	val := r.URL.Query().Get(param)
-	if val == "" {
-		return uuid.UUID{}, apperrors.BadRequest(param + " is required")
-	}
-
-	id, err := uuid.Parse(val)
-	if err != nil {
-		return uuid.UUID{}, apperrors.BadRequest("invalid " + param)
-	}
-
-	return id, nil
 }

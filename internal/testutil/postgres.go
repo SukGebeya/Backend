@@ -3,13 +3,17 @@ package testutil
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib" // pgx database/sql driver for goose
 	"github.com/pressly/goose/v3"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -23,8 +27,14 @@ type PostgresContainer struct {
 
 func SetupPostgres(t *testing.T) *PostgresContainer {
 	t.Helper()
-	ctx := context.Background()
+	container, err := startPostgres(context.Background())
+	if err != nil {
+		t.Fatalf("failed to start container: %s", err)
+	}
+	return container
+}
 
+func startPostgres(ctx context.Context) (*PostgresContainer, error) {
 	container, err := postgres.Run(ctx,
 		"postgres:16-alpine",
 		postgres.WithDatabase("testdb"),
@@ -33,42 +43,135 @@ func SetupPostgres(t *testing.T) *PostgresContainer {
 		testcontainers.WithWaitStrategy(
 			wait.ForLog("database system is ready to accept connections").
 				WithOccurrence(2).
-				WithStartupTimeout(5*time.Second)),
+				WithStartupTimeout(60*time.Second)),
 	)
 	if err != nil {
-		t.Fatalf("failed to start container: %s", err)
+		return nil, err
 	}
 
 	connStr, err := container.ConnectionString(ctx, "sslmode=disable")
 	if err != nil {
-		t.Fatalf("failed to get connection string: %s", err)
+		return nil, err
 	}
 
 	return &PostgresContainer{
 		PostgresContainer: container,
 		ConnectionString:  connStr,
-	}
+	}, nil
 }
 
 func RunMigrations(t *testing.T, connStr string) {
 	t.Helper()
+	if err := migrate(connStr); err != nil {
+		t.Fatalf("failed to run migrations: %v", err)
+	}
+}
 
-	_, filename, _, _ := runtime.Caller(0)
-	projectRoot := filepath.Join(filepath.Dir(filename), "..", "..")
-	migrationsDir := filepath.Join(projectRoot, "migrations")
+func migrate(connStr string) error {
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		return fmt.Errorf("cannot locate migrations directory")
+	}
+	migrationsDir := filepath.Join(filepath.Dir(filename), "..", "..", "migrations")
 
 	db, err := goose.OpenDBWithDriver("postgres", connStr)
 	if err != nil {
-		t.Fatalf("failed to open DB: %v", err)
+		return fmt.Errorf("open DB: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := goose.SetDialect("postgres"); err != nil {
-		t.Fatalf("failed to set dialect: %v", err)
+		return err
+	}
+	return goose.Up(db, migrationsDir)
+}
+
+const templateDatabase = "gebeya_template"
+
+var shared struct {
+	once      sync.Once
+	container *PostgresContainer
+	admin     *pgxpool.Pool
+	err       error
+	counter   atomic.Int64
+}
+
+func withDatabase(connStr, name string) (string, error) {
+	u, err := url.Parse(connStr)
+	if err != nil {
+		return "", err
+	}
+	u.Path = "/" + name
+	return u.String(), nil
+}
+
+func startShared() {
+	ctx := context.Background()
+	shared.container, shared.err = startPostgres(ctx)
+	if shared.err != nil {
+		return
 	}
 
-	if err := goose.Up(db, migrationsDir); err != nil {
-		t.Fatalf("failed to run migrations: %v", err)
+	shared.admin, shared.err = pgxpool.New(ctx, shared.container.ConnectionString)
+	if shared.err != nil {
+		return
+	}
+
+	if _, shared.err = shared.admin.Exec(ctx, "CREATE DATABASE "+templateDatabase); shared.err != nil {
+		return
+	}
+
+	templateURL, err := withDatabase(shared.container.ConnectionString, templateDatabase)
+	if err != nil {
+		shared.err = err
+		return
+	}
+	shared.err = migrate(templateURL)
+}
+
+// NewTestDatabase returns a pool for a fresh, fully migrated database. One
+// Postgres container is shared per test binary and every test gets its own
+// database cloned from a migrated template, so tests are isolated and fast.
+// Integration tests are skipped under -short.
+func NewTestDatabase(t *testing.T) *pgxpool.Pool {
+	t.Helper()
+	if testing.Short() {
+		t.Skip("integration test: requires Docker (run without -short)")
+	}
+
+	shared.once.Do(startShared)
+	if shared.err != nil {
+		t.Fatalf("failed to start shared postgres: %v", shared.err)
+	}
+
+	ctx := context.Background()
+	name := fmt.Sprintf("test_%d_%d", os.Getpid(), shared.counter.Add(1))
+	if _, err := shared.admin.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s TEMPLATE %s", name, templateDatabase)); err != nil {
+		t.Fatalf("failed to create test database: %v", err)
+	}
+
+	connStr, err := withDatabase(shared.container.ConnectionString, name)
+	if err != nil {
+		t.Fatalf("failed to build test database URL: %v", err)
+	}
+
+	pool := CreatePool(t, connStr)
+	t.Cleanup(func() {
+		pool.Close()
+		if _, err := shared.admin.Exec(context.Background(), fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", name)); err != nil {
+			t.Logf("failed to drop test database %s: %v", name, err)
+		}
+	})
+	return pool
+}
+
+// StopSharedPostgres terminates the shared container; call it from TestMain.
+func StopSharedPostgres() {
+	if shared.admin != nil {
+		shared.admin.Close()
+	}
+	if shared.container != nil {
+		_ = shared.container.Terminate(context.Background())
 	}
 }
 

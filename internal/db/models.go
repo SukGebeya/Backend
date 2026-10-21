@@ -65,6 +65,7 @@ const (
 	OrderStatusDelivered      OrderStatus = "delivered"
 	OrderStatusCancelled      OrderStatus = "cancelled"
 	OrderStatusRefunded       OrderStatus = "refunded"
+	OrderStatusDisputed       OrderStatus = "disputed"
 )
 
 func (e *OrderStatus) Scan(src interface{}) error {
@@ -200,23 +201,27 @@ type Inventory struct {
 }
 
 type MerchantProfile struct {
-	ID              uuid.UUID          `json:"id"`
-	UserID          uuid.UUID          `json:"user_id"`
-	ShopName        string             `json:"shop_name"`
-	ShopSlug        string             `json:"shop_slug"`
-	ShopDescription *string            `json:"shop_description"`
-	ShopLogoUrl     *string            `json:"shop_logo_url"`
-	ShopBannerUrl   *string            `json:"shop_banner_url"`
-	ContactPhone    string             `json:"contact_phone"`
-	ContactEmail    *string            `json:"contact_email"`
-	Address         *string            `json:"address"`
-	City            string             `json:"city"`
-	BlnkBalanceID   *string            `json:"blnk_balance_id"`
-	BlnkLedgerID    *string            `json:"blnk_ledger_id"`
-	IsVerified      bool               `json:"is_verified"`
-	TotalSalesCents int64              `json:"total_sales_cents"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	ID                         uuid.UUID          `json:"id"`
+	UserID                     uuid.UUID          `json:"user_id"`
+	ShopName                   string             `json:"shop_name"`
+	ShopSlug                   string             `json:"shop_slug"`
+	ShopDescription            *string            `json:"shop_description"`
+	ShopLogoUrl                *string            `json:"shop_logo_url"`
+	ShopBannerUrl              *string            `json:"shop_banner_url"`
+	ContactPhone               string             `json:"contact_phone"`
+	ContactEmail               *string            `json:"contact_email"`
+	Address                    *string            `json:"address"`
+	City                       string             `json:"city"`
+	BlnkBalanceID              *string            `json:"blnk_balance_id"`
+	BlnkLedgerID               *string            `json:"blnk_ledger_id"`
+	IsVerified                 bool               `json:"is_verified"`
+	TotalSalesCents            int64              `json:"total_sales_cents"`
+	CreatedAt                  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                  pgtype.Timestamptz `json:"updated_at"`
+	DeliveryFeeCents           int64              `json:"delivery_fee_cents"`
+	FreeDeliveryThresholdCents *int64             `json:"free_delivery_threshold_cents"`
+	Tin                        *string            `json:"tin"`
+	TradeLicenseNumber         *string            `json:"trade_license_number"`
 }
 
 type Order struct {
@@ -234,6 +239,9 @@ type Order struct {
 	ChapaTxRef        *string            `json:"chapa_tx_ref"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	DeliveryFeeCents  int64              `json:"delivery_fee_cents"`
+	DisputedAt        pgtype.Timestamptz `json:"disputed_at"`
+	DisputeReason     *string            `json:"dispute_reason"`
 }
 
 type OrderItem struct {
@@ -259,6 +267,7 @@ type Payment struct {
 	BlnkTransactionID *string            `json:"blnk_transaction_id"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	ChargeCents       int64              `json:"charge_cents"`
 }
 
 type Payout struct {
@@ -273,6 +282,10 @@ type Payout struct {
 	FailureReason     *string            `json:"failure_reason"`
 	RequestedAt       pgtype.Timestamptz `json:"requested_at"`
 	ProcessedAt       pgtype.Timestamptz `json:"processed_at"`
+	AccountName       *string            `json:"account_name"`
+	BankCode          *string            `json:"bank_code"`
+	TransferReference *string            `json:"transfer_reference"`
+	ProviderResponse  []byte             `json:"provider_response"`
 }
 
 type Product struct {
@@ -325,18 +338,19 @@ type Shipment struct {
 }
 
 type User struct {
-	ID           uuid.UUID          `json:"id"`
-	Email        *string            `json:"email"`
-	Phone        *string            `json:"phone"`
-	PasswordHash string             `json:"password_hash"`
-	Role         string             `json:"role"`
-	FullName     *string            `json:"full_name"`
-	AvatarUrl    *string            `json:"avatar_url"`
-	KycStatus    string             `json:"kyc_status"`
-	NationalID   *string            `json:"national_id"`
-	IsActive     bool               `json:"is_active"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	ID              uuid.UUID          `json:"id"`
+	Email           *string            `json:"email"`
+	Phone           *string            `json:"phone"`
+	PasswordHash    string             `json:"password_hash"`
+	Role            string             `json:"role"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	FullName        *string            `json:"full_name"`
+	AvatarUrl       *string            `json:"avatar_url"`
+	KycStatus       string             `json:"kyc_status"`
+	NationalID      *string            `json:"national_id"`
+	IsActive        bool               `json:"is_active"`
+	PhoneVerifiedAt pgtype.Timestamptz `json:"phone_verified_at"`
 }
 
 type WalletTransaction struct {
@@ -350,4 +364,17 @@ type WalletTransaction struct {
 	Status            string             `json:"status"`
 	Description       *string            `json:"description"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+}
+
+type WebhookEvent struct {
+	ID          uuid.UUID          `json:"id"`
+	Provider    string             `json:"provider"`
+	EventType   string             `json:"event_type"`
+	TxRef       *string            `json:"tx_ref"`
+	PayloadHash string             `json:"payload_hash"`
+	Payload     []byte             `json:"payload"`
+	Status      string             `json:"status"`
+	Error       *string            `json:"error"`
+	ReceivedAt  pgtype.Timestamptz `json:"received_at"`
+	ProcessedAt pgtype.Timestamptz `json:"processed_at"`
 }

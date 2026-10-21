@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 )
 
 type sessionRepository struct {
@@ -44,5 +44,5 @@ func (r *sessionRepository) Delete(ctx context.Context, sessionID string) error 
 
 func (r *sessionRepository) AssociateUser(ctx context.Context, sessionID string, userID uuid.UUID) error {
 	key := sessionKeyPrefix + sessionID
-	return r.client.Set(ctx, key, userID.String(), time.Duration(7*24*time.Hour)).Err()
+	return r.client.Set(ctx, key, userID.String(), 7*24*time.Hour).Err()
 }

@@ -14,7 +14,7 @@ import (
 const createPayment = `-- name: CreatePayment :one
 INSERT INTO payments (id, order_id, provider, status, amount_cents, currency, provider_tx_ref, provider_response, blnk_transaction_id)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, order_id, provider, status, amount_cents, currency, provider_tx_ref, provider_response, blnk_transaction_id, created_at, updated_at
+RETURNING id, order_id, provider, status, amount_cents, currency, provider_tx_ref, provider_response, blnk_transaction_id, created_at, updated_at, charge_cents
 `
 
 type CreatePaymentParams struct {
@@ -54,12 +54,13 @@ func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (P
 		&i.BlnkTransactionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ChargeCents,
 	)
 	return i, err
 }
 
 const getPaymentByID = `-- name: GetPaymentByID :one
-SELECT id, order_id, provider, status, amount_cents, currency, provider_tx_ref, provider_response, blnk_transaction_id, created_at, updated_at
+SELECT id, order_id, provider, status, amount_cents, currency, provider_tx_ref, provider_response, blnk_transaction_id, created_at, updated_at, charge_cents
 FROM payments
 WHERE id = $1
 `
@@ -79,12 +80,13 @@ func (q *Queries) GetPaymentByID(ctx context.Context, id uuid.UUID) (Payment, er
 		&i.BlnkTransactionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ChargeCents,
 	)
 	return i, err
 }
 
 const getPaymentByOrderID = `-- name: GetPaymentByOrderID :one
-SELECT id, order_id, provider, status, amount_cents, currency, provider_tx_ref, provider_response, blnk_transaction_id, created_at, updated_at
+SELECT id, order_id, provider, status, amount_cents, currency, provider_tx_ref, provider_response, blnk_transaction_id, created_at, updated_at, charge_cents
 FROM payments
 WHERE order_id = $1
 `
@@ -104,12 +106,13 @@ func (q *Queries) GetPaymentByOrderID(ctx context.Context, orderID uuid.UUID) (P
 		&i.BlnkTransactionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ChargeCents,
 	)
 	return i, err
 }
 
 const getPaymentByProviderTxRef = `-- name: GetPaymentByProviderTxRef :one
-SELECT id, order_id, provider, status, amount_cents, currency, provider_tx_ref, provider_response, blnk_transaction_id, created_at, updated_at
+SELECT id, order_id, provider, status, amount_cents, currency, provider_tx_ref, provider_response, blnk_transaction_id, created_at, updated_at, charge_cents
 FROM payments
 WHERE provider_tx_ref = $1
 `
@@ -129,12 +132,13 @@ func (q *Queries) GetPaymentByProviderTxRef(ctx context.Context, providerTxRef *
 		&i.BlnkTransactionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ChargeCents,
 	)
 	return i, err
 }
 
 const listPaymentsByStatus = `-- name: ListPaymentsByStatus :many
-SELECT id, order_id, provider, status, amount_cents, currency, provider_tx_ref, provider_response, blnk_transaction_id, created_at, updated_at
+SELECT id, order_id, provider, status, amount_cents, currency, provider_tx_ref, provider_response, blnk_transaction_id, created_at, updated_at, charge_cents
 FROM payments
 WHERE status = $1
 ORDER BY created_at DESC
@@ -168,6 +172,7 @@ func (q *Queries) ListPaymentsByStatus(ctx context.Context, arg ListPaymentsBySt
 			&i.BlnkTransactionID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ChargeCents,
 		); err != nil {
 			return nil, err
 		}
@@ -183,7 +188,7 @@ const updatePaymentBlnkTransaction = `-- name: UpdatePaymentBlnkTransaction :one
 UPDATE payments
 SET blnk_transaction_id = $1, updated_at = NOW()
 WHERE id = $2
-RETURNING id, order_id, provider, status, amount_cents, currency, provider_tx_ref, provider_response, blnk_transaction_id, created_at, updated_at
+RETURNING id, order_id, provider, status, amount_cents, currency, provider_tx_ref, provider_response, blnk_transaction_id, created_at, updated_at, charge_cents
 `
 
 type UpdatePaymentBlnkTransactionParams struct {
@@ -206,6 +211,7 @@ func (q *Queries) UpdatePaymentBlnkTransaction(ctx context.Context, arg UpdatePa
 		&i.BlnkTransactionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ChargeCents,
 	)
 	return i, err
 }
@@ -214,7 +220,7 @@ const updatePaymentProviderResponse = `-- name: UpdatePaymentProviderResponse :o
 UPDATE payments
 SET provider_response = $1, updated_at = NOW()
 WHERE id = $2
-RETURNING id, order_id, provider, status, amount_cents, currency, provider_tx_ref, provider_response, blnk_transaction_id, created_at, updated_at
+RETURNING id, order_id, provider, status, amount_cents, currency, provider_tx_ref, provider_response, blnk_transaction_id, created_at, updated_at, charge_cents
 `
 
 type UpdatePaymentProviderResponseParams struct {
@@ -237,6 +243,52 @@ func (q *Queries) UpdatePaymentProviderResponse(ctx context.Context, arg UpdateP
 		&i.BlnkTransactionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ChargeCents,
+	)
+	return i, err
+}
+
+const updatePaymentResult = `-- name: UpdatePaymentResult :one
+UPDATE payments
+SET status = $1,
+    provider_response = COALESCE($2, provider_response),
+    blnk_transaction_id = COALESCE($3, blnk_transaction_id),
+    charge_cents = COALESCE($4, charge_cents),
+    updated_at = NOW()
+WHERE id = $5
+RETURNING id, order_id, provider, status, amount_cents, currency, provider_tx_ref, provider_response, blnk_transaction_id, created_at, updated_at, charge_cents
+`
+
+type UpdatePaymentResultParams struct {
+	Status            string    `json:"status"`
+	ProviderResponse  []byte    `json:"provider_response"`
+	BlnkTransactionID *string   `json:"blnk_transaction_id"`
+	ChargeCents       *int64    `json:"charge_cents"`
+	ID                uuid.UUID `json:"id"`
+}
+
+func (q *Queries) UpdatePaymentResult(ctx context.Context, arg UpdatePaymentResultParams) (Payment, error) {
+	row := q.db.QueryRow(ctx, updatePaymentResult,
+		arg.Status,
+		arg.ProviderResponse,
+		arg.BlnkTransactionID,
+		arg.ChargeCents,
+		arg.ID,
+	)
+	var i Payment
+	err := row.Scan(
+		&i.ID,
+		&i.OrderID,
+		&i.Provider,
+		&i.Status,
+		&i.AmountCents,
+		&i.Currency,
+		&i.ProviderTxRef,
+		&i.ProviderResponse,
+		&i.BlnkTransactionID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ChargeCents,
 	)
 	return i, err
 }
@@ -245,7 +297,7 @@ const updatePaymentStatus = `-- name: UpdatePaymentStatus :one
 UPDATE payments
 SET status = $1, updated_at = NOW()
 WHERE id = $2
-RETURNING id, order_id, provider, status, amount_cents, currency, provider_tx_ref, provider_response, blnk_transaction_id, created_at, updated_at
+RETURNING id, order_id, provider, status, amount_cents, currency, provider_tx_ref, provider_response, blnk_transaction_id, created_at, updated_at, charge_cents
 `
 
 type UpdatePaymentStatusParams struct {
@@ -268,6 +320,7 @@ func (q *Queries) UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStat
 		&i.BlnkTransactionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ChargeCents,
 	)
 	return i, err
 }

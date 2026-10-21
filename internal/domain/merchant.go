@@ -22,10 +22,24 @@ type MerchantProfile struct {
 	BlnkLedgerID    *string   `db:"blnk_ledger_id" json:"blnk_ledger_id"`
 	IsVerified      bool      `db:"is_verified" json:"is_verified"`
 	TotalSalesCents int64     `db:"total_sales_cents" json:"total_sales_cents"`
-	CreatedAt       time.Time `db:"created_at" json:"created_at"`
-	UpdatedAt       time.Time `db:"updated_at" json:"updated_at"`
+
+	DeliveryFeeCents           int64     `db:"delivery_fee_cents" json:"delivery_fee_cents"`
+	FreeDeliveryThresholdCents *int64    `db:"free_delivery_threshold_cents" json:"free_delivery_threshold_cents,omitempty"`
+	TIN                        *string   `db:"tin" json:"tin,omitempty"`
+	TradeLicenseNumber         *string   `db:"trade_license_number" json:"trade_license_number,omitempty"`
+	CreatedAt                  time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt                  time.Time `db:"updated_at" json:"updated_at"`
 }
 
 func (m *MerchantProfile) HasWallet() bool {
 	return m.BlnkBalanceID != nil && *m.BlnkBalanceID != ""
+}
+
+// DeliveryFeeFor returns the merchant's flat delivery fee for an order subtotal,
+// or zero when the order qualifies for free delivery.
+func (m *MerchantProfile) DeliveryFeeFor(subtotalCents int64) int64 {
+	if m.FreeDeliveryThresholdCents != nil && subtotalCents >= *m.FreeDeliveryThresholdCents {
+		return 0
+	}
+	return m.DeliveryFeeCents
 }

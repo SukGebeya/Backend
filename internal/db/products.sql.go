@@ -12,6 +12,135 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const browseProducts = `-- name: BrowseProducts :many
+SELECT p.id, p.merchant_id, p.category_id, p.name, p.slug, p.description, p.status, p.is_digital, p.created_at, p.updated_at,
+    COALESCE((SELECT MIN(v.price_cents) FROM product_variants v WHERE v.product_id = p.id AND v.is_active), 0)::bigint AS min_price_cents,
+    COALESCE((SELECT SUM(GREATEST(i.quantity - i.reserved, 0)) FROM product_variants v JOIN inventory i ON i.variant_id = v.id
+              WHERE v.product_id = p.id AND v.is_active), 0)::bigint AS available_quantity,
+    COALESCE((SELECT pi.url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.is_primary DESC, pi.sort_order, pi.id LIMIT 1), '')::text AS primary_image_url,
+    m.shop_name, m.shop_slug, m.is_verified AS merchant_verified
+FROM products p
+JOIN merchant_profiles m ON m.id = p.merchant_id
+WHERE p.status = 'active'
+  AND ($1::uuid IS NULL OR p.category_id = $1::uuid)
+  AND ($2::uuid IS NULL OR p.merchant_id = $2::uuid)
+  AND ($3::text IS NULL OR p.name ILIKE $3::text OR p.description ILIKE $3::text)
+ORDER BY p.created_at DESC, p.id
+LIMIT $5 OFFSET $4
+`
+
+type BrowseProductsParams struct {
+	CategoryID pgtype.UUID `json:"category_id"`
+	MerchantID pgtype.UUID `json:"merchant_id"`
+	Search     *string     `json:"search"`
+	PageOffset int32       `json:"page_offset"`
+	PageLimit  int32       `json:"page_limit"`
+}
+
+type BrowseProductsRow struct {
+	ID                uuid.UUID          `json:"id"`
+	MerchantID        uuid.UUID          `json:"merchant_id"`
+	CategoryID        pgtype.UUID        `json:"category_id"`
+	Name              string             `json:"name"`
+	Slug              string             `json:"slug"`
+	Description       *string            `json:"description"`
+	Status            string             `json:"status"`
+	IsDigital         bool               `json:"is_digital"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	MinPriceCents     int64              `json:"min_price_cents"`
+	AvailableQuantity int64              `json:"available_quantity"`
+	PrimaryImageUrl   string             `json:"primary_image_url"`
+	ShopName          string             `json:"shop_name"`
+	ShopSlug          string             `json:"shop_slug"`
+	MerchantVerified  bool               `json:"merchant_verified"`
+}
+
+func (q *Queries) BrowseProducts(ctx context.Context, arg BrowseProductsParams) ([]BrowseProductsRow, error) {
+	rows, err := q.db.Query(ctx, browseProducts,
+		arg.CategoryID,
+		arg.MerchantID,
+		arg.Search,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []BrowseProductsRow{}
+	for rows.Next() {
+		var i BrowseProductsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.MerchantID,
+			&i.CategoryID,
+			&i.Name,
+			&i.Slug,
+			&i.Description,
+			&i.Status,
+			&i.IsDigital,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.MinPriceCents,
+			&i.AvailableQuantity,
+			&i.PrimaryImageUrl,
+			&i.ShopName,
+			&i.ShopSlug,
+			&i.MerchantVerified,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const clearPrimaryProductImage = `-- name: ClearPrimaryProductImage :exec
+UPDATE product_images SET is_primary = false WHERE product_id = $1
+`
+
+func (q *Queries) ClearPrimaryProductImage(ctx context.Context, productID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, clearPrimaryProductImage, productID)
+	return err
+}
+
+const countBrowseProducts = `-- name: CountBrowseProducts :one
+SELECT COUNT(*)
+FROM products p
+WHERE p.status = 'active'
+  AND ($1::uuid IS NULL OR p.category_id = $1::uuid)
+  AND ($2::uuid IS NULL OR p.merchant_id = $2::uuid)
+  AND ($3::text IS NULL OR p.name ILIKE $3::text OR p.description ILIKE $3::text)
+`
+
+type CountBrowseProductsParams struct {
+	CategoryID pgtype.UUID `json:"category_id"`
+	MerchantID pgtype.UUID `json:"merchant_id"`
+	Search     *string     `json:"search"`
+}
+
+func (q *Queries) CountBrowseProducts(ctx context.Context, arg CountBrowseProductsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countBrowseProducts, arg.CategoryID, arg.MerchantID, arg.Search)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countProductImages = `-- name: CountProductImages :one
+SELECT COUNT(*) FROM product_images WHERE product_id = $1
+`
+
+func (q *Queries) CountProductImages(ctx context.Context, productID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countProductImages, productID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countProductsByMerchant = `-- name: CountProductsByMerchant :one
 SELECT COUNT(*) FROM products WHERE merchant_id = $1
 `

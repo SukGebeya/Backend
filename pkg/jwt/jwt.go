@@ -139,6 +139,10 @@ func (m *Manager) ValidateRefreshToken(tokenString string) (uuid.UUID, string, e
 	return userID, claims.ID, nil
 }
 
+func (m *Manager) AccessTTL() time.Duration {
+	return m.accessTTL
+}
+
 func (m *Manager) GetAccessPublicKey() *rsa.PublicKey {
 	return m.accessPublicKey
 }

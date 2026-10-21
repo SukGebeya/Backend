@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"github.com/sony/gobreaker"
 )
 
@@ -57,7 +57,8 @@ func (r *CircuitBreakerRefreshTokenRepository) Get(ctx context.Context, userID u
 		return false, err
 	}
 
-	return result.(string) != "", nil
+	value, _ := result.(string)
+	return value != "", nil
 }
 
 func (r *CircuitBreakerRefreshTokenRepository) Delete(ctx context.Context, userID uuid.UUID, tokenID string) error {
@@ -127,7 +128,8 @@ func (r *CircuitBreakerRateLimitRepository) Increment(ctx context.Context, key s
 		return 0, err
 	}
 
-	return result.(int64), nil
+	count, _ := result.(int64)
+	return count, nil
 }
 
 func (r *CircuitBreakerRateLimitRepository) GetTTL(ctx context.Context, key string) (int64, error) {
@@ -140,7 +142,8 @@ func (r *CircuitBreakerRateLimitRepository) GetTTL(ctx context.Context, key stri
 		return 0, err
 	}
 
-	return int64(result.(time.Duration).Seconds()), nil
+	ttl, _ := result.(time.Duration)
+	return int64(ttl.Seconds()), nil
 }
 
 func (r *CircuitBreakerRateLimitRepository) Reset(ctx context.Context, key string) error {

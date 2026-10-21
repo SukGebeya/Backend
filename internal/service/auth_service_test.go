@@ -14,16 +14,9 @@ import (
 func TestAuthService_Register_Success(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
+	pool := testutil.NewTestDatabase(t)
 
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
-
-	redisContainer := testutil.SetupRedis(t)
-	redisClient := testutil.CreateRedisClient(t, redisContainer.ConnectionString)
-	defer testutil.CleanupRedis(t, redisContainer, redisClient)
+	redisClient := testutil.NewTestRedis(t)
 
 	userRepo := repository.NewUserRepository(pool)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(redisClient)
@@ -77,16 +70,9 @@ func TestAuthService_Register_Success(t *testing.T) {
 func TestAuthService_Register_DuplicateEmail(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
+	pool := testutil.NewTestDatabase(t)
 
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
-
-	redisContainer := testutil.SetupRedis(t)
-	redisClient := testutil.CreateRedisClient(t, redisContainer.ConnectionString)
-	defer testutil.CleanupRedis(t, redisContainer, redisClient)
+	redisClient := testutil.NewTestRedis(t)
 
 	userRepo := repository.NewUserRepository(pool)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(redisClient)
@@ -117,16 +103,9 @@ func TestAuthService_Register_DuplicateEmail(t *testing.T) {
 func TestAuthService_Login_ValidCredentials(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
+	pool := testutil.NewTestDatabase(t)
 
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
-
-	redisContainer := testutil.SetupRedis(t)
-	redisClient := testutil.CreateRedisClient(t, redisContainer.ConnectionString)
-	defer testutil.CleanupRedis(t, redisContainer, redisClient)
+	redisClient := testutil.NewTestRedis(t)
 
 	userRepo := repository.NewUserRepository(pool)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(redisClient)
@@ -182,16 +161,9 @@ func TestAuthService_Login_ValidCredentials(t *testing.T) {
 func TestAuthService_Login_InvalidPassword(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
+	pool := testutil.NewTestDatabase(t)
 
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
-
-	redisContainer := testutil.SetupRedis(t)
-	redisClient := testutil.CreateRedisClient(t, redisContainer.ConnectionString)
-	defer testutil.CleanupRedis(t, redisContainer, redisClient)
+	redisClient := testutil.NewTestRedis(t)
 
 	userRepo := repository.NewUserRepository(pool)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(redisClient)
@@ -227,16 +199,9 @@ func TestAuthService_Login_InvalidPassword(t *testing.T) {
 func TestAuthService_Login_UserNotFound(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
+	pool := testutil.NewTestDatabase(t)
 
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
-
-	redisContainer := testutil.SetupRedis(t)
-	redisClient := testutil.CreateRedisClient(t, redisContainer.ConnectionString)
-	defer testutil.CleanupRedis(t, redisContainer, redisClient)
+	redisClient := testutil.NewTestRedis(t)
 
 	userRepo := repository.NewUserRepository(pool)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(redisClient)
@@ -260,16 +225,9 @@ func TestAuthService_Login_UserNotFound(t *testing.T) {
 func TestAuthService_RefreshToken(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
+	pool := testutil.NewTestDatabase(t)
 
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
-
-	redisContainer := testutil.SetupRedis(t)
-	redisClient := testutil.CreateRedisClient(t, redisContainer.ConnectionString)
-	defer testutil.CleanupRedis(t, redisContainer, redisClient)
+	redisClient := testutil.NewTestRedis(t)
 
 	userRepo := repository.NewUserRepository(pool)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(redisClient)
@@ -312,16 +270,9 @@ func TestAuthService_RefreshToken(t *testing.T) {
 func TestAuthService_Logout(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
+	pool := testutil.NewTestDatabase(t)
 
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
-
-	redisContainer := testutil.SetupRedis(t)
-	redisClient := testutil.CreateRedisClient(t, redisContainer.ConnectionString)
-	defer testutil.CleanupRedis(t, redisContainer, redisClient)
+	redisClient := testutil.NewTestRedis(t)
 
 	userRepo := repository.NewUserRepository(pool)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(redisClient)

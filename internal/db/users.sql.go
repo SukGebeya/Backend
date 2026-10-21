@@ -11,6 +11,16 @@ import (
 	"github.com/google/uuid"
 )
 
+const clearUserPhoneVerified = `-- name: ClearUserPhoneVerified :exec
+UPDATE users SET phone_verified_at = NULL, updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) ClearUserPhoneVerified(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, clearUserPhoneVerified, id)
+	return err
+}
+
 const countUsers = `-- name: CountUsers :one
 SELECT COUNT(*) FROM users
 `
@@ -25,7 +35,7 @@ func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (id, email, phone, password_hash, role, kyc_status, is_active)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, email, phone, password_hash, role, full_name, avatar_url, kyc_status, national_id, is_active, created_at, updated_at
+RETURNING id, email, phone, password_hash, role, created_at, updated_at, full_name, avatar_url, kyc_status, national_id, is_active, phone_verified_at
 `
 
 type CreateUserParams struct {
@@ -55,13 +65,14 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Phone,
 		&i.PasswordHash,
 		&i.Role,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 		&i.FullName,
 		&i.AvatarUrl,
 		&i.KycStatus,
 		&i.NationalID,
 		&i.IsActive,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+		&i.PhoneVerifiedAt,
 	)
 	return i, err
 }
@@ -76,7 +87,7 @@ func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) error {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, phone, password_hash, role, full_name, avatar_url, kyc_status, national_id, is_active, created_at, updated_at
+SELECT id, email, phone, password_hash, role, created_at, updated_at, full_name, avatar_url, kyc_status, national_id, is_active, phone_verified_at
 FROM users
 WHERE email = $1
 `
@@ -90,19 +101,20 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email *string) (User, erro
 		&i.Phone,
 		&i.PasswordHash,
 		&i.Role,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 		&i.FullName,
 		&i.AvatarUrl,
 		&i.KycStatus,
 		&i.NationalID,
 		&i.IsActive,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+		&i.PhoneVerifiedAt,
 	)
 	return i, err
 }
 
 const getUserByEmailOrPhone = `-- name: GetUserByEmailOrPhone :one
-SELECT id, email, phone, password_hash, role, full_name, avatar_url, kyc_status, national_id, is_active, created_at, updated_at
+SELECT id, email, phone, password_hash, role, created_at, updated_at, full_name, avatar_url, kyc_status, national_id, is_active, phone_verified_at
 FROM users
 WHERE email = $1 OR phone = $1
 `
@@ -116,19 +128,20 @@ func (q *Queries) GetUserByEmailOrPhone(ctx context.Context, identifier *string)
 		&i.Phone,
 		&i.PasswordHash,
 		&i.Role,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 		&i.FullName,
 		&i.AvatarUrl,
 		&i.KycStatus,
 		&i.NationalID,
 		&i.IsActive,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+		&i.PhoneVerifiedAt,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, phone, password_hash, role, full_name, avatar_url, kyc_status, national_id, is_active, created_at, updated_at
+SELECT id, email, phone, password_hash, role, created_at, updated_at, full_name, avatar_url, kyc_status, national_id, is_active, phone_verified_at
 FROM users
 WHERE id = $1
 `
@@ -142,19 +155,20 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.Phone,
 		&i.PasswordHash,
 		&i.Role,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 		&i.FullName,
 		&i.AvatarUrl,
 		&i.KycStatus,
 		&i.NationalID,
 		&i.IsActive,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+		&i.PhoneVerifiedAt,
 	)
 	return i, err
 }
 
 const getUserByPhone = `-- name: GetUserByPhone :one
-SELECT id, email, phone, password_hash, role, full_name, avatar_url, kyc_status, national_id, is_active, created_at, updated_at
+SELECT id, email, phone, password_hash, role, created_at, updated_at, full_name, avatar_url, kyc_status, national_id, is_active, phone_verified_at
 FROM users
 WHERE phone = $1
 `
@@ -168,19 +182,20 @@ func (q *Queries) GetUserByPhone(ctx context.Context, phone *string) (User, erro
 		&i.Phone,
 		&i.PasswordHash,
 		&i.Role,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 		&i.FullName,
 		&i.AvatarUrl,
 		&i.KycStatus,
 		&i.NationalID,
 		&i.IsActive,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+		&i.PhoneVerifiedAt,
 	)
 	return i, err
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, email, phone, password_hash, role, full_name, avatar_url, kyc_status, national_id, is_active, created_at, updated_at
+SELECT id, email, phone, password_hash, role, created_at, updated_at, full_name, avatar_url, kyc_status, national_id, is_active, phone_verified_at
 FROM users
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $1
@@ -206,13 +221,14 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.Phone,
 			&i.PasswordHash,
 			&i.Role,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 			&i.FullName,
 			&i.AvatarUrl,
 			&i.KycStatus,
 			&i.NationalID,
 			&i.IsActive,
-			&i.CreatedAt,
-			&i.UpdatedAt,
+			&i.PhoneVerifiedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -222,6 +238,16 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 		return nil, err
 	}
 	return items, nil
+}
+
+const markUserPhoneVerified = `-- name: MarkUserPhoneVerified :exec
+UPDATE users SET phone_verified_at = NOW(), updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) MarkUserPhoneVerified(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markUserPhoneVerified, id)
+	return err
 }
 
 const updateUser = `-- name: UpdateUser :one
@@ -238,7 +264,7 @@ SET
     is_active = COALESCE($9, is_active),
     updated_at = NOW()
 WHERE id = $10
-RETURNING id, email, phone, password_hash, role, full_name, avatar_url, kyc_status, national_id, is_active, created_at, updated_at
+RETURNING id, email, phone, password_hash, role, created_at, updated_at, full_name, avatar_url, kyc_status, national_id, is_active, phone_verified_at
 `
 
 type UpdateUserParams struct {
@@ -274,13 +300,29 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.Phone,
 		&i.PasswordHash,
 		&i.Role,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 		&i.FullName,
 		&i.AvatarUrl,
 		&i.KycStatus,
 		&i.NationalID,
 		&i.IsActive,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+		&i.PhoneVerifiedAt,
 	)
 	return i, err
+}
+
+const updateUserPassword = `-- name: UpdateUserPassword :exec
+UPDATE users SET password_hash = $1, updated_at = NOW()
+WHERE id = $2
+`
+
+type UpdateUserPasswordParams struct {
+	PasswordHash string    `json:"password_hash"`
+	ID           uuid.UUID `json:"id"`
+}
+
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error {
+	_, err := q.db.Exec(ctx, updateUserPassword, arg.PasswordHash, arg.ID)
+	return err
 }

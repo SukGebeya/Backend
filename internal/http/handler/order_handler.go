@@ -1,24 +1,28 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
 	"github.com/SukGebeya/Backend/internal/domain"
 	apperrors "github.com/SukGebeya/Backend/internal/errors"
 	"github.com/SukGebeya/Backend/internal/http/middleware"
+	"github.com/SukGebeya/Backend/internal/jobs"
 	"github.com/SukGebeya/Backend/internal/service"
 	"github.com/SukGebeya/Backend/pkg/response"
 	"github.com/SukGebeya/Backend/pkg/validation"
 )
 
 type OrderHandler struct {
-	orderService *service.OrderService
+	orderService   *service.OrderService
+	paymentService *service.PaymentService
 }
 
-func NewOrderHandler(orderService *service.OrderService) *OrderHandler {
+func NewOrderHandler(orderService *service.OrderService, paymentService *service.PaymentService) *OrderHandler {
 	return &OrderHandler{
-		orderService: orderService,
+		orderService:   orderService,
+		paymentService: paymentService,
 	}
 }
 
@@ -30,9 +34,11 @@ type OrderResponse struct {
 	Status            string  `json:"status"`
 	SubtotalCents     int64   `json:"subtotal_cents"`
 	PlatformFeeCents  int64   `json:"platform_fee_cents"`
+	DeliveryFeeCents  int64   `json:"delivery_fee_cents"`
 	TotalCents        int64   `json:"total_cents"`
 	Currency          string  `json:"currency"`
 	Notes             *string `json:"notes,omitempty"`
+	DisputeReason     *string `json:"dispute_reason,omitempty"`
 	CreatedAt         string  `json:"created_at"`
 	UpdatedAt         string  `json:"updated_at"`
 }
@@ -66,7 +72,7 @@ type OrderItemResponse struct {
 }
 
 type UpdateOrderStatusRequest struct {
-	Status string `json:"status" validate:"required,oneof=pending_payment paid processing shipped delivered cancelled refunded" example:"processing"`
+	Status string `json:"status" validate:"required,oneof=processing shipped cancelled" example:"processing"`
 }
 
 type MarkOrderShippedRequest struct {
@@ -245,7 +251,103 @@ func (h *OrderHandler) CancelOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, err := h.orderService.CancelOrder(r.Context(), orderID, "buyer")
+	updated, err := h.orderService.CancelOrder(r.Context(), orderID, service.CancelledByBuyer)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	response.JSON(w, http.StatusOK, toOrderResponse(updated))
+}
+
+// RefreshPayment godoc
+// @Summary Re-check payment status (buyer)
+// @Description Verifies the order's payment with Chapa immediately. Use it from the payment return page instead of waiting for the webhook.
+// @Tags orders
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Order ID"
+// @Success 200 {object} OrderResponse "Order with current status"
+// @Failure 401 {object} response.ErrorResponse "Unauthorized"
+// @Failure 403 {object} response.ErrorResponse "Forbidden"
+// @Failure 404 {object} response.ErrorResponse "Order not found"
+// @Failure 500 {object} response.ErrorResponse "Internal server error"
+// @Router /orders/{id}/payment/refresh [post]
+func (h *OrderHandler) RefreshPayment(w http.ResponseWriter, r *http.Request) {
+	orderID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		response.Error(w, apperrors.Unauthorized("authentication required"))
+		return
+	}
+
+	order, err := h.orderService.GetByID(r.Context(), orderID)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	if order.BuyerID != userID {
+		response.Error(w, forbidden("not authorized to view this order"))
+		return
+	}
+
+	if order.Status == domain.OrderStatusPendingPayment && order.ChapaTxRef != nil {
+		if err := h.paymentService.ProcessPayment(r.Context(), *order.ChapaTxRef); err != nil && !errors.Is(err, jobs.ErrNotReady) {
+			response.Error(w, err)
+			return
+		}
+		if order, err = h.orderService.GetByID(r.Context(), orderID); err != nil {
+			response.Error(w, err)
+			return
+		}
+	}
+
+	response.JSON(w, http.StatusOK, toOrderResponse(order))
+}
+
+// MerchantCancelOrder godoc
+// @Summary Cancel order (merchant)
+// @Description Merchant cancels an order that has not shipped. Paid orders are restocked and refunded to the buyer.
+// @Tags merchant
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Order ID"
+// @Success 200 {object} OrderResponse "Cancelled order"
+// @Failure 400 {object} response.ErrorResponse "Order cannot be cancelled"
+// @Failure 401 {object} response.ErrorResponse "Unauthorized"
+// @Failure 403 {object} response.ErrorResponse "Forbidden"
+// @Failure 404 {object} response.ErrorResponse "Order not found"
+// @Failure 500 {object} response.ErrorResponse "Internal server error"
+// @Router /merchant/orders/{id}/cancel [post]
+func (h *OrderHandler) MerchantCancelOrder(w http.ResponseWriter, r *http.Request) {
+	orderID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	merchant, ok := middleware.GetMerchantProfile(r.Context())
+	if !ok {
+		response.Error(w, forbidden("merchant profile required"))
+		return
+	}
+
+	order, err := h.orderService.GetByID(r.Context(), orderID)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	if order.MerchantID != merchant.ID {
+		response.Error(w, forbidden("not authorized to cancel this order"))
+		return
+	}
+
+	updated, err := h.orderService.CancelOrder(r.Context(), orderID, service.CancelledByMerchant)
 	if err != nil {
 		response.Error(w, err)
 		return
@@ -379,9 +481,11 @@ func toOrderResponse(o *domain.Order) OrderResponse {
 		Status:            string(o.Status),
 		SubtotalCents:     o.SubtotalCents,
 		PlatformFeeCents:  o.PlatformFeeCents,
+		DeliveryFeeCents:  o.DeliveryFeeCents,
 		TotalCents:        o.TotalCents,
 		Currency:          o.Currency,
 		Notes:             o.Notes,
+		DisputeReason:     o.DisputeReason,
 		CreatedAt:         o.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt:         o.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
@@ -445,26 +549,6 @@ func toOrderDetailResponseWithShipment(od *service.OrderWithDetails) OrderDetail
 		Order:    toOrderResponse(&od.Order),
 		Items:    items,
 		Shipment: toShipmentResponse(od.Shipment),
-	}
-}
-
-func toOrderDetailResponse(o *domain.OrderWithItems) OrderDetailResponse {
-	items := make([]OrderItemResponse, len(o.Items))
-	for i, item := range o.Items {
-		items[i] = OrderItemResponse{
-			ID:              item.ID.String(),
-			VariantID:       item.VariantID.String(),
-			ProductName:     item.ProductName,
-			VariantTitle:    item.VariantTitle,
-			Quantity:        item.Quantity,
-			UnitPriceCents:  item.UnitPriceCents,
-			TotalPriceCents: item.TotalPriceCents,
-		}
-	}
-
-	return OrderDetailResponse{
-		Order: toOrderResponse(&o.Order),
-		Items: items,
 	}
 }
 
@@ -583,5 +667,61 @@ func (h *OrderHandler) MarkOrderShipped(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	response.JSON(w, http.StatusOK, toOrderResponse(updated))
+}
+
+type OpenDisputeRequest struct {
+	Reason string `json:"reason" validate:"required,min=5,max=1000" example:"The item never arrived"`
+}
+
+// OpenDispute godoc
+// @Summary Open a dispute (buyer)
+// @Description Report a problem with an order that is being prepared or is on its way. The payment stays in escrow and is neither released to the merchant nor auto-confirmed until an admin resolves the dispute.
+// @Tags orders
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Order ID"
+// @Param request body OpenDisputeRequest true "Reason"
+// @Success 200 {object} OrderResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Router /orders/{id}/dispute [post]
+func (h *OrderHandler) OpenDispute(w http.ResponseWriter, r *http.Request) {
+	orderID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		response.Error(w, apperrors.Unauthorized("authentication required"))
+		return
+	}
+	order, err := h.orderService.GetByID(r.Context(), orderID)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	if order.BuyerID != userID {
+		response.Error(w, forbidden("not authorized to dispute this order"))
+		return
+	}
+
+	var req OpenDisputeRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.Error(w, err)
+		return
+	}
+	if errs := validation.Validate(req); len(errs) > 0 {
+		response.JSON(w, http.StatusBadRequest, errs)
+		return
+	}
+
+	updated, err := h.orderService.OpenDispute(r.Context(), orderID, req.Reason)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
 	response.JSON(w, http.StatusOK, toOrderResponse(updated))
 }

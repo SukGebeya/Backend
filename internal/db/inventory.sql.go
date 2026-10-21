@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const commitInventory = `-- name: CommitInventory :exec
+const commitInventory = `-- name: CommitInventory :execrows
 UPDATE inventory
 SET quantity = quantity - $1, reserved = reserved - $1, updated_at = NOW()
 WHERE variant_id = $2 AND reserved >= $1
@@ -22,9 +22,12 @@ type CommitInventoryParams struct {
 	VariantID uuid.UUID `json:"variant_id"`
 }
 
-func (q *Queries) CommitInventory(ctx context.Context, arg CommitInventoryParams) error {
-	_, err := q.db.Exec(ctx, commitInventory, arg.Qty, arg.VariantID)
-	return err
+func (q *Queries) CommitInventory(ctx context.Context, arg CommitInventoryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, commitInventory, arg.Qty, arg.VariantID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const createInventory = `-- name: CreateInventory :one
@@ -129,7 +132,7 @@ func (q *Queries) GetInventoryByVariantID(ctx context.Context, variantID uuid.UU
 	return i, err
 }
 
-const releaseInventory = `-- name: ReleaseInventory :exec
+const releaseInventory = `-- name: ReleaseInventory :execrows
 UPDATE inventory
 SET reserved = reserved - $1, updated_at = NOW()
 WHERE variant_id = $2 AND reserved >= $1
@@ -140,12 +143,15 @@ type ReleaseInventoryParams struct {
 	VariantID uuid.UUID `json:"variant_id"`
 }
 
-func (q *Queries) ReleaseInventory(ctx context.Context, arg ReleaseInventoryParams) error {
-	_, err := q.db.Exec(ctx, releaseInventory, arg.Qty, arg.VariantID)
-	return err
+func (q *Queries) ReleaseInventory(ctx context.Context, arg ReleaseInventoryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, releaseInventory, arg.Qty, arg.VariantID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
-const reserveInventory = `-- name: ReserveInventory :exec
+const reserveInventory = `-- name: ReserveInventory :execrows
 UPDATE inventory
 SET reserved = reserved + $1, updated_at = NOW()
 WHERE variant_id = $2 AND (quantity - reserved) >= $1
@@ -156,9 +162,31 @@ type ReserveInventoryParams struct {
 	VariantID uuid.UUID `json:"variant_id"`
 }
 
-func (q *Queries) ReserveInventory(ctx context.Context, arg ReserveInventoryParams) error {
-	_, err := q.db.Exec(ctx, reserveInventory, arg.Qty, arg.VariantID)
-	return err
+func (q *Queries) ReserveInventory(ctx context.Context, arg ReserveInventoryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, reserveInventory, arg.Qty, arg.VariantID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const restockInventory = `-- name: RestockInventory :execrows
+UPDATE inventory
+SET quantity = quantity + $1, updated_at = NOW()
+WHERE variant_id = $2
+`
+
+type RestockInventoryParams struct {
+	Qty       int32     `json:"qty"`
+	VariantID uuid.UUID `json:"variant_id"`
+}
+
+func (q *Queries) RestockInventory(ctx context.Context, arg RestockInventoryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, restockInventory, arg.Qty, arg.VariantID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateInventoryQuantity = `-- name: UpdateInventoryQuantity :one

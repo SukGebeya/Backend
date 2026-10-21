@@ -145,3 +145,32 @@ DELETE FROM product_variants WHERE id = sqlc.arg(id);
 
 -- name: DeleteVariantsByProduct :exec
 DELETE FROM product_variants WHERE product_id = sqlc.arg(product_id);
+-- name: BrowseProducts :many
+SELECT p.id, p.merchant_id, p.category_id, p.name, p.slug, p.description, p.status, p.is_digital, p.created_at, p.updated_at,
+    COALESCE((SELECT MIN(v.price_cents) FROM product_variants v WHERE v.product_id = p.id AND v.is_active), 0)::bigint AS min_price_cents,
+    COALESCE((SELECT SUM(GREATEST(i.quantity - i.reserved, 0)) FROM product_variants v JOIN inventory i ON i.variant_id = v.id
+              WHERE v.product_id = p.id AND v.is_active), 0)::bigint AS available_quantity,
+    COALESCE((SELECT pi.url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.is_primary DESC, pi.sort_order, pi.id LIMIT 1), '')::text AS primary_image_url,
+    m.shop_name, m.shop_slug, m.is_verified AS merchant_verified
+FROM products p
+JOIN merchant_profiles m ON m.id = p.merchant_id
+WHERE p.status = 'active'
+  AND (sqlc.narg(category_id)::uuid IS NULL OR p.category_id = sqlc.narg(category_id)::uuid)
+  AND (sqlc.narg(merchant_id)::uuid IS NULL OR p.merchant_id = sqlc.narg(merchant_id)::uuid)
+  AND (sqlc.narg(search)::text IS NULL OR p.name ILIKE sqlc.narg(search)::text OR p.description ILIKE sqlc.narg(search)::text)
+ORDER BY p.created_at DESC, p.id
+LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
+
+-- name: CountBrowseProducts :one
+SELECT COUNT(*)
+FROM products p
+WHERE p.status = 'active'
+  AND (sqlc.narg(category_id)::uuid IS NULL OR p.category_id = sqlc.narg(category_id)::uuid)
+  AND (sqlc.narg(merchant_id)::uuid IS NULL OR p.merchant_id = sqlc.narg(merchant_id)::uuid)
+  AND (sqlc.narg(search)::text IS NULL OR p.name ILIKE sqlc.narg(search)::text OR p.description ILIKE sqlc.narg(search)::text);
+
+-- name: CountProductImages :one
+SELECT COUNT(*) FROM product_images WHERE product_id = sqlc.arg(product_id);
+
+-- name: ClearPrimaryProductImage :exec
+UPDATE product_images SET is_primary = false WHERE product_id = sqlc.arg(product_id);

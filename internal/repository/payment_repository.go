@@ -153,6 +153,23 @@ func (r *paymentRepository) UpdateProviderResponse(ctx context.Context, id uuid.
 	return dbPaymentToDomain(payment), nil
 }
 
+func (r *paymentRepository) UpdateResult(ctx context.Context, id uuid.UUID, status domain.PaymentStatus, providerResponse []byte, blnkTxID *string, chargeCents *int64) (*domain.Payment, error) {
+	payment, err := r.queries.UpdatePaymentResult(ctx, db.UpdatePaymentResultParams{
+		ID:                id,
+		Status:            string(status),
+		ProviderResponse:  providerResponse,
+		BlnkTransactionID: blnkTxID,
+		ChargeCents:       chargeCents,
+	})
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, domainerrors.NotFound("payment not found")
+		}
+		return nil, domainerrors.Internal("failed to update payment", err)
+	}
+	return dbPaymentToDomain(payment), nil
+}
+
 func (r *paymentRepository) UpdateBlnkTransaction(ctx context.Context, id uuid.UUID, blnkTxID string) (*domain.Payment, error) {
 	payment, err := r.queries.UpdatePaymentBlnkTransaction(ctx, db.UpdatePaymentBlnkTransactionParams{
 		ID:                id,
@@ -183,6 +200,7 @@ func dbPaymentToDomain(p db.Payment) *domain.Payment {
 		ProviderTxRef:     p.ProviderTxRef,
 		ProviderResponse:  providerResponse,
 		BlnkTransactionID: p.BlnkTransactionID,
+		ChargeCents:       p.ChargeCents,
 		CreatedAt:         p.CreatedAt.Time,
 		UpdatedAt:         p.UpdatedAt.Time,
 	}

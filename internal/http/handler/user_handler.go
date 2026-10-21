@@ -18,12 +18,15 @@ func NewUserHandler(userService *service.UserService) *UserHandler {
 }
 
 type UserResponse struct {
-	ID        string  `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Email     *string `json:"email,omitempty" example:"user@example.com"`
-	Phone     *string `json:"phone,omitempty" example:"+1234567890"`
-	Role      string  `json:"role" example:"user"`
-	CreatedAt string  `json:"created_at" example:"2024-01-15T10:30:00Z"`
-	UpdatedAt string  `json:"updated_at" example:"2024-01-15T10:30:00Z"`
+	ID            string  `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Email         *string `json:"email,omitempty" example:"user@example.com"`
+	Phone         *string `json:"phone,omitempty" example:"+251911234567"`
+	FullName      *string `json:"full_name,omitempty" example:"Abebe Bikila"`
+	Role          string  `json:"role" example:"buyer"`
+	KYCStatus     string  `json:"kyc_status" example:"pending"`
+	PhoneVerified bool    `json:"phone_verified" example:"true"`
+	CreatedAt     string  `json:"created_at" example:"2024-01-15T10:30:00Z"`
+	UpdatedAt     string  `json:"updated_at" example:"2024-01-15T10:30:00Z"`
 }
 
 type UserListResponse struct {
@@ -35,8 +38,9 @@ type UserListResponse struct {
 }
 
 type UpdateProfileRequest struct {
-	Email *string `json:"email" validate:"omitempty,email" example:"newemail@example.com"`
-	Phone *string `json:"phone" validate:"omitempty,phone" example:"+1987654321"`
+	Email    *string `json:"email" validate:"omitempty,email" example:"newemail@example.com"`
+	Phone    *string `json:"phone" validate:"omitempty,etphone" example:"0911234567"`
+	FullName *string `json:"full_name" validate:"omitempty,min=2,max=100" example:"Abebe Bikila"`
 }
 
 // GetMe godoc
@@ -107,8 +111,9 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := h.userService.UpdateProfile(r.Context(), userID, service.UpdateProfileInput{
-		Email: req.Email,
-		Phone: req.Phone,
+		Email:    req.Email,
+		Phone:    req.Phone,
+		FullName: req.FullName,
 	})
 	if err != nil {
 		response.Error(w, err)

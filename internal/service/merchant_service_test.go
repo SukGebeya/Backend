@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/SukGebeya/Backend/internal/blnk"
 	"github.com/SukGebeya/Backend/internal/domain"
+	"github.com/SukGebeya/Backend/internal/mocks"
 	"github.com/SukGebeya/Backend/internal/repository"
 	"github.com/SukGebeya/Backend/internal/service"
 	"github.com/SukGebeya/Backend/internal/testutil"
@@ -15,23 +15,19 @@ import (
 func TestMerchantService_Onboard_CreatesBlnkWallet(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
-
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
+	pool := testutil.NewTestDatabase(t)
 
 	userRepo := repository.NewUserRepository(pool)
 	merchantRepo := repository.NewMerchantRepository(pool)
 
-	mockBlnkClient := &blnk.MockClient{
-		CreateMerchantWalletFunc: func(ctx context.Context, merchantID uuid.UUID, shopName string) (string, error) {
-			return "blnk_balance_test123", nil
-		},
+	var walletShopNames []string
+	mockBlnkClient := mocks.NewMockBlnkClient()
+	mockBlnkClient.CreateMerchantWalletFunc = func(ctx context.Context, merchantID uuid.UUID, shopName string) (string, error) {
+		walletShopNames = append(walletShopNames, shopName)
+		return "blnk_balance_test123", nil
 	}
 
-	merchantService := service.NewMerchantService(merchantRepo, mockBlnkClient)
+	merchantService := service.NewMerchantService(merchantRepo, userRepo, mockBlnkClient, false)
 
 	userBuilder := testutil.NewUserBuilder().
 		WithEmail("merchant@example.com").
@@ -56,17 +52,12 @@ func TestMerchantService_Onboard_CreatesBlnkWallet(t *testing.T) {
 		t.Fatalf("Onboard() failed: %v", err)
 	}
 
-	if !mockBlnkClient.CreateMerchantWalletCalled {
-		t.Error("CreateMerchantWallet was not called during Onboard")
+	if got := mockBlnkClient.CallCount("CreateMerchantWallet"); got != 1 {
+		t.Fatalf("expected 1 CreateMerchantWallet call, got %d", got)
 	}
 
-	if len(mockBlnkClient.CreateMerchantWalletCalls) != 1 {
-		t.Errorf("expected 1 CreateMerchantWallet call, got %d", len(mockBlnkClient.CreateMerchantWalletCalls))
-	}
-
-	call := mockBlnkClient.CreateMerchantWalletCalls[0]
-	if call.ShopName != onboardInput.ShopName {
-		t.Errorf("expected shop name %q, got %q", onboardInput.ShopName, call.ShopName)
+	if walletShopNames[0] != onboardInput.ShopName {
+		t.Errorf("expected shop name %q, got %q", onboardInput.ShopName, walletShopNames[0])
 	}
 
 	if merchant.BlnkBalanceID == nil || *merchant.BlnkBalanceID == "" {
@@ -81,19 +72,14 @@ func TestMerchantService_Onboard_CreatesBlnkWallet(t *testing.T) {
 func TestMerchantService_Onboard_DuplicateSlug(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
-
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
+	pool := testutil.NewTestDatabase(t)
 
 	userRepo := repository.NewUserRepository(pool)
 	merchantRepo := repository.NewMerchantRepository(pool)
 
-	mockBlnkClient := &blnk.MockClient{}
+	mockBlnkClient := mocks.NewMockBlnkClient()
 
-	merchantService := service.NewMerchantService(merchantRepo, mockBlnkClient)
+	merchantService := service.NewMerchantService(merchantRepo, userRepo, mockBlnkClient, false)
 
 	user1Builder := testutil.NewUserBuilder().WithEmail("user1@example.com")
 	user1 := user1Builder.Build()
@@ -139,19 +125,14 @@ func TestMerchantService_Onboard_DuplicateSlug(t *testing.T) {
 func TestMerchantService_Onboard_AlreadyHasProfile(t *testing.T) {
 	ctx := context.Background()
 
-	pgContainer := testutil.SetupPostgres(t)
-	defer testutil.CleanupPostgres(t, pgContainer, nil)
-
-	testutil.RunMigrations(t, pgContainer.ConnectionString)
-	pool := testutil.CreatePool(t, pgContainer.ConnectionString)
-	defer pool.Close()
+	pool := testutil.NewTestDatabase(t)
 
 	userRepo := repository.NewUserRepository(pool)
 	merchantRepo := repository.NewMerchantRepository(pool)
 
-	mockBlnkClient := &blnk.MockClient{}
+	mockBlnkClient := mocks.NewMockBlnkClient()
 
-	merchantService := service.NewMerchantService(merchantRepo, mockBlnkClient)
+	merchantService := service.NewMerchantService(merchantRepo, userRepo, mockBlnkClient, false)
 
 	userBuilder := testutil.NewUserBuilder().WithEmail("user@example.com")
 	user := userBuilder.Build()

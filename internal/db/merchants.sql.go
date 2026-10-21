@@ -14,26 +14,32 @@ import (
 const createMerchantProfile = `-- name: CreateMerchantProfile :one
 INSERT INTO merchant_profiles (
     id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, shop_banner_url,
-    contact_phone, contact_email, address, city, blnk_balance_id, blnk_ledger_id
+    contact_phone, contact_email, address, city, blnk_balance_id, blnk_ledger_id,
+    delivery_fee_cents, free_delivery_threshold_cents, tin, trade_license_number
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-RETURNING id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, shop_banner_url, contact_phone, contact_email, address, city, blnk_balance_id, blnk_ledger_id, is_verified, total_sales_cents, created_at, updated_at
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+        $14, $15, $16, $17)
+RETURNING id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, shop_banner_url, contact_phone, contact_email, address, city, blnk_balance_id, blnk_ledger_id, is_verified, total_sales_cents, created_at, updated_at, delivery_fee_cents, free_delivery_threshold_cents, tin, trade_license_number
 `
 
 type CreateMerchantProfileParams struct {
-	ID              uuid.UUID `json:"id"`
-	UserID          uuid.UUID `json:"user_id"`
-	ShopName        string    `json:"shop_name"`
-	ShopSlug        string    `json:"shop_slug"`
-	ShopDescription *string   `json:"shop_description"`
-	ShopLogoUrl     *string   `json:"shop_logo_url"`
-	ShopBannerUrl   *string   `json:"shop_banner_url"`
-	ContactPhone    string    `json:"contact_phone"`
-	ContactEmail    *string   `json:"contact_email"`
-	Address         *string   `json:"address"`
-	City            string    `json:"city"`
-	BlnkBalanceID   *string   `json:"blnk_balance_id"`
-	BlnkLedgerID    *string   `json:"blnk_ledger_id"`
+	ID                         uuid.UUID `json:"id"`
+	UserID                     uuid.UUID `json:"user_id"`
+	ShopName                   string    `json:"shop_name"`
+	ShopSlug                   string    `json:"shop_slug"`
+	ShopDescription            *string   `json:"shop_description"`
+	ShopLogoUrl                *string   `json:"shop_logo_url"`
+	ShopBannerUrl              *string   `json:"shop_banner_url"`
+	ContactPhone               string    `json:"contact_phone"`
+	ContactEmail               *string   `json:"contact_email"`
+	Address                    *string   `json:"address"`
+	City                       string    `json:"city"`
+	BlnkBalanceID              *string   `json:"blnk_balance_id"`
+	BlnkLedgerID               *string   `json:"blnk_ledger_id"`
+	DeliveryFeeCents           int64     `json:"delivery_fee_cents"`
+	FreeDeliveryThresholdCents *int64    `json:"free_delivery_threshold_cents"`
+	Tin                        *string   `json:"tin"`
+	TradeLicenseNumber         *string   `json:"trade_license_number"`
 }
 
 func (q *Queries) CreateMerchantProfile(ctx context.Context, arg CreateMerchantProfileParams) (MerchantProfile, error) {
@@ -51,6 +57,10 @@ func (q *Queries) CreateMerchantProfile(ctx context.Context, arg CreateMerchantP
 		arg.City,
 		arg.BlnkBalanceID,
 		arg.BlnkLedgerID,
+		arg.DeliveryFeeCents,
+		arg.FreeDeliveryThresholdCents,
+		arg.Tin,
+		arg.TradeLicenseNumber,
 	)
 	var i MerchantProfile
 	err := row.Scan(
@@ -71,12 +81,16 @@ func (q *Queries) CreateMerchantProfile(ctx context.Context, arg CreateMerchantP
 		&i.TotalSalesCents,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeliveryFeeCents,
+		&i.FreeDeliveryThresholdCents,
+		&i.Tin,
+		&i.TradeLicenseNumber,
 	)
 	return i, err
 }
 
 const getMerchantProfileByID = `-- name: GetMerchantProfileByID :one
-SELECT id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, shop_banner_url, contact_phone, contact_email, address, city, blnk_balance_id, blnk_ledger_id, is_verified, total_sales_cents, created_at, updated_at
+SELECT id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, shop_banner_url, contact_phone, contact_email, address, city, blnk_balance_id, blnk_ledger_id, is_verified, total_sales_cents, created_at, updated_at, delivery_fee_cents, free_delivery_threshold_cents, tin, trade_license_number
 FROM merchant_profiles
 WHERE id = $1
 `
@@ -102,12 +116,16 @@ func (q *Queries) GetMerchantProfileByID(ctx context.Context, id uuid.UUID) (Mer
 		&i.TotalSalesCents,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeliveryFeeCents,
+		&i.FreeDeliveryThresholdCents,
+		&i.Tin,
+		&i.TradeLicenseNumber,
 	)
 	return i, err
 }
 
 const getMerchantProfileBySlug = `-- name: GetMerchantProfileBySlug :one
-SELECT id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, shop_banner_url, contact_phone, contact_email, address, city, blnk_balance_id, blnk_ledger_id, is_verified, total_sales_cents, created_at, updated_at
+SELECT id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, shop_banner_url, contact_phone, contact_email, address, city, blnk_balance_id, blnk_ledger_id, is_verified, total_sales_cents, created_at, updated_at, delivery_fee_cents, free_delivery_threshold_cents, tin, trade_license_number
 FROM merchant_profiles
 WHERE shop_slug = $1
 `
@@ -133,12 +151,16 @@ func (q *Queries) GetMerchantProfileBySlug(ctx context.Context, shopSlug string)
 		&i.TotalSalesCents,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeliveryFeeCents,
+		&i.FreeDeliveryThresholdCents,
+		&i.Tin,
+		&i.TradeLicenseNumber,
 	)
 	return i, err
 }
 
 const getMerchantProfileByUserID = `-- name: GetMerchantProfileByUserID :one
-SELECT id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, shop_banner_url, contact_phone, contact_email, address, city, blnk_balance_id, blnk_ledger_id, is_verified, total_sales_cents, created_at, updated_at
+SELECT id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, shop_banner_url, contact_phone, contact_email, address, city, blnk_balance_id, blnk_ledger_id, is_verified, total_sales_cents, created_at, updated_at, delivery_fee_cents, free_delivery_threshold_cents, tin, trade_license_number
 FROM merchant_profiles
 WHERE user_id = $1
 `
@@ -164,12 +186,16 @@ func (q *Queries) GetMerchantProfileByUserID(ctx context.Context, userID uuid.UU
 		&i.TotalSalesCents,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeliveryFeeCents,
+		&i.FreeDeliveryThresholdCents,
+		&i.Tin,
+		&i.TradeLicenseNumber,
 	)
 	return i, err
 }
 
 const listMerchantProfiles = `-- name: ListMerchantProfiles :many
-SELECT id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, shop_banner_url, contact_phone, contact_email, address, city, blnk_balance_id, blnk_ledger_id, is_verified, total_sales_cents, created_at, updated_at
+SELECT id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, shop_banner_url, contact_phone, contact_email, address, city, blnk_balance_id, blnk_ledger_id, is_verified, total_sales_cents, created_at, updated_at, delivery_fee_cents, free_delivery_threshold_cents, tin, trade_license_number
 FROM merchant_profiles
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $1
@@ -207,6 +233,10 @@ func (q *Queries) ListMerchantProfiles(ctx context.Context, arg ListMerchantProf
 			&i.TotalSalesCents,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeliveryFeeCents,
+			&i.FreeDeliveryThresholdCents,
+			&i.Tin,
+			&i.TradeLicenseNumber,
 		); err != nil {
 			return nil, err
 		}
@@ -218,8 +248,39 @@ func (q *Queries) ListMerchantProfiles(ctx context.Context, arg ListMerchantProf
 	return items, nil
 }
 
+const listMerchantsWithWallets = `-- name: ListMerchantsWithWallets :many
+SELECT id, blnk_balance_id
+FROM merchant_profiles
+WHERE blnk_balance_id IS NOT NULL
+`
+
+type ListMerchantsWithWalletsRow struct {
+	ID            uuid.UUID `json:"id"`
+	BlnkBalanceID *string   `json:"blnk_balance_id"`
+}
+
+func (q *Queries) ListMerchantsWithWallets(ctx context.Context) ([]ListMerchantsWithWalletsRow, error) {
+	rows, err := q.db.Query(ctx, listMerchantsWithWallets)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMerchantsWithWalletsRow{}
+	for rows.Next() {
+		var i ListMerchantsWithWalletsRow
+		if err := rows.Scan(&i.ID, &i.BlnkBalanceID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listVerifiedMerchants = `-- name: ListVerifiedMerchants :many
-SELECT id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, shop_banner_url, contact_phone, contact_email, address, city, blnk_balance_id, blnk_ledger_id, is_verified, total_sales_cents, created_at, updated_at
+SELECT id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, shop_banner_url, contact_phone, contact_email, address, city, blnk_balance_id, blnk_ledger_id, is_verified, total_sales_cents, created_at, updated_at, delivery_fee_cents, free_delivery_threshold_cents, tin, trade_license_number
 FROM merchant_profiles
 WHERE is_verified = true
 ORDER BY created_at DESC
@@ -258,6 +319,10 @@ func (q *Queries) ListVerifiedMerchants(ctx context.Context, arg ListVerifiedMer
 			&i.TotalSalesCents,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeliveryFeeCents,
+			&i.FreeDeliveryThresholdCents,
+			&i.Tin,
+			&i.TradeLicenseNumber,
 		); err != nil {
 			return nil, err
 		}
@@ -273,7 +338,7 @@ const updateMerchantBlnkWallet = `-- name: UpdateMerchantBlnkWallet :one
 UPDATE merchant_profiles
 SET blnk_balance_id = $1, blnk_ledger_id = $2, updated_at = NOW()
 WHERE id = $3
-RETURNING id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, shop_banner_url, contact_phone, contact_email, address, city, blnk_balance_id, blnk_ledger_id, is_verified, total_sales_cents, created_at, updated_at
+RETURNING id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, shop_banner_url, contact_phone, contact_email, address, city, blnk_balance_id, blnk_ledger_id, is_verified, total_sales_cents, created_at, updated_at, delivery_fee_cents, free_delivery_threshold_cents, tin, trade_license_number
 `
 
 type UpdateMerchantBlnkWalletParams struct {
@@ -303,6 +368,10 @@ func (q *Queries) UpdateMerchantBlnkWallet(ctx context.Context, arg UpdateMercha
 		&i.TotalSalesCents,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeliveryFeeCents,
+		&i.FreeDeliveryThresholdCents,
+		&i.Tin,
+		&i.TradeLicenseNumber,
 	)
 	return i, err
 }
@@ -321,24 +390,34 @@ SET
     blnk_balance_id = COALESCE($9, blnk_balance_id),
     blnk_ledger_id = COALESCE($10, blnk_ledger_id),
     is_verified = COALESCE($11, is_verified),
+    delivery_fee_cents = COALESCE($12, delivery_fee_cents),
+    free_delivery_threshold_cents = CASE WHEN $13::boolean THEN NULL
+        ELSE COALESCE($14, free_delivery_threshold_cents) END,
+    tin = COALESCE($15, tin),
+    trade_license_number = COALESCE($16, trade_license_number),
     updated_at = NOW()
-WHERE id = $12
-RETURNING id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, shop_banner_url, contact_phone, contact_email, address, city, blnk_balance_id, blnk_ledger_id, is_verified, total_sales_cents, created_at, updated_at
+WHERE id = $17
+RETURNING id, user_id, shop_name, shop_slug, shop_description, shop_logo_url, shop_banner_url, contact_phone, contact_email, address, city, blnk_balance_id, blnk_ledger_id, is_verified, total_sales_cents, created_at, updated_at, delivery_fee_cents, free_delivery_threshold_cents, tin, trade_license_number
 `
 
 type UpdateMerchantProfileParams struct {
-	ShopName        string    `json:"shop_name"`
-	ShopDescription *string   `json:"shop_description"`
-	ShopLogoUrl     *string   `json:"shop_logo_url"`
-	ShopBannerUrl   *string   `json:"shop_banner_url"`
-	ContactPhone    string    `json:"contact_phone"`
-	ContactEmail    *string   `json:"contact_email"`
-	Address         *string   `json:"address"`
-	City            string    `json:"city"`
-	BlnkBalanceID   *string   `json:"blnk_balance_id"`
-	BlnkLedgerID    *string   `json:"blnk_ledger_id"`
-	IsVerified      bool      `json:"is_verified"`
-	ID              uuid.UUID `json:"id"`
+	ShopName                   string    `json:"shop_name"`
+	ShopDescription            *string   `json:"shop_description"`
+	ShopLogoUrl                *string   `json:"shop_logo_url"`
+	ShopBannerUrl              *string   `json:"shop_banner_url"`
+	ContactPhone               string    `json:"contact_phone"`
+	ContactEmail               *string   `json:"contact_email"`
+	Address                    *string   `json:"address"`
+	City                       string    `json:"city"`
+	BlnkBalanceID              *string   `json:"blnk_balance_id"`
+	BlnkLedgerID               *string   `json:"blnk_ledger_id"`
+	IsVerified                 bool      `json:"is_verified"`
+	DeliveryFeeCents           *int64    `json:"delivery_fee_cents"`
+	ClearFreeDeliveryThreshold bool      `json:"clear_free_delivery_threshold"`
+	FreeDeliveryThresholdCents *int64    `json:"free_delivery_threshold_cents"`
+	Tin                        *string   `json:"tin"`
+	TradeLicenseNumber         *string   `json:"trade_license_number"`
+	ID                         uuid.UUID `json:"id"`
 }
 
 func (q *Queries) UpdateMerchantProfile(ctx context.Context, arg UpdateMerchantProfileParams) (MerchantProfile, error) {
@@ -354,6 +433,11 @@ func (q *Queries) UpdateMerchantProfile(ctx context.Context, arg UpdateMerchantP
 		arg.BlnkBalanceID,
 		arg.BlnkLedgerID,
 		arg.IsVerified,
+		arg.DeliveryFeeCents,
+		arg.ClearFreeDeliveryThreshold,
+		arg.FreeDeliveryThresholdCents,
+		arg.Tin,
+		arg.TradeLicenseNumber,
 		arg.ID,
 	)
 	var i MerchantProfile
@@ -375,6 +459,10 @@ func (q *Queries) UpdateMerchantProfile(ctx context.Context, arg UpdateMerchantP
 		&i.TotalSalesCents,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeliveryFeeCents,
+		&i.FreeDeliveryThresholdCents,
+		&i.Tin,
+		&i.TradeLicenseNumber,
 	)
 	return i, err
 }

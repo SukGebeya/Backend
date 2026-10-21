@@ -80,3 +80,23 @@ type ProductWithInventory struct {
 	Variant   ProductVariant
 	Inventory *Inventory
 }
+
+type ProductFilter struct {
+	CategoryID *uuid.UUID
+	MerchantID *uuid.UUID
+	Search     string
+}
+
+// ProductSummary is a product as shown in listings: its lowest active price, how
+// many units can be bought right now, and the shop selling it.
+type ProductSummary struct {
+	Product
+	MinPriceCents     int64   `json:"min_price_cents"`
+	AvailableQuantity int64   `json:"available_quantity"`
+	PrimaryImageURL   *string `json:"primary_image_url,omitempty"`
+	ShopName          string  `json:"shop_name"`
+	ShopSlug          string  `json:"shop_slug"`
+	MerchantVerified  bool    `json:"merchant_verified"`
+}
+
+const MaxImagesPerProduct = 10

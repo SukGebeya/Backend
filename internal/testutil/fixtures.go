@@ -1,8 +1,6 @@
 package testutil
 
 import (
-	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -609,19 +607,14 @@ func NewTestPasswordHasher() *password.Hasher {
 func NewTestJWTManager(t *testing.T) *jwt.Manager {
 	t.Helper()
 
-	_, filename, _, _ := runtime.Caller(0)
-	projectRoot := filepath.Join(filepath.Dir(filename), "..", "..")
-
-	manager, err := jwt.NewManagerFromFiles(
-		filepath.Join(projectRoot, "keys", "access_private.pem"),
-		filepath.Join(projectRoot, "keys", "access_public.pem"),
-		filepath.Join(projectRoot, "keys", "refresh_private.pem"),
-		filepath.Join(projectRoot, "keys", "refresh_public.pem"),
-		15*time.Minute,
-		7*24*time.Hour,
-	)
+	accessKeys, err := jwt.GenerateKeyPair(2048)
 	if err != nil {
-		t.Fatalf("failed to create JWT manager: %v", err)
+		t.Fatalf("failed to generate access key pair: %v", err)
 	}
-	return manager
+	refreshKeys, err := jwt.GenerateKeyPair(2048)
+	if err != nil {
+		t.Fatalf("failed to generate refresh key pair: %v", err)
+	}
+
+	return jwt.NewManager(accessKeys, refreshKeys, 15*time.Minute, 7*24*time.Hour)
 }

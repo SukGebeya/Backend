@@ -3,6 +3,7 @@ package validation
 import (
 	"regexp"
 
+	"github.com/SukGebeya/Backend/pkg/phone"
 	"github.com/go-playground/validator/v10"
 )
 
@@ -15,8 +16,15 @@ var (
 
 func Init() {
 	validate = validator.New()
-	validate.RegisterValidation("phone", validatePhone)
-	validate.RegisterValidation("slug", validateSlug)
+	if err := validate.RegisterValidation("phone", validatePhone); err != nil {
+		panic(err)
+	}
+	if err := validate.RegisterValidation("slug", validateSlug); err != nil {
+		panic(err)
+	}
+	if err := validate.RegisterValidation("etphone", validateEthiopianPhone); err != nil {
+		panic(err)
+	}
 }
 
 func Get() *validator.Validate {
@@ -32,6 +40,14 @@ func validatePhone(fl validator.FieldLevel) bool {
 		return true
 	}
 	return phoneRegex.MatchString(phone)
+}
+
+func validateEthiopianPhone(fl validator.FieldLevel) bool {
+	value := fl.Field().String()
+	if value == "" {
+		return true
+	}
+	return phone.IsValid(value)
 }
 
 func validateSlug(fl validator.FieldLevel) bool {
@@ -75,6 +91,8 @@ func FormatErrors(err error) ValidationErrors {
 			message = field + " must be a valid email address"
 		case "phone":
 			message = field + " must be a valid phone number"
+		case "etphone":
+			message = field + " must be an Ethiopian mobile number (e.g. 0911234567 or +251911234567)"
 		case "min":
 			message = field + " must be at least " + err.Param() + " characters"
 		case "max":

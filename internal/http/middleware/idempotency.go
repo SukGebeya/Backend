@@ -1,22 +1,32 @@
 package middleware
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"log/slog"
 	"net/http"
-	"time"
 
 	apperrors "github.com/SukGebeya/Backend/internal/errors"
 	"github.com/SukGebeya/Backend/internal/repository"
 	"github.com/SukGebeya/Backend/pkg/response"
 )
 
-type IdempotencyKey string
+const (
+	IdempotencyKeyHeader  = "Idempotency-Key"
+	idempotencyTTLSeconds = 24 * 60 * 60
+	idempotencyLockTTL    = 60
+)
 
-const IdempotencyKeyHeader = "Idempotency-Key"
+type cachedResponse struct {
+	Status int             `json:"status"`
+	Body   json.RawMessage `json:"body"`
+}
 
-func Idempotency(redisRepo repository.IdempotencyRepository) func(http.Handler) http.Handler {
+// Idempotency replays the first successful response for a repeated
+// Idempotency-Key. Keys are scoped to the caller so one user can never receive
+// another user's response, and a lock rejects concurrent duplicates.
+func Idempotency(repo repository.IdempotencyRepository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			key := r.Header.Get(IdempotencyKeyHeader)
@@ -26,38 +36,70 @@ func Idempotency(redisRepo repository.IdempotencyRepository) func(http.Handler) 
 			}
 
 			ctx := r.Context()
+			scope := "anonymous"
+			if userID, ok := GetUserID(ctx); ok {
+				scope = userID.String()
+			}
 
-			method := r.Method
-			path := r.URL.Path
-
-			hash := sha256.Sum256([]byte(method + ":" + path + ":" + key))
+			hash := sha256.Sum256([]byte(scope + ":" + r.Method + ":" + r.URL.Path + ":" + key))
 			cacheKey := "idempotency:" + hex.EncodeToString(hash[:])
+			lockKey := cacheKey + ":lock"
 
-			result, err := redisRepo.Get(ctx, cacheKey)
-			if err == nil && result != "" {
-				w.Header().Set("X-Idempotent-Replayed", "true")
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(result))
+			if replayed := replay(w, r, repo, cacheKey); replayed {
 				return
 			}
 
-			responseRecorder := &responseRecorder{
-				ResponseWriter: w,
-				body:           make([]byte, 0),
+			locked, err := repo.Lock(ctx, lockKey, idempotencyLockTTL)
+			if err != nil {
+				slog.Error("idempotency lock failed; processing without protection", "error", err)
+				next.ServeHTTP(w, r)
+				return
+			}
+			if !locked {
+				response.Error(w, apperrors.Conflict("a request with this Idempotency-Key is already in progress"))
+				return
+			}
+			defer func() {
+				if err := repo.Unlock(ctx, lockKey); err != nil {
+					slog.Error("idempotency unlock failed", "error", err)
+				}
+			}()
+
+			if replayed := replay(w, r, repo, cacheKey); replayed {
+				return
 			}
 
-			ctx = context.WithValue(ctx, IdempotencyKey("cache_key"), cacheKey)
-			ctx = context.WithValue(ctx, IdempotencyKey("redis_repo"), redisRepo)
+			recorder := &responseRecorder{ResponseWriter: w, status: http.StatusOK}
+			next.ServeHTTP(recorder, r)
 
-			next.ServeHTTP(responseRecorder, r.WithContext(ctx))
-
-			if responseRecorder.status >= 200 && responseRecorder.status < 300 {
-				ttl := int64(24 * time.Hour)
-				_ = redisRepo.Set(ctx, cacheKey, string(responseRecorder.body), ttl)
+			if recorder.status >= 200 && recorder.status < 300 && json.Valid(recorder.body) {
+				encoded, err := json.Marshal(cachedResponse{Status: recorder.status, Body: recorder.body})
+				if err == nil {
+					if err := repo.Set(ctx, cacheKey, string(encoded), idempotencyTTLSeconds); err != nil {
+						slog.Error("failed to store idempotent response", "error", err)
+					}
+				}
 			}
 		})
 	}
+}
+
+func replay(w http.ResponseWriter, r *http.Request, repo repository.IdempotencyRepository, cacheKey string) bool {
+	stored, err := repo.Get(r.Context(), cacheKey)
+	if err != nil || stored == "" {
+		return false
+	}
+
+	var cached cachedResponse
+	if err := json.Unmarshal([]byte(stored), &cached); err != nil || cached.Status == 0 {
+		return false
+	}
+
+	w.Header().Set("X-Idempotent-Replayed", "true")
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(cached.Status)
+	_, _ = w.Write(cached.Body)
+	return true
 }
 
 type responseRecorder struct {
@@ -76,19 +118,12 @@ func (r *responseRecorder) WriteHeader(statusCode int) {
 	r.ResponseWriter.WriteHeader(statusCode)
 }
 
-func GetIdempotencyCacheKey(ctx context.Context) (string, bool) {
-	key, ok := ctx.Value(IdempotencyKey("cache_key")).(string)
-	return key, ok
-}
-
 func IdempotencyRequired(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key := r.Header.Get(IdempotencyKeyHeader)
-		if key == "" {
+		if r.Header.Get(IdempotencyKeyHeader) == "" {
 			response.Error(w, apperrors.BadRequest("Idempotency-Key header is required"))
 			return
 		}
-
 		next.ServeHTTP(w, r)
 	})
 }

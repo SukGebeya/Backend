@@ -96,24 +96,59 @@ func (r *inventoryRepository) UpdateQuantity(ctx context.Context, id uuid.UUID, 
 }
 
 func (r *inventoryRepository) Reserve(ctx context.Context, variantID uuid.UUID, qty int) error {
-	return r.queries.ReserveInventory(ctx, db.ReserveInventoryParams{
+	rows, err := r.queries.ReserveInventory(ctx, db.ReserveInventoryParams{
 		VariantID: variantID,
 		Qty:       int32(qty),
 	})
+	if err != nil {
+		return domainerrors.Internal("failed to reserve inventory", err)
+	}
+	if rows == 0 {
+		return domainerrors.InsufficientInventory("insufficient inventory available")
+	}
+	return nil
 }
 
 func (r *inventoryRepository) Release(ctx context.Context, variantID uuid.UUID, qty int) error {
-	return r.queries.ReleaseInventory(ctx, db.ReleaseInventoryParams{
+	rows, err := r.queries.ReleaseInventory(ctx, db.ReleaseInventoryParams{
 		VariantID: variantID,
 		Qty:       int32(qty),
 	})
+	if err != nil {
+		return domainerrors.Internal("failed to release inventory", err)
+	}
+	if rows == 0 {
+		return domainerrors.Conflict("no matching inventory reservation to release")
+	}
+	return nil
 }
 
 func (r *inventoryRepository) Commit(ctx context.Context, variantID uuid.UUID, qty int) error {
-	return r.queries.CommitInventory(ctx, db.CommitInventoryParams{
+	rows, err := r.queries.CommitInventory(ctx, db.CommitInventoryParams{
 		VariantID: variantID,
 		Qty:       int32(qty),
 	})
+	if err != nil {
+		return domainerrors.Internal("failed to commit inventory", err)
+	}
+	if rows == 0 {
+		return domainerrors.Conflict("no matching inventory reservation to commit")
+	}
+	return nil
+}
+
+func (r *inventoryRepository) Restock(ctx context.Context, variantID uuid.UUID, qty int) error {
+	rows, err := r.queries.RestockInventory(ctx, db.RestockInventoryParams{
+		VariantID: variantID,
+		Qty:       int32(qty),
+	})
+	if err != nil {
+		return domainerrors.Internal("failed to restock inventory", err)
+	}
+	if rows == 0 {
+		return domainerrors.NotFound("inventory not found for variant")
+	}
+	return nil
 }
 
 func dbInventoryToDomain(inv db.Inventory) *domain.Inventory {

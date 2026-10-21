@@ -55,6 +55,8 @@ type CartItemWithDetails struct {
 
 const MaxCartItems = 50
 
+const MaxQuantityPerItem = 100
+
 type AddToCartInput struct {
 	UserIDorSession *uuid.UUID
 	SessionID       *string

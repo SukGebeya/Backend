@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/SukGebeya/Backend/internal/db"
 	"github.com/SukGebeya/Backend/internal/domain"
@@ -129,6 +130,7 @@ func (r *orderRepository) Create(ctx context.Context, order *domain.Order) (*dom
 		ShippingAddressID: shippingAddressID,
 		Status:            db.OrderStatus(order.Status),
 		SubtotalCents:     order.SubtotalCents,
+		DeliveryFeeCents:  order.DeliveryFeeCents,
 		PlatformFeeCents:  order.PlatformFeeCents,
 		TotalCents:        order.TotalCents,
 		Currency:          order.Currency,
@@ -151,6 +153,27 @@ func (r *orderRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status
 			return nil, domainerrors.NotFound("order not found")
 		}
 		return nil, domainerrors.Internal("failed to update order status", err)
+	}
+	return dbOrderToDomain(order), nil
+}
+
+// Transition moves an order to a new status only if it is currently in one of
+// the given statuses, so concurrent workers cannot apply conflicting changes.
+func (r *orderRepository) Transition(ctx context.Context, id uuid.UUID, to domain.OrderStatus, from ...domain.OrderStatus) (*domain.Order, error) {
+	fromStatuses := make([]string, len(from))
+	for i, st := range from {
+		fromStatuses[i] = string(st)
+	}
+	order, err := r.queries.TransitionOrderStatus(ctx, db.TransitionOrderStatusParams{
+		ID:           id,
+		ToStatus:     db.OrderStatus(to),
+		FromStatuses: fromStatuses,
+	})
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, domainerrors.Conflict(fmt.Sprintf("order cannot move to %s from its current status", to))
+		}
+		return nil, domainerrors.Internal("failed to transition order status", err)
 	}
 	return dbOrderToDomain(order), nil
 }
@@ -232,7 +255,7 @@ func dbOrderToDomain(o db.Order) *domain.Order {
 		shippingAddressID = &id
 	}
 
-	return &domain.Order{
+	order := &domain.Order{
 		ID:                o.ID,
 		BuyerID:           o.BuyerID,
 		MerchantID:        o.MerchantID,
@@ -247,7 +270,48 @@ func dbOrderToDomain(o db.Order) *domain.Order {
 		ChapaTxRef:        o.ChapaTxRef,
 		CreatedAt:         o.CreatedAt.Time,
 		UpdatedAt:         o.UpdatedAt.Time,
+		DeliveryFeeCents:  o.DeliveryFeeCents,
+		DisputeReason:     o.DisputeReason,
 	}
+	if o.DisputedAt.Valid {
+		order.DisputedAt = &o.DisputedAt.Time
+	}
+	return order
+}
+
+func (r *orderRepository) OpenDispute(ctx context.Context, id uuid.UUID, reason string, from ...domain.OrderStatus) (*domain.Order, error) {
+	fromStatuses := make([]string, len(from))
+	for i, st := range from {
+		fromStatuses[i] = string(st)
+	}
+	order, err := r.queries.OpenOrderDispute(ctx, db.OpenOrderDisputeParams{ID: id, Reason: &reason, FromStatuses: fromStatuses})
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, domainerrors.BadRequest("this order cannot be disputed in its current status")
+		}
+		return nil, domainerrors.Internal("failed to open dispute", err)
+	}
+	return dbOrderToDomain(order), nil
+}
+
+func (r *orderRepository) CountByStatusForMerchant(ctx context.Context, merchantID uuid.UUID) (map[domain.OrderStatus]int64, error) {
+	rows, err := r.queries.CountOrdersByMerchantGroupedByStatus(ctx, merchantID)
+	if err != nil {
+		return nil, domainerrors.Internal("failed to count orders", err)
+	}
+	counts := make(map[domain.OrderStatus]int64, len(rows))
+	for _, row := range rows {
+		counts[domain.OrderStatus(row.Status)] = row.Count
+	}
+	return counts, nil
+}
+
+func (r *orderRepository) SumUnsettledEscrow(ctx context.Context) (int64, error) {
+	total, err := r.queries.SumUnsettledEscrowCents(ctx)
+	if err != nil {
+		return 0, domainerrors.Internal("failed to sum unsettled escrow", err)
+	}
+	return total, nil
 }
 
 func dbOrderItemToDomain(i db.OrderItem) *domain.OrderItem {

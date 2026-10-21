@@ -28,7 +28,7 @@ func Auth(jwtManager *jwt.Manager) func(http.Handler) http.Handler {
 			}
 
 			parts := strings.Split(authHeader, " ")
-			if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+			if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") {
 				response.Error(w, apperrors.Unauthorized("invalid authorization header format"))
 				return
 			}
@@ -44,6 +44,23 @@ func Auth(jwtManager *jwt.Manager) func(http.Handler) http.Handler {
 			ctx = context.WithValue(ctx, RoleKey, claims.Role)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+// OptionalAuth attaches the user when a valid bearer token is sent and lets
+// anonymous requests through. A malformed or expired token is still rejected so
+// clients refresh instead of silently falling back to a guest session.
+func OptionalAuth(jwtManager *jwt.Manager) func(http.Handler) http.Handler {
+	required := Auth(jwtManager)
+	return func(next http.Handler) http.Handler {
+		authed := required(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Header.Get("Authorization") == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			authed.ServeHTTP(w, r)
 		})
 	}
 }

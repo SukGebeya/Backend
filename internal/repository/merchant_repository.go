@@ -81,6 +81,11 @@ func (r *merchantRepository) Create(ctx context.Context, merchant *domain.Mercha
 		City:            merchant.City,
 		BlnkBalanceID:   merchant.BlnkBalanceID,
 		BlnkLedgerID:    merchant.BlnkLedgerID,
+
+		DeliveryFeeCents:           merchant.DeliveryFeeCents,
+		FreeDeliveryThresholdCents: merchant.FreeDeliveryThresholdCents,
+		Tin:                        merchant.TIN,
+		TradeLicenseNumber:         merchant.TradeLicenseNumber,
 	})
 	if err != nil {
 		return nil, domainerrors.Internal("failed to create merchant profile", err)
@@ -102,6 +107,12 @@ func (r *merchantRepository) Update(ctx context.Context, merchant *domain.Mercha
 		BlnkBalanceID:   merchant.BlnkBalanceID,
 		BlnkLedgerID:    merchant.BlnkLedgerID,
 		IsVerified:      merchant.IsVerified,
+
+		DeliveryFeeCents:           &merchant.DeliveryFeeCents,
+		ClearFreeDeliveryThreshold: merchant.FreeDeliveryThresholdCents == nil,
+		FreeDeliveryThresholdCents: merchant.FreeDeliveryThresholdCents,
+		Tin:                        merchant.TIN,
+		TradeLicenseNumber:         merchant.TradeLicenseNumber,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -168,5 +179,31 @@ func dbMerchantToDomain(m db.MerchantProfile) *domain.MerchantProfile {
 		TotalSalesCents: m.TotalSalesCents,
 		CreatedAt:       m.CreatedAt.Time,
 		UpdatedAt:       m.UpdatedAt.Time,
+
+		DeliveryFeeCents:           m.DeliveryFeeCents,
+		FreeDeliveryThresholdCents: m.FreeDeliveryThresholdCents,
+		TIN:                        m.Tin,
+		TradeLicenseNumber:         m.TradeLicenseNumber,
 	}
+}
+
+func (r *merchantRepository) IncrementTotalSales(ctx context.Context, id uuid.UUID, amountCents int64) error {
+	if err := r.queries.UpdateMerchantTotalSales(ctx, db.UpdateMerchantTotalSalesParams{ID: id, Amount: amountCents}); err != nil {
+		return domainerrors.Internal("failed to update merchant sales", err)
+	}
+	return nil
+}
+
+func (r *merchantRepository) ListWallets(ctx context.Context) (map[uuid.UUID]string, error) {
+	rows, err := r.queries.ListMerchantsWithWallets(ctx)
+	if err != nil {
+		return nil, domainerrors.Internal("failed to list merchant wallets", err)
+	}
+	wallets := make(map[uuid.UUID]string, len(rows))
+	for _, row := range rows {
+		if row.BlnkBalanceID != nil {
+			wallets[row.ID] = *row.BlnkBalanceID
+		}
+	}
+	return wallets, nil
 }

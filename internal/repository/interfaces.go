@@ -19,6 +19,9 @@ type UserRepository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 	List(ctx context.Context, opts domain.ListOptions) (*domain.PaginatedResult[domain.User], error)
 	Count(ctx context.Context) (int64, error)
+	MarkPhoneVerified(ctx context.Context, id uuid.UUID) error
+	ClearPhoneVerified(ctx context.Context, id uuid.UUID) error
+	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
 }
 
 type RefreshTokenRepository interface {
@@ -36,6 +39,8 @@ type MerchantRepository interface {
 	Update(ctx context.Context, merchant *domain.MerchantProfile) (*domain.MerchantProfile, error)
 	UpdateBlnkWallet(ctx context.Context, id uuid.UUID, balanceID, ledgerID string) (*domain.MerchantProfile, error)
 	List(ctx context.Context, opts domain.ListOptions) (*domain.PaginatedResult[domain.MerchantProfile], error)
+	IncrementTotalSales(ctx context.Context, id uuid.UUID, amountCents int64) error
+	ListWallets(ctx context.Context) (map[uuid.UUID]string, error)
 	WithTx(tx pgx.Tx) MerchantRepository
 }
 
@@ -62,6 +67,7 @@ type ProductRepository interface {
 	Update(ctx context.Context, product *domain.Product) (*domain.Product, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 	CountByMerchant(ctx context.Context, merchantID uuid.UUID) (int64, error)
+	Browse(ctx context.Context, filter domain.ProductFilter, opts domain.ListOptions) (*domain.PaginatedResult[domain.ProductSummary], error)
 }
 
 type ProductImageRepository interface {
@@ -71,6 +77,8 @@ type ProductImageRepository interface {
 	Update(ctx context.Context, image *domain.ProductImage) (*domain.ProductImage, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 	DeleteByProduct(ctx context.Context, productID uuid.UUID) error
+	Count(ctx context.Context, productID uuid.UUID) (int64, error)
+	ClearPrimary(ctx context.Context, productID uuid.UUID) error
 }
 
 type ProductVariantRepository interface {
@@ -93,6 +101,7 @@ type InventoryRepository interface {
 	Reserve(ctx context.Context, variantID uuid.UUID, qty int) error
 	Release(ctx context.Context, variantID uuid.UUID, qty int) error
 	Commit(ctx context.Context, variantID uuid.UUID, qty int) error
+	Restock(ctx context.Context, variantID uuid.UUID, qty int) error
 	WithTx(tx pgx.Tx) InventoryRepository
 }
 
@@ -156,6 +165,10 @@ type OrderRepository interface {
 	ListByStatus(ctx context.Context, status domain.OrderStatus, page, pageSize int) ([]domain.Order, error)
 	Create(ctx context.Context, order *domain.Order) (*domain.Order, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.OrderStatus) (*domain.Order, error)
+	Transition(ctx context.Context, id uuid.UUID, to domain.OrderStatus, from ...domain.OrderStatus) (*domain.Order, error)
+	OpenDispute(ctx context.Context, id uuid.UUID, reason string, from ...domain.OrderStatus) (*domain.Order, error)
+	CountByStatusForMerchant(ctx context.Context, merchantID uuid.UUID) (map[domain.OrderStatus]int64, error)
+	SumUnsettledEscrow(ctx context.Context) (int64, error)
 	UpdateBlnkTransaction(ctx context.Context, id uuid.UUID, blnkTxID string) (*domain.Order, error)
 	CountByBuyerID(ctx context.Context, buyerID uuid.UUID) (int64, error)
 	CountByMerchantID(ctx context.Context, merchantID uuid.UUID) (int64, error)
@@ -173,6 +186,7 @@ type PaymentRepository interface {
 	Create(ctx context.Context, payment *domain.Payment) (*domain.Payment, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.PaymentStatus) (*domain.Payment, error)
 	UpdateProviderResponse(ctx context.Context, id uuid.UUID, providerResponse map[string]any) (*domain.Payment, error)
+	UpdateResult(ctx context.Context, id uuid.UUID, status domain.PaymentStatus, providerResponse []byte, blnkTxID *string, chargeCents *int64) (*domain.Payment, error)
 	UpdateBlnkTransaction(ctx context.Context, id uuid.UUID, blnkTxID string) (*domain.Payment, error)
 	WithTx(tx pgx.Tx) PaymentRepository
 }
@@ -194,6 +208,7 @@ type WalletTransactionRepository interface {
 	Create(ctx context.Context, txn *domain.WalletTransaction) (*domain.WalletTransaction, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.WalletTransactionStatus) (*domain.WalletTransaction, error)
 	CountByMerchantID(ctx context.Context, merchantID uuid.UUID) (int64, error)
+	NetByMerchant(ctx context.Context, merchantID uuid.UUID) (int64, error)
 	WithTx(tx pgx.Tx) WalletTransactionRepository
 }
 
@@ -204,11 +219,32 @@ type PayoutRepository interface {
 	ListAll(ctx context.Context, page, pageSize int) ([]domain.Payout, error)
 	Create(ctx context.Context, payout *domain.Payout) (*domain.Payout, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.PayoutStatus, blnkTxID *string, failureReason *string) (*domain.Payout, error)
+	ClaimForProcessing(ctx context.Context, id uuid.UUID) (*domain.Payout, error)
+	UpdateTransfer(ctx context.Context, id uuid.UUID, reference string, providerResponse []byte) (*domain.Payout, error)
+	SumSince(ctx context.Context, merchantID uuid.UUID, since time.Time) (int64, error)
 	CountByMerchantID(ctx context.Context, merchantID uuid.UUID) (int64, error)
 	CountByStatus(ctx context.Context, status domain.PayoutStatus) (int64, error)
+	WithTx(tx pgx.Tx) PayoutRepository
+}
+
+type WebhookEventRepository interface {
+	Create(ctx context.Context, event *domain.WebhookEvent) (*domain.WebhookEvent, bool, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.WebhookEvent, error)
+	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.WebhookEventStatus, errMsg *string) error
+	WithTx(tx pgx.Tx) WebhookEventRepository
+}
+
+type OTPRepository interface {
+	Store(ctx context.Context, key, codeHash string, ttl time.Duration) error
+	Get(ctx context.Context, key string) (string, error)
+	IncrementAttempts(ctx context.Context, key string, ttl time.Duration) (int64, error)
+	Delete(ctx context.Context, key string) error
+	AcquireCooldown(ctx context.Context, key string, ttl time.Duration) (bool, error)
 }
 
 type IdempotencyRepository interface {
 	Get(ctx context.Context, key string) (string, error)
 	Set(ctx context.Context, key string, value string, ttl int64) error
+	Lock(ctx context.Context, key string, ttl int64) (bool, error)
+	Unlock(ctx context.Context, key string) error
 }

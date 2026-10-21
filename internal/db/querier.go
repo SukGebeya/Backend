@@ -12,15 +12,22 @@ import (
 )
 
 type Querier interface {
+	BrowseProducts(ctx context.Context, arg BrowseProductsParams) ([]BrowseProductsRow, error)
+	ClaimPayoutForProcessing(ctx context.Context, id uuid.UUID) (Payout, error)
 	ClearCartItems(ctx context.Context, cartID uuid.UUID) error
-	CommitInventory(ctx context.Context, arg CommitInventoryParams) error
+	ClearPrimaryProductImage(ctx context.Context, productID uuid.UUID) error
+	ClearUserPhoneVerified(ctx context.Context, id uuid.UUID) error
+	CommitInventory(ctx context.Context, arg CommitInventoryParams) (int64, error)
 	CountAddressesByUser(ctx context.Context, userID uuid.UUID) (int64, error)
+	CountBrowseProducts(ctx context.Context, arg CountBrowseProductsParams) (int64, error)
 	CountCartItems(ctx context.Context, cartID uuid.UUID) (int64, error)
 	CountDistinctVariantsInCart(ctx context.Context, cartID uuid.UUID) (int32, error)
 	CountOrdersByBuyerID(ctx context.Context, buyerID uuid.UUID) (int64, error)
+	CountOrdersByMerchantGroupedByStatus(ctx context.Context, merchantID uuid.UUID) ([]CountOrdersByMerchantGroupedByStatusRow, error)
 	CountOrdersByMerchantID(ctx context.Context, merchantID uuid.UUID) (int64, error)
 	CountPayoutsByMerchantID(ctx context.Context, merchantID uuid.UUID) (int64, error)
 	CountPayoutsByStatus(ctx context.Context, status string) (int64, error)
+	CountProductImages(ctx context.Context, productID uuid.UUID) (int64, error)
 	CountProductsByMerchant(ctx context.Context, merchantID uuid.UUID) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
 	CountWalletTransactionsByMerchantID(ctx context.Context, merchantID uuid.UUID) (int64, error)
@@ -40,6 +47,7 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateVariant(ctx context.Context, arg CreateVariantParams) (ProductVariant, error)
 	CreateWalletTransaction(ctx context.Context, arg CreateWalletTransactionParams) (WalletTransaction, error)
+	CreateWebhookEvent(ctx context.Context, arg CreateWebhookEventParams) (WebhookEvent, error)
 	DeleteAddress(ctx context.Context, id uuid.UUID) error
 	DeleteCart(ctx context.Context, id uuid.UUID) error
 	DeleteCartBySessionID(ctx context.Context, sessionID *string) error
@@ -93,12 +101,14 @@ type Querier interface {
 	GetVariantsByProduct(ctx context.Context, productID uuid.UUID) ([]ProductVariant, error)
 	GetWalletTransactionByID(ctx context.Context, id uuid.UUID) (WalletTransaction, error)
 	GetWalletTransactionByOrderID(ctx context.Context, orderID pgtype.UUID) (WalletTransaction, error)
+	GetWebhookEventByID(ctx context.Context, id uuid.UUID) (WebhookEvent, error)
 	ListAddressesByUserID(ctx context.Context, userID uuid.UUID) ([]Address, error)
 	ListAllPayouts(ctx context.Context, arg ListAllPayoutsParams) ([]Payout, error)
 	ListCartItems(ctx context.Context, cartID uuid.UUID) ([]CartItem, error)
 	ListCategories(ctx context.Context) ([]Category, error)
 	ListCategoriesByParent(ctx context.Context, parentID pgtype.UUID) ([]Category, error)
 	ListMerchantProfiles(ctx context.Context, arg ListMerchantProfilesParams) ([]MerchantProfile, error)
+	ListMerchantsWithWallets(ctx context.Context) ([]ListMerchantsWithWalletsRow, error)
 	ListOrderItemsByOrderID(ctx context.Context, orderID uuid.UUID) ([]OrderItem, error)
 	ListOrdersByBuyerID(ctx context.Context, arg ListOrdersByBuyerIDParams) ([]Order, error)
 	ListOrdersByMerchantID(ctx context.Context, arg ListOrdersByMerchantIDParams) ([]Order, error)
@@ -114,11 +124,18 @@ type Querier interface {
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	ListVerifiedMerchants(ctx context.Context, arg ListVerifiedMerchantsParams) ([]MerchantProfile, error)
 	ListWalletTransactionsByMerchantID(ctx context.Context, arg ListWalletTransactionsByMerchantIDParams) ([]WalletTransaction, error)
+	MarkUserPhoneVerified(ctx context.Context, id uuid.UUID) error
 	MergeCartItems(ctx context.Context, arg MergeCartItemsParams) error
-	ReleaseInventory(ctx context.Context, arg ReleaseInventoryParams) error
-	ReserveInventory(ctx context.Context, arg ReserveInventoryParams) error
+	OpenOrderDispute(ctx context.Context, arg OpenOrderDisputeParams) (Order, error)
+	ReleaseInventory(ctx context.Context, arg ReleaseInventoryParams) (int64, error)
+	ReserveInventory(ctx context.Context, arg ReserveInventoryParams) (int64, error)
+	RestockInventory(ctx context.Context, arg RestockInventoryParams) (int64, error)
 	SetAddressAsDefault(ctx context.Context, id uuid.UUID) (Address, error)
 	SetDefaultAddress(ctx context.Context, userID uuid.UUID) error
+	SumPayoutsSince(ctx context.Context, arg SumPayoutsSinceParams) (int64, error)
+	SumUnsettledEscrowCents(ctx context.Context) (int64, error)
+	SumWalletTransactionsByMerchant(ctx context.Context, merchantID uuid.UUID) (SumWalletTransactionsByMerchantRow, error)
+	TransitionOrderStatus(ctx context.Context, arg TransitionOrderStatusParams) (Order, error)
 	UpdateAddress(ctx context.Context, arg UpdateAddressParams) (Address, error)
 	UpdateCartExpiresAt(ctx context.Context, arg UpdateCartExpiresAtParams) (Cart, error)
 	UpdateCartItemQuantity(ctx context.Context, arg UpdateCartItemQuantityParams) (CartItem, error)
@@ -132,16 +149,20 @@ type Querier interface {
 	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (Order, error)
 	UpdatePaymentBlnkTransaction(ctx context.Context, arg UpdatePaymentBlnkTransactionParams) (Payment, error)
 	UpdatePaymentProviderResponse(ctx context.Context, arg UpdatePaymentProviderResponseParams) (Payment, error)
+	UpdatePaymentResult(ctx context.Context, arg UpdatePaymentResultParams) (Payment, error)
 	UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStatusParams) (Payment, error)
 	UpdatePayoutStatus(ctx context.Context, arg UpdatePayoutStatusParams) (Payout, error)
+	UpdatePayoutTransfer(ctx context.Context, arg UpdatePayoutTransferParams) (Payout, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)
 	UpdateProductImage(ctx context.Context, arg UpdateProductImageParams) (ProductImage, error)
 	UpdateShipmentDelivered(ctx context.Context, id uuid.UUID) (Shipment, error)
 	UpdateShipmentShipped(ctx context.Context, arg UpdateShipmentShippedParams) (Shipment, error)
 	UpdateShipmentStatus(ctx context.Context, arg UpdateShipmentStatusParams) (Shipment, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
+	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	UpdateVariant(ctx context.Context, arg UpdateVariantParams) (ProductVariant, error)
 	UpdateWalletTransactionStatus(ctx context.Context, arg UpdateWalletTransactionStatusParams) (WalletTransaction, error)
+	UpdateWebhookEventStatus(ctx context.Context, arg UpdateWebhookEventStatusParams) error
 	UpsertCartItem(ctx context.Context, arg UpsertCartItemParams) (CartItem, error)
 }
 

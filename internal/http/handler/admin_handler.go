@@ -1,45 +1,131 @@
 package handler
 
 import (
-	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/SukGebeya/Backend/internal/domain"
 	apperrors "github.com/SukGebeya/Backend/internal/errors"
-	"github.com/SukGebeya/Backend/internal/jobs"
 	"github.com/SukGebeya/Backend/internal/repository"
 	"github.com/SukGebeya/Backend/internal/service"
 	"github.com/SukGebeya/Backend/pkg/response"
 	"github.com/SukGebeya/Backend/pkg/validation"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/riverqueue/river"
 )
 
 type AdminHandler struct {
-	payoutRepo   repository.PayoutRepository
-	userService  *service.UserService
-	merchantRepo repository.MerchantRepository
-	merchantSvc  *service.MerchantService
-	riverClient  *river.Client[pgx.Tx]
+	walletService  *service.WalletService
+	userService    *service.UserService
+	merchantRepo   repository.MerchantRepository
+	merchantSvc    *service.MerchantService
+	orderService   *service.OrderService
+	reconciliation *service.ReconciliationService
 }
 
 func NewAdminHandler(
-	payoutRepo repository.PayoutRepository,
+	walletService *service.WalletService,
 	userService *service.UserService,
 	merchantRepo repository.MerchantRepository,
 	merchantSvc *service.MerchantService,
-	riverClient *river.Client[pgx.Tx],
+	orderService *service.OrderService,
+	reconciliation *service.ReconciliationService,
 ) *AdminHandler {
 	return &AdminHandler{
-		payoutRepo:   payoutRepo,
-		userService:  userService,
-		merchantRepo: merchantRepo,
-		merchantSvc:  merchantSvc,
-		riverClient:  riverClient,
+		walletService:  walletService,
+		userService:    userService,
+		merchantRepo:   merchantRepo,
+		merchantSvc:    merchantSvc,
+		orderService:   orderService,
+		reconciliation: reconciliation,
 	}
+}
+
+type ResolveDisputeRequest struct {
+	Outcome string `json:"outcome" validate:"required,oneof=release refund" example:"refund"`
+	Restock bool   `json:"restock"`
+}
+
+// ResolveDispute godoc
+// @Summary Resolve an order dispute (admin)
+// @Description release pays the merchant as if delivery were confirmed; refund cancels the order and refunds the buyer through Chapa (set restock when the goods came back).
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Order ID"
+// @Param request body ResolveDisputeRequest true "Resolution"
+// @Success 200 {object} OrderResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /admin/orders/{id}/resolve [post]
+func (h *AdminHandler) ResolveDispute(w http.ResponseWriter, r *http.Request) {
+	orderID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	var req ResolveDisputeRequest
+	if err := decodeJSON(r, &req); err != nil {
+		response.Error(w, err)
+		return
+	}
+	if errs := validation.Validate(req); len(errs) > 0 {
+		response.JSON(w, http.StatusBadRequest, errs)
+		return
+	}
+	order, err := h.orderService.ResolveDispute(r.Context(), orderID, service.DisputeOutcome(req.Outcome), req.Restock)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, toOrderResponse(order))
+}
+
+// ProvisionWallet godoc
+// @Summary Create a missing merchant wallet (admin)
+// @Description Creates the merchant's Blnk wallet if it has none (seeded merchants, or onboarding while Blnk was down). Safe to repeat.
+// @Tags admin
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Merchant ID"
+// @Success 200 {object} MerchantProfileResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /admin/merchants/{id}/wallet [post]
+func (h *AdminHandler) ProvisionWallet(w http.ResponseWriter, r *http.Request) {
+	merchantID, err := parseUUIDParam(r, "id")
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	merchant, err := h.merchantSvc.ProvisionWallet(r.Context(), merchantID)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, toMerchantProfileResponse(merchant))
+}
+
+// Reconciliation godoc
+// @Summary Reconcile ledger with database (admin)
+// @Description Compares every merchant wallet and the escrow balance in Blnk with Postgres records. Also runs daily at 03:00 Addis Ababa time.
+// @Tags admin
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} service.ReconciliationReport
+// @Failure 500 {object} response.ErrorResponse
+// @Router /admin/reconciliation [get]
+func (h *AdminHandler) Reconciliation(w http.ResponseWriter, r *http.Request) {
+	report, err := h.reconciliation.Run(r.Context())
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, report)
+}
+
+type RejectPayoutRequest struct {
+	Reason string `json:"reason" validate:"max=500"`
 }
 
 type AdminPayoutResponse struct {
@@ -50,7 +136,10 @@ type AdminPayoutResponse struct {
 	Method            string    `json:"method"`
 	Destination       string    `json:"destination"`
 	Status            string    `json:"status"`
+	AccountName       *string   `json:"account_name,omitempty"`
+	BankCode          *string   `json:"bank_code,omitempty"`
 	BlnkTransactionID *string   `json:"blnk_transaction_id,omitempty"`
+	TransferReference *string   `json:"transfer_reference,omitempty"`
 	FailureReason     *string   `json:"failure_reason,omitempty"`
 	RequestedAt       string    `json:"requested_at"`
 	ProcessedAt       *string   `json:"processed_at,omitempty"`
@@ -79,7 +168,10 @@ func toAdminPayoutResponse(p *domain.Payout) AdminPayoutResponse {
 		Method:            string(p.Method),
 		Destination:       p.Destination,
 		Status:            string(p.Status),
+		AccountName:       p.AccountName,
+		BankCode:          p.BankCode,
 		BlnkTransactionID: p.BlnkTransactionID,
+		TransferReference: p.TransferReference,
 		FailureReason:     p.FailureReason,
 		RequestedAt:       p.RequestedAt.Format("2006-01-02T15:04:05Z07:00"),
 		ProcessedAt:       processedAt,
@@ -113,27 +205,20 @@ func (h *AdminHandler) ListPayouts(w http.ResponseWriter, r *http.Request) {
 		perPage = 20
 	}
 
-	statusFilter := r.URL.Query().Get("status")
-
-	var payouts []domain.Payout
-	var total int64
-	var err error
-
-	if statusFilter != "" {
-		payouts, err = h.payoutRepo.ListByStatus(ctx, domain.PayoutStatus(statusFilter), page, perPage)
-		if err == nil {
-			total, _ = h.payoutRepo.CountByStatus(ctx, domain.PayoutStatus(statusFilter))
-		}
-	} else {
-		payouts, err = h.payoutRepo.ListAll(ctx, page, perPage)
-		// For list all, we'd need a separate count method or we calculate from page info
-		// For now, set total to length of items (simplified)
-		total = int64(len(payouts))
+	var statusFilter *domain.PayoutStatus
+	if raw := r.URL.Query().Get("status"); raw != "" {
+		st := domain.PayoutStatus(raw)
+		statusFilter = &st
 	}
 
+	result, err := h.walletService.ListPayouts(ctx, statusFilter, page, perPage)
 	if err != nil {
 		response.Error(w, err)
 		return
+	}
+	payouts, total := result.Items, result.Total
+	if statusFilter == nil {
+		total = int64(len(payouts))
 	}
 
 	items := make([]AdminPayoutResponse, len(payouts))
@@ -151,56 +236,74 @@ func (h *AdminHandler) ListPayouts(w http.ResponseWriter, r *http.Request) {
 }
 
 // ProcessPayout godoc
-// @Summary Process a payout (admin)
-// @Description Process a pending payout request - this will debit the merchant's wallet. Idempotency-Key header is recommended to prevent duplicate processing.
+// @Summary Approve and process a payout (admin)
+// @Description Approves a pending payout and starts the Chapa transfer asynchronously. The merchant's funds are already held, so approval cannot overdraw the wallet.
 // @Tags admin
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param Idempotency-Key header string false "Optional idempotency key to prevent duplicate processing"
 // @Param id path string true "Payout ID"
-// @Success 200 {object} AdminPayoutResponse
+// @Success 202 {object} AdminPayoutResponse
 // @Failure 400 {object} response.ErrorResponse
 // @Failure 401 {object} response.ErrorResponse
 // @Failure 404 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
 // @Failure 500 {object} response.ErrorResponse
 // @Router /admin/payouts/{id}/process [post]
 func (h *AdminHandler) ProcessPayout(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	payoutIDStr := chi.URLParam(r, "id")
-	payoutID, err := uuid.Parse(payoutIDStr)
+	payoutID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		response.Error(w, apperrors.BadRequest("invalid payout ID"))
 		return
 	}
 
-	payout, err := h.payoutRepo.GetByID(ctx, payoutID)
+	payout, err := h.walletService.ApprovePayout(r.Context(), payoutID)
 	if err != nil {
 		response.Error(w, err)
 		return
 	}
 
-	if payout.Status != domain.PayoutStatusPending {
-		response.Error(w, apperrors.BadRequest("payout is not in pending status"))
+	response.JSON(w, http.StatusAccepted, toAdminPayoutResponse(payout))
+}
+
+// RejectPayout godoc
+// @Summary Reject a payout (admin)
+// @Description Rejects a pending payout and releases the held funds back to the merchant's wallet
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Payout ID"
+// @Param request body RejectPayoutRequest false "Rejection reason"
+// @Success 200 {object} AdminPayoutResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Failure 500 {object} response.ErrorResponse
+// @Router /admin/payouts/{id}/reject [post]
+func (h *AdminHandler) RejectPayout(w http.ResponseWriter, r *http.Request) {
+	payoutID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.Error(w, apperrors.BadRequest("invalid payout ID"))
 		return
 	}
 
-	_, err = h.payoutRepo.UpdateStatus(ctx, payoutID, domain.PayoutStatusProcessing, nil, nil)
+	var req RejectPayoutRequest
+	if r.ContentLength > 0 {
+		if err := decodeJSON(r, &req); err != nil {
+			response.Error(w, err)
+			return
+		}
+	}
+
+	payout, err := h.walletService.RejectPayout(r.Context(), payoutID, req.Reason)
 	if err != nil {
 		response.Error(w, err)
 		return
 	}
 
-	_, err = h.riverClient.Insert(ctx, jobs.ProcessPayoutArgs{PayoutID: payoutID}, nil)
-	if err != nil {
-		slog.Error("failed to enqueue payout job", "payout_id", payoutID, "error", err)
-	}
-
-	response.JSON(w, http.StatusOK, map[string]string{
-		"message":   "Payout processing initiated. The payout will be processed asynchronously.",
-		"payout_id": payoutID.String(),
-	})
+	response.JSON(w, http.StatusOK, toAdminPayoutResponse(payout))
 }
 
 // ListUsers godoc
