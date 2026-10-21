@@ -76,7 +76,7 @@ func main() {
 	}
 	fmt.Println()
 
-	var escrowBalanceID, revenueBalanceID string
+	var escrowBalanceID, revenueBalanceID, processingFeeBalanceID string
 
 	escrowBalanceID, err = findOrCreateBalance(client, etbLedger.LedgerID, "escrow", "Escrow Balance")
 	if err != nil {
@@ -88,6 +88,11 @@ func main() {
 		log.Fatalf("❌ Failed to setup revenue balance: %v", err)
 	}
 
+	processingFeeBalanceID, err = findOrCreateBalance(client, etbLedger.LedgerID, "processing_fees", "Chapa Processing Fees")
+	if err != nil {
+		log.Fatalf("❌ Failed to setup processing fee balance: %v", err)
+	}
+
 	fmt.Println()
 	fmt.Println("📊 Blnk Setup Summary:")
 	fmt.Println("┌─────────────────────────────────────────────────────────────┐")
@@ -96,14 +101,16 @@ func main() {
 	fmt.Printf("│ %-25s │ %-32s │\n", "ETB Ledger ID", etbLedger.LedgerID)
 	fmt.Printf("│ %-25s │ %-32s │\n", "Escrow Balance ID", escrowBalanceID)
 	fmt.Printf("│ %-25s │ %-32s │\n", "Revenue Balance ID", revenueBalanceID)
+	fmt.Printf("│ %-25s │ %-32s │\n", "Processing Fee Balance ID", processingFeeBalanceID)
 	fmt.Println("└─────────────────────────────────────────────────────────────┘")
 	fmt.Println()
 
-	envFile := ".env.example"
+	envFile := getEnvOrDefault("BLNK_ENV_FILE", ".env")
 	if err := updateEnvFile(envFile, map[string]string{
-		"BLNK_ETB_LEDGER_ID":      etbLedger.LedgerID,
-		"BLNK_ESCROW_BALANCE_ID":  escrowBalanceID,
-		"BLNK_REVENUE_BALANCE_ID": revenueBalanceID,
+		"BLNK_ETB_LEDGER_ID":             etbLedger.LedgerID,
+		"BLNK_ESCROW_BALANCE_ID":         escrowBalanceID,
+		"BLNK_REVENUE_BALANCE_ID":        revenueBalanceID,
+		"BLNK_PROCESSING_FEE_BALANCE_ID": processingFeeBalanceID,
 	}); err != nil {
 		log.Fatalf("❌ Failed to update %s: %v", envFile, err)
 	}
@@ -113,9 +120,8 @@ func main() {
 	fmt.Println("🎉 Blnk setup complete!")
 	fmt.Println()
 	fmt.Println("Next steps:")
-	fmt.Println("  1. Copy the values from .env.example to your .env file")
-	fmt.Println("  2. Restart your application")
-	fmt.Println("  3. Run 'make seed' to seed the database")
+	fmt.Println("  1. Restart your application so it picks up the new IDs")
+	fmt.Println("  2. Run 'make seed' to seed the database")
 }
 
 func findOrCreateBalance(client *blnkgo.Client, ledgerID, balanceType, displayName string) (string, error) {

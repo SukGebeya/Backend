@@ -157,3 +157,8 @@ COMMIT;
 -- Product Variants: 8
 -- Inventory: 8 records
 -- =============================================================================
+-- Test accounts have already confirmed their phones; shop 1 charges 100 ETB delivery, free above 2,000 ETB.
+-- Seeded merchants have no Blnk wallet yet: run POST /api/v1/admin/merchants/{id}/wallet for each.
+UPDATE users SET phone_verified_at = NOW() WHERE email LIKE '%@test.com';
+UPDATE merchant_profiles SET delivery_fee_cents = 10000, free_delivery_threshold_cents = 200000
+WHERE id = '20000000-0000-0000-0000-000000000001';

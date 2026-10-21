@@ -30,18 +30,22 @@ services:
       retries: 5
 
   blnk:
-    image: jerryenebeli/blnk:latest
+    image: jerryenebeli/blnk:0.15.6
     container_name: sukgebeya-blnk-dev
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "blnk migrate up && blnk start"
     ports:
       - "5001:5001"
+    environment:
+      BLNK_SERVER_SECURE: "true"
+      BLNK_SERVER_SECRET_KEY: ${BLNK_SECRET_KEY:-dev-blnk-secret}
     volumes:
       - ./blnk.json:/blnk.json
-    command: >
-      sh -c "blnk migrate up && blnk start"
     depends_on:
       blnk-postgres:
         condition: service_healthy
-      redis:
+      blnk-redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:5001/health || exit 1"]
@@ -49,6 +53,29 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  blnk-worker:
+    image: jerryenebeli/blnk:0.15.6
+    container_name: sukgebeya-blnk-worker-dev
+    entrypoint: ["blnk", "workers"]
+    environment:
+      BLNK_SERVER_SECURE: "true"
+      BLNK_SERVER_SECRET_KEY: ${BLNK_SECRET_KEY:-dev-blnk-secret}
+    restart: on-failure
+    volumes:
+      - ./blnk.json:/blnk.json
+    depends_on:
+      blnk:
+        condition: service_healthy
+
+  blnk-redis:
+    image: redis:7-alpine
+    container_name: sukgebeya-blnk-redis-dev
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   blnk-postgres:
     image: postgres:16-alpine

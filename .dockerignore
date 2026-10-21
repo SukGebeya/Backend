@@ -1,0 +1,13 @@
+.git
+.github
+.env
+.env.*
+!.env.example
+!.env.production.example
+keys/
+*.pem
+tmp/
+bin/
+coverage.out
+*.md
+docs/*.md

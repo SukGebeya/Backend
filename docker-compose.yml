@@ -37,32 +37,67 @@ services:
       - backend
 
   blnk:
-    image: jerryenebeli/blnk:latest
-    container_name: sukgebeya-blnk-dev
-    ports:
-      - "5001:5001"
+    image: jerryenebeli/blnk:0.15.6
+    container_name: sukgebeya-blnk
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "blnk migrate up && blnk start"
+    environment:
+      BLNK_SERVER_SECURE: "true"
+      BLNK_SERVER_SECRET_KEY: ${BLNK_SECRET_KEY:?BLNK_SECRET_KEY is required}
     volumes:
       - ./blnk.json:/blnk.json
     depends_on:
       blnk-postgres:
         condition: service_healthy
-      redis:
+      blnk-redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5001/health"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:5001/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - backend
+
+  blnk-worker:
+    image: jerryenebeli/blnk:0.15.6
+    container_name: sukgebeya-blnk-worker
+    entrypoint: ["blnk", "workers"]
+    environment:
+      BLNK_SERVER_SECURE: "true"
+      BLNK_SERVER_SECRET_KEY: ${BLNK_SECRET_KEY:?BLNK_SECRET_KEY is required}
+    restart: unless-stopped
+    volumes:
+      - ./blnk.json:/blnk.json
+    depends_on:
+      blnk:
+        condition: service_healthy
+    networks:
+      - backend
+
+  blnk-redis:
+    image: redis:7-alpine
+    container_name: sukgebeya-blnk-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - backend
 
   blnk-postgres:
     image: postgres:16-alpine
     container_name: sukgebeya-blnk-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: blnk
-    ports:
-      - "5433:5432"
     volumes:
       - blnk_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -70,6 +105,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - backend
 
 
   app:
@@ -91,11 +128,32 @@ services:
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
       JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-168h}
       ENVIRONMENT: production
-      BLNK_BASE_URL: http://blnk:8081
-      BLNK_SECRET_KEY: dev-secret-key
-      BLNK_ETB_LEDGER_ID: ""
-      BLNK_ESCROW_BALANCE_ID: ""
-      BLNK_REVENUE_BALANCE_ID: ""
+      BLNK_BASE_URL: http://blnk:5001
+      BLNK_SECRET_KEY: ${BLNK_SECRET_KEY:?BLNK_SECRET_KEY is required}
+      BLNK_ETB_LEDGER_ID: ${BLNK_ETB_LEDGER_ID:?BLNK_ETB_LEDGER_ID is required (run make seed-blnk)}
+      BLNK_ESCROW_BALANCE_ID: ${BLNK_ESCROW_BALANCE_ID:?BLNK_ESCROW_BALANCE_ID is required}
+      BLNK_REVENUE_BALANCE_ID: ${BLNK_REVENUE_BALANCE_ID:?BLNK_REVENUE_BALANCE_ID is required}
+      BLNK_PROCESSING_FEE_BALANCE_ID: ${BLNK_PROCESSING_FEE_BALANCE_ID:?BLNK_PROCESSING_FEE_BALANCE_ID is required}
+      CHAPA_MODE: ${CHAPA_MODE:-live}
+      CHAPA_SECRET_KEY: ${CHAPA_SECRET_KEY:?CHAPA_SECRET_KEY is required}
+      CHAPA_WEBHOOK_SECRET: ${CHAPA_WEBHOOK_SECRET:?CHAPA_WEBHOOK_SECRET is required}
+      CHAPA_CALLBACK_URL: ${CHAPA_CALLBACK_URL:?CHAPA_CALLBACK_URL is required}
+      CHAPA_RETURN_URL: ${CHAPA_RETURN_URL:?CHAPA_RETURN_URL is required}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      PLATFORM_FEE_PERCENT: ${PLATFORM_FEE_PERCENT:-5}
+      ORDER_PAYMENT_TIMEOUT: ${ORDER_PAYMENT_TIMEOUT:-1h}
+      AUTO_CONFIRM_DELIVERY_DAYS: ${AUTO_CONFIRM_DELIVERY_DAYS:-7}
+      PAYOUT_MIN_CENTS: ${PAYOUT_MIN_CENTS:-10000}
+      PAYOUT_DAILY_LIMIT_CENTS: ${PAYOUT_DAILY_LIMIT_CENTS:-10000000}
+      REQUIRE_PHONE_VERIFICATION: ${REQUIRE_PHONE_VERIFICATION:-true}
+      SMS_PROVIDER: ${SMS_PROVIDER:-afromessage}
+      AFROMESSAGE_TOKEN: ${AFROMESSAGE_TOKEN:?AFROMESSAGE_TOKEN is required}
+      AFROMESSAGE_SENDER: ${AFROMESSAGE_SENDER:-}
+      AFROMESSAGE_IDENTIFIER_ID: ${AFROMESSAGE_IDENTIFIER_ID:-}
+      OTP_SECRET: ${OTP_SECRET:?OTP_SECRET is required}
+      TRUSTED_PROXY_COUNT: ${TRUSTED_PROXY_COUNT:-0}
+      APP_TIMEZONE: Africa/Addis_Ababa
+      LOG_FORMAT: json
     volumes:
       - ./keys:/app/keys:ro
     depends_on:

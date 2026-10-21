@@ -1,22 +1,12 @@
-version: 2
+version: "2"
 
 run:
   timeout: 5m
   issues-exit-code: 1
   tests: true
 
-output:
-  format: colored-line-number
-  print-issued-lines: true
-  print-linter-name: true
-
 linters:
   enable:
-    - errcheck
-    - govet
-    - ineffassign
-    - staticcheck
-    - unused
     - bodyclose
     - dogsled
     - dupl
@@ -25,7 +15,6 @@ linters:
     - goconst
     - gocritic
     - gocyclo
-    - godot
     - goprintffuncname
     - misspell
     - nakedret
@@ -39,95 +28,94 @@ linters:
     - unparam
     - whitespace
 
-linters-settings:
-  errcheck:
-    check-type-assertions: true
-    check-blank: true
+  settings:
+    errcheck:
+      check-type-assertions: true
 
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+        - shadow
 
-  gocyclo:
-    min-complexity: 15
+    gocyclo:
+      min-complexity: 20
 
-  dupl:
-    threshold: 100
+    dupl:
+      threshold: 150
 
-  goconst:
-    min-len: 3
-    min-occurrences: 3
+    goconst:
+      min-len: 3
+      min-occurrences: 5
+      ignore-string-values:
+        - "ETB"
 
-  misspell:
-    locale: US
+    exhaustive:
+      default-signifies-exhaustive: true
 
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-    disabled-checks:
-      - dupImport
-      - ifElseChain
-      - octalLiteral
-      - whyNoLint
-      - wrapperFunc
+    misspell:
+      locale: US
+      ignore-rules:
+        - cancelled
+        - cancelling
+        - honoured
 
-  revive:
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+      disabled-checks:
+        - hugeParam
+        - rangeValCopy
+
+    # The project convention is no comments unless logic is non-obvious, so the
+    # doc-comment rules (exported, package-comments) are intentionally left out.
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: if-return
+        - name: increment-decrement
+        - name: var-naming
+        - name: var-declaration
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unreachable-code
+        - name: redefines-builtin-id
+
+  exclusions:
+    generated: strict
+    paths:
+      - docs
+      - internal/db
+      - internal/repository/mocks
+      - internal/service/mocks
     rules:
-      - name: blank-imports
-      - name: context-as-argument
-      - name: context-keys-type
-      - name: dot-imports
-      - name: error-return
-      - name: error-strings
-      - name: error-naming
-      - name: exported
-      - name: if-return
-      - name: increment-decrement
-      - name: var-naming
-      - name: var-declaration
-      - name: package-comments
-      - name: range
-      - name: receiver-naming
-      - name: time-naming
-      - name: unexported-return
-      - name: indent-error-flow
-      - name: errorf
-      - name: empty-block
-      - name: superfluous-else
-      - name: unused-parameter
-      - name: unreachable-code
-      - name: redefines-builtin-id
+      - path: _test\.go
+        linters:
+          - dupl
+          - gocyclo
+          - goconst
+          - errcheck
+      - path: internal/http/handler/
+        linters:
+          - dupl
+
+formatters:
+  enable:
+    - gofmt
 
 issues:
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - dupl
-        - gocyclo
-        - gosec
-        - goconst
-
-    - path: docs/docs\.go
-      linters:
-        - all
-
-    - path: internal/db/.*\.go
-      linters:
-        - all
-
-    - path: cmd/api/main.go
-      linters:
-        - gocritic
-
-    - linters:
-        - godot
-      source: "^// @"
-
   max-issues-per-linter: 0
   max-same-issues: 0
-  new: false

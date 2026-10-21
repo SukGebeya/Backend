@@ -4,7 +4,7 @@
     "dns": "postgres://postgres:postgres@blnk-postgres:5432/blnk?sslmode=disable"
   },
   "redis": {
-    "dns": "redis:6379"
+    "dns": "blnk-redis:6379"
   },
   "server": {
     "domain": "localhost",
