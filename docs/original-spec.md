@@ -1,3 +1,5 @@
+> **Historical document.** This is the original product and architecture spec the project started from (March 2026). The implementation has since diverged in several deliberate ways: escrow is created when payment is verified rather than at checkout, payouts hold funds before transferring, delivery fees, disputes and SMS verification were added, and the migration numbering differs. See [ARCHITECTURE.md](ARCHITECTURE.md) for how the system works today and [DECISIONS.md](DECISIONS.md) for why it changed.
+
 # Gebeya — SME Marketplace Platform
 ## Agent Context Document & Implementation Plan
 

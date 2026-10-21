@@ -1,731 +1,137 @@
-# Go Boilerplate
+# Gebeya: escrow marketplace backend for Ethiopia
 
-A production-ready Go REST API boilerplate with clean architecture, JWT authentication, PostgreSQL, and Redis.
+[![CI](https://github.com/SukGebeya/Backend/actions/workflows/ci.yml/badge.svg)](https://github.com/SukGebeya/Backend/actions/workflows/ci.yml)
+![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)
+![Postgres](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## Features
+**Gebeya** (ገበያ, "marketplace") is a backend for small and informal merchants in Ethiopia. Merchants get a storefront and a wallet. Buyers pay with Telebirr, CBE Birr or card through [Chapa](https://chapa.co), and the money is held in escrow until the buyer confirms delivery. Every birr is recorded in a [Blnk](https://github.com/blnkfinance/blnk) double-entry ledger, which becomes each merchant's verifiable sales history: the basis for working-capital loans later.
 
-### Core Features
-- **Clean Architecture** - Separation of concerns with domain, service, repository, and HTTP layers
-- **JWT Authentication** - RSA-signed access and refresh tokens with automatic rotation
-- **PostgreSQL** - Type-safe SQL with sqlc code generation
-- **Redis** - Refresh token storage and distributed rate limiting
-- **Password Hashing** - Argon2id with configurable parameters
-- **Request Validation** - go-playground/validator with custom phone validation
-- **Database Migrations** - Goose for version-controlled schema changes
-- **Docker Ready** - Multi-stage Dockerfile and docker-compose setup
-- **Soft Delete** - Notes support soft delete with restore capability
+## Highlights
 
-### Production Readiness ✨
+- **Escrow that reconciles.** Payments are re-verified with Chapa (status, exact amount, live mode) before escrow is created. Settlement, refunds, chargebacks and payouts are retryable background jobs, idempotent through deterministic ledger references. A daily job cross-checks the ledger against Postgres.
+- **Built for the Ethiopian market.**
+  - Phone-first accounts: `0911…`, `+251 91…` and `911…` are the same user, verified by SMS in Amharic and English.
+  - Chapa's field rules are handled.
+  - Addresses use subcity and woreda.
+  - Search works in Ge'ez script.
+  - Merchant delivery fees, disputes, and auto-confirmed delivery.
+  - KYC-gated payouts to Telebirr, CBE Birr and banks.
+- **Correct under failure and concurrency.**
+  - Jobs are enqueued in the same database transaction as the change that needs them.
+  - Order status changes are compare-and-set.
+  - Stock reservations move from cart to order without double counting.
+  - Idempotency keys are scoped per user and locked against concurrent duplicates.
+- **Tested against the real thing.** 99 test functions (Postgres and Redis via testcontainers, about 15 s) plus an HTTP end-to-end script that runs the whole money flow against a live Blnk ledger and checks balances.
 
-- **API Documentation** - Swagger/OpenAPI documentation for all 18 endpoints
-- **Testing Infrastructure** - testcontainers, mocks, and comprehensive unit tests
-- **Structured Logging** - JSON and text format logging with slog
-- **CI/CD Pipeline** - GitHub Actions with automated linting, testing, and Docker builds
-- **Service Interfaces** - Interface-based architecture with compile-time verification
-- **Resilience Patterns** - Request timeouts, connection pooling, and circuit breakers
-- **Observability** - Request logging, health checks, and password redaction
+## How money moves
 
-## Quick Start
+```
+Buyer checkout (verified phone + delivery address)
+  total = goods + merchant's flat delivery fee (free above the shop's threshold)
+  └─► order pending_payment ─► Chapa hosted checkout
+Chapa webhook / callback / buyer refresh / expiry job
+  └─► verify with Chapa (status, amount, mode, charge)
+  └─► Blnk  @World ─inflight─► Escrow                         order paid, stock committed
+Merchant: processing ─► shipped ─► auto-confirm scheduled (7 days)
+Buyer confirms delivery (or auto-confirm) ─► settle_order job
+  └─► Blnk  commit escrow
+            Escrow  ─► Merchant          goods − 5% fee + delivery
+            Escrow  ─► Revenue           5% platform fee
+            Revenue ─► Processing fees   Chapa's charge (absorbed by the platform)
+Buyer disputes ─► escrow frozen ─► admin: release (settle) or refund
+Payout request (verified shop + KYC, limits in Addis Ababa time)
+  └─► Blnk  Merchant ─inflight─► @World   (held; cannot be double-spent)
+Admin approves ─► Chapa transfer ─► verify ─► commit (void on failure)
+```
+
+The full design is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), including the ledger reference table, order state machine and job catalogue.
+
+## Tech stack
+
+| Concern | Choice |
+|---|---|
+| Language / HTTP | Go 1.26, chi v5 |
+| Data | PostgreSQL 16 (pgx v5, sqlc, goose), Redis 7 |
+| Ledger | Blnk 0.15 (self-hosted, double-entry, inflight holds) |
+| Payments | Chapa: checkout, verify, refunds, transfers |
+| Background jobs | River (Postgres-backed, transactional enqueue, periodic jobs) |
+| SMS | AfroMessage |
+| Auth | RS256 JWT + rotating refresh tokens, Argon2id passwords, SMS codes |
+| Tooling | testcontainers-go, gomock, golangci-lint v2, swag, Docker Compose, GitHub Actions |
+
+## Quick start
+
+Requirements: Go 1.26+, Docker, and `jq`, `curl` and `openssl` for the end-to-end script.
 
 ```bash
-# Clone the repository
-git clone https://github.com/nate/sukgebeya.git
-cd sukgebeya
-
-# Copy environment file
-cp .env.example .env
-
-# Generate RSA keys
-make generate-keys
-
-# Start services
-make docker-up
-
-# Run migrations (if not using docker)
-make migrate-up
-
-# Start the server
-make run
+cp .env.example .env          # development defaults: Chapa simulated in memory, SMS printed to the log
+make generate-keys            # RSA keys for JWT
+make local                    # Postgres, Redis, Blnk server + worker
+make seed-blnk                # create the ETB ledger and platform balances; writes their IDs into .env
+make run                      # API on :8080 (runs migrations on start)
+./scripts/e2e-money-flow.sh   # sign-up → SMS verify → shop → checkout → settlement → dispute → payout
 ```
 
-The API will be available at `http://localhost:8080`.
+- Swagger UI: http://localhost:8080/swagger/index.html
+- Health: http://localhost:8080/health (Postgres, Redis and ledger status)
 
-**Swagger Documentation**: `http://localhost:8080/swagger/index.html`
+In development, `CHAPA_MODE=mock`, `SMS_PROVIDER=log` and `OTP_DEV_CODE=123456` make the flow scriptable; config refuses all three outside development. To use the Chapa sandbox, set `CHAPA_MODE=live`, a `CHASECK_TEST-…` key, the webhook secret hash from the Chapa dashboard, and a public `CHAPA_CALLBACK_URL`. Every setting is documented in [.env.example](.env.example) and [.env.production.example](.env.production.example).
 
-## Prerequisites
+## API overview
 
-- Go 1.24+
-- PostgreSQL 16+
-- Redis 7+
-- Docker & Docker Compose (optional)
-- sqlc (for code generation)
-- goose (for migrations)
+All routes are under `/api/v1`; Swagger has the full contract. Endpoints that move money require an `Idempotency-Key` header.
 
-## Project Structure
-
-```
-.
-├── cmd/
-│   └── api/
-│       └── main.go              # Application entry point
-├── internal/
-│   ├── config/                  # Configuration management
-│   ├── db/                      # Generated sqlc code
-│   ├── domain/                  # Domain models (User, Note)
-│   │   ├── user.go
-│   │   ├── note.go
-│   │   └── common.go
-│   ├── errors/                  # Custom error types with codes
-│   ├── http/
-│   │   ├── handler/             # HTTP handlers by domain
-│   │   │   ├── auth_handler.go
-│   │   │   ├── user_handler.go
-│   │   │   ├── note_handler.go
-│   │   │   ├── health_handler.go
-│   │   │   ├── helpers.go
-│   │   │   └── responses.go
-│   │   ├── middleware/          # Chi middleware
-│   │   │   ├── auth.go
-│   │   │   ├── rate_limit.go
-│   │   │   ├── timeout.go       # Request timeout middleware
-│   │   │   └── common.go
-│   │   └── router.go            # Route definitions
-│   ├── repository/              # Data access layer
-│   │   ├── interfaces.go
-│   │   ├── user_repository.go
-│   │   ├── note_repository.go
-│   │   ├── redis.go
-│   │   ├── circuit_breaker.go   # Circuit breaker for Redis
-│   │   └── mocks/               # Generated repository mocks
-│   ├── service/                 # Business logic layer
-│   │   ├── interfaces.go        # Service interfaces
-│   │   ├── auth_service.go
-│   │   ├── user_service.go
-│   │   ├── note_service.go
-│   │   ├── mocks/               # Generated service mocks
-│   │   └── generate.go          # Mock generation
-│   └── testutil/                # Test utilities
-│       ├── postgres.go          # PostgreSQL testcontainers
-│       ├── redis.go             # Redis testcontainers
-│       ├── fixtures.go          # Test data builders
-│       └── context.go           # Context helpers
-├── pkg/                         # Reusable packages
-│   ├── jwt/
-│   │   ├── jwt.go               # JWT token management
-│   │   ├── keys.go              # RSA key handling
-│   │   ├── interfaces.go        # Token manager interfaces
-│   │   └── jwt_test.go          # Comprehensive unit tests
-│   ├── password/
-│   │   ├── argon2id.go          # Password hashing
-│   │   ├── interfaces.go        # Hasher interface
-│   │   └── argon2id_test.go     # Comprehensive unit tests
-│   ├── logger/
-│   │   ├── logger.go            # Structured logging with slog
-│   │   └── middleware.go        # HTTP request logging
-│   ├── response/
-│   │   └── response.go          # JSON response utilities
-│   └── validation/
-│       └── validation.go        # Request validation
-├── docs/                        # Documentation
-│   ├── SERVICE_INTERFACES.md    # Service interfaces guide
-│   ├── RESILIENCE.md            # Resilience patterns guide
-│   ├── swagger.json             # Generated Swagger spec
-│   ├── swagger.yaml
-│   └── docs.go
-├── .github/
-│   ├── workflows/
-│   │   └── ci.yml               # GitHub Actions CI/CD
-│   └── dependabot.yml           # Dependency updates
-├── migrations/                  # Database migrations
-├── sqlc/
-│   └── queries/
-│       └── queries.sql          # SQL queries for sqlc
-├── scripts/
-│   └── generate_keys.sh         # RSA key generation script
-├── keys/                        # RSA key pairs (generated)
-├── Makefile
-├── docker-compose.yml
-├── docker-compose-dev.yml       # Development with hot reload
-├── Dockerfile
-├── sqlc.yaml
-├── .golangci.yml                # Linter configuration
-└── .env.example
-```
-
-## Architecture
-
-### Layered Architecture
-
-```
-HTTP Layer (Handlers)
-       ↓
-Service Layer (Business Logic)
-       ↓
-Repository Layer (Data Access)
-       ↓
-Database (PostgreSQL/Redis)
-```
-
-- **Handlers** - Parse requests, validate input, call services, format responses
-- **Services** - Business logic, orchestration, domain rules
-- **Repositories** - Database operations, data persistence
-
-### Domain-Driven Structure
-
-Each domain (auth, user, note) has its own:
-- Handler file(s)
-- Service file with interface definition
-- Repository file with interface definition
-- Domain model(s)
-
-## API Endpoints
-
-### Public Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/health` | Health check (includes DB + Redis status) |
-| POST | `/api/v1/register` | Register new user |
-| POST | `/api/v1/login` | Login with email/phone |
-| POST | `/api/v1/refresh` | Refresh access token |
-| POST | `/api/v1/logout` | Logout (revoke refresh token) |
-
-### Authenticated Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/logout-all` | Logout from all devices |
-| GET | `/api/v1/users/me` | Get current user profile |
-| PUT | `/api/v1/users/me` | Update current user profile |
-| GET | `/api/v1/notes` | List user's notes |
-| POST | `/api/v1/notes` | Create note |
-| GET | `/api/v1/notes/{id}` | Get note by ID |
-| PUT | `/api/v1/notes/{id}` | Update note |
-| DELETE | `/api/v1/notes/{id}` | Soft delete note |
-| POST | `/api/v1/notes/{id}/restore` | Restore deleted note |
-
-### Admin Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/users` | List all users (paginated) |
-| GET | `/api/v1/users/{id}` | Get user by ID |
-| DELETE | `/api/v1/users/{id}` | Delete user |
-
-## Authentication Flow
-
-### Registration
-
-```bash
-# Register with email
-curl -X POST http://localhost:8080/api/v1/register \
-  -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com", "password": "password123"}'
-
-# Register with phone
-curl -X POST http://localhost:8080/api/v1/register \
-  -H "Content-Type: application/json" \
-  -d '{"phone": "+1234567890", "password": "password123"}'
-```
-
-### Login
-
-```bash
-# Login with email or phone
-curl -X POST http://localhost:8080/api/v1/login \
-  -H "Content-Type: application/json" \
-  -d '{"identifier": "user@example.com", "password": "password123"}'
-```
-
-### Using Access Token
-
-```bash
-curl http://localhost:8080/api/v1/notes \
-  -H "Authorization: Bearer <access_token>"
-```
-
-### Refreshing Tokens
-
-```bash
-curl -X POST http://localhost:8080/api/v1/refresh \
-  -H "Content-Type: application/json" \
-  -d '{"refresh_token": "<refresh_token>"}'
-```
-
-## Configuration
-
-Environment variables (see `.env.example`):
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Server port | `8080` |
-| `ENVIRONMENT` | Environment | `development` |
-| `DATABASE_URL` | PostgreSQL connection string | Required |
-| `REDIS_URL` | Redis connection string | Required |
-| `JWT_ACCESS_PRIVATE_KEY_PATH` | Access token private key path | `keys/access_private.pem` |
-| `JWT_ACCESS_PUBLIC_KEY_PATH` | Access token public key path | `keys/access_public.pem` |
-| `JWT_REFRESH_PRIVATE_KEY_PATH` | Refresh token private key path | `keys/refresh_private.pem` |
-| `JWT_REFRESH_PUBLIC_KEY_PATH` | Refresh token public key path | `keys/refresh_public.pem` |
-| `JWT_ACCESS_TTL` | Access token validity | `15m` |
-| `JWT_REFRESH_TTL` | Refresh token validity | `168h` (7 days) |
-| `ARGON2_MEMORY` | Argon2 memory (KB) | `65536` |
-| `ARGON2_ITERATIONS` | Argon2 iterations | `3` |
-| `ARGON2_PARALLELISM` | Argon2 parallelism | `2` |
-| `RATE_LIMIT_REQUESTS` | Rate limit requests per window | `100` |
-| `RATE_LIMIT_WINDOW` | Rate limit window | `1m` |
-| `LOG_FORMAT` | Log format (json/text) | `text` |
-| `LOG_LEVEL` | Log level (debug/info/warn/error) | `info` |
-
-## Database Schema
-
-### Users Table
-
-```sql
-CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255),
-    phone VARCHAR(20),
-    password_hash VARCHAR(255) NOT NULL,
-    role VARCHAR(50) NOT NULL DEFAULT 'user',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT users_email_or_phone CHECK (email IS NOT NULL OR phone IS NOT NULL)
-);
-```
-
-### Notes Table
-
-```sql
-CREATE TABLE notes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    title VARCHAR(255) NOT NULL,
-    content TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    deleted_at TIMESTAMPTZ
-);
-```
+| Area | Routes |
+|---|---|
+| Auth | `POST /register`, `/login`, `/refresh`, `/logout`, `/logout-all`, `/auth/otp/send`, `/auth/otp/verify`, `/auth/password/reset/{request,confirm}` |
+| Catalog (public) | `GET /products?q=&category_id=&merchant_id=`, `/products/{id or slug}`, `/categories`, `/shops/{slug}` |
+| Cart (guest or signed in) | `GET/DELETE /cart`, `POST /cart/items`, `PUT/DELETE /cart/items/{variantId}`, `POST /cart/merge` |
+| Buyer | `/addresses…`, `POST /orders/checkout`, `GET /orders[/{id}]`, `POST /orders/{id}/{cancel,confirm-delivery,dispute,payment/refresh}` |
+| Merchant | `POST /merchant/onboard`, `GET /merchant/dashboard`, `/merchant/products…` (variants, stock, images), `/merchant/orders…` (`status`, `ship`, `cancel`) |
+| Wallet | `GET /merchant/wallet[/transactions,/banks,/payouts]`, `POST /merchant/wallet/payout` |
+| Admin | users and KYC, merchant verification and wallets, `POST /admin/orders/{id}/resolve`, payouts `process`/`reject`, `GET /admin/reconciliation` |
+| Payments | `POST /webhooks/chapa` (signature verified), `GET /payments/chapa/callback` |
 
 ## Development
 
-### Available Make Commands
-
 ```bash
-# Building
-make build              # Build the binary
-
-# Running
-make run                # Run the application
-make air                # Run with hot reload (requires air)
-make dev                # Start services and run app
-make local              # Start only DB and Redis for local dev
-
-# Testing
-make test               # Run all tests
-make test-unit          # Run unit tests only
-make test-integration   # Run integration tests
-make test-coverage      # Run tests with coverage report
-
-# Code Quality
-make lint               # Run golangci-lint
-make fmt                # Format code
-make vet                # Run go vet
-make deps               # Download dependencies
-
-# Code Generation
-make sqlc-generate      # Generate sqlc code
-make swagger            # Generate swagger documentation
-make mocks              # Generate mocks for testing
-make generate-keys      # Generate RSA key pairs
-
-# Database
-make migrate-up         # Run database migrations
-make migrate-down       # Rollback migrations
-make migrate-status     # Check migration status
-make migrate-create     # Create new migration
-
-# Docker
-make docker-dev-up      # Start development services (with hot reload)
-make docker-dev-down    # Stop development services
-make docker-dev-logs    # View development logs
-make docker-prod-up     # Start production services
-make docker-prod-down   # Stop production services
-make docker-prod-logs   # View production logs
-make docker-build       # Build Docker image
-
-# Utilities
-make redis-cli          # Access Redis CLI
-make psql               # Access PostgreSQL CLI
+go test -short ./...   # unit tests, no Docker
+make test              # all tests with -race (integration tests use testcontainers)
+make lint              # golangci-lint v2
+make sqlc-generate     # after editing sqlc/queries or migrations
+make mocks             # after changing repository/service interfaces
+make swagger           # after changing handler annotations
 ```
 
-### Adding a New Migration
-
-```bash
-make migrate-create
-# Enter migration name when prompted
 ```
-
-### Generating sqlc Code
-
-After modifying `sqlc/queries/queries.sql`:
-
-```bash
-make sqlc-generate
+cmd/api            entrypoint and dependency wiring
+internal/service   business rules: checkout, payment, order, wallet, cart, OTP, reconciliation
+internal/jobs      River job types, workers, transactional enqueuer
+internal/http      router, handlers, middleware (auth, idempotency, rate limit, client IP)
+internal/blnk      ledger client, idempotent by reference
+internal/chapa     Chapa client + in-memory fake
+internal/repository, internal/db   data access (sqlc)
+pkg/phone, pkg/sms Ethiopian phone normalization, AfroMessage sender
+migrations         goose migrations (also the sqlc schema)
+scripts            Blnk setup, seed data, end-to-end money-flow test
 ```
-
-### Generating RSA Keys
-
-```bash
-make generate-keys
-# Or manually:
-./scripts/generate_keys.sh keys
-```
-
-### Generating Mocks
-
-```bash
-make mocks
-```
-
-## Testing
-
-### Test Structure
-
-- **Unit Tests** - Fast tests without external dependencies (`*_test.go`)
-- **Integration Tests** - Tests with real databases using testcontainers
-- **Test Utilities** - Shared test helpers in `internal/testutil/`
-
-### Running Tests
-
-```bash
-# Run all tests
-make test
-
-# Run unit tests only (fast)
-make test-unit
-
-# Run integration tests (requires Docker)
-make test-integration
-
-# Run with coverage
-make test-coverage
-```
-
-### Test Coverage
-
-- `pkg/password` - 8 test functions
-- `pkg/jwt` - 17 test functions
-- Target coverage: 70-80%
-
-### Testcontainers
-
-Integration tests use testcontainers for:
-- PostgreSQL - Real database testing
-- Redis - Real cache testing
-- Automatic cleanup after tests
-
-## API Documentation
-
-### Swagger UI
-
-Access interactive API documentation at:
-```
-http://localhost:8080/swagger/index.html
-```
-
-### Generating Swagger Docs
-
-```bash
-make swagger
-```
-
-Swagger documentation includes:
-- All 18 API endpoints
-- Request/response schemas
-- Authentication requirements
-- Error responses
-- Example values
-
-## Logging
-
-### Structured Logging
-
-The application uses Go's `slog` package for structured logging:
-
-**Development (text format)**:
-```
-level=INFO msg="Request completed" method=GET path=/api/v1/users/me status=200 duration_ms=45
-```
-
-**Production (JSON format)**:
-```json
-{"level":"info","msg":"Request completed","method":"GET","path":"/api/v1/users/me","status":200,"duration_ms":45}
-```
-
-### Features
-
-- **Format Selection** - JSON for production, text for development
-- **Request ID Tracking** - Every request has a unique ID
-- **Password Redaction** - Passwords automatically redacted from logs
-- **Performance Metrics** - Request duration in milliseconds
-- **Error Logging** - Detailed error information with context
-
-### Log Levels
-
-Set via `LOG_LEVEL` environment variable:
-- `debug` - Detailed debugging information
-- `info` - General operational information
-- `warn` - Warning conditions
-- `error` - Error conditions
-
-## Resilience Patterns
-
-### Request Timeout
-
-- 30-second timeout for all requests
-- Returns HTTP 408 when exceeded
-- Prevents resource exhaustion
-
-### Database Connection Pool
-
-Production-optimized configuration:
-- **Max Connections**: 25
-- **Min Connections**: 5
-- **Connection Lifetime**: 1 hour
-- **Idle Timeout**: 30 minutes
-- **Health Checks**: Every minute
-
-### Circuit Breaker for Redis
-
-Protects against Redis failures:
-- **Failure Threshold**: 60% failure rate
-- **Timeout**: 30 seconds before retry
-- **States**: Closed → Open → Half-Open
-- **Automatic Recovery**: Tests Redis health periodically
-
-See `docs/RESILIENCE.md` for detailed documentation.
-
-## CI/CD Pipeline
-
-### GitHub Actions
-
-Automated pipeline on every push and PR:
-
-**Jobs:**
-1. **lint** - Run golangci-lint
-2. **test** - Run unit tests with coverage
-3. **build** - Build binary and verify
-4. **swagger** - Verify swagger docs are current
-5. **docker** - Build and push Docker images (main/master only)
-
-### Dependabot
-
-Automated dependency updates:
-- Weekly updates for Go modules
-- Weekly updates for GitHub Actions
-- Grouped updates for better organization
-
-### Code Quality
-
-24+ linters enabled including:
-- errcheck, govet, staticcheck
-- gocyclo, gocritic, revive
-- misspell, godot, whitespace
-
-See `.golangci.yml` for full configuration.
-
-## Service Interfaces
-
-### Interface-Based Architecture
-
-All services implement interfaces for better testability:
-
-```go
-type Authenticator interface {
-    Register(ctx context.Context, input RegisterInput) (*AuthResult, error)
-    Login(ctx context.Context, input LoginInput) (*AuthResult, error)
-    // ...
-}
-
-type NoteManager interface {
-    Create(ctx context.Context, input CreateNoteInput) (*domain.Note, error)
-    // ...
-}
-
-type UserManager interface {
-    GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
-    // ...
-}
-```
-
-### Compile-Time Verification
-
-Services verify interface implementation at compile time:
-```go
-var _ Authenticator = (*AuthService)(nil)
-```
-
-### Using Mocks in Tests
-
-```go
-mockAuth := new(mocks.MockAuthenticator)
-mockAuth.On("Login", ctx, mock.Anything).
-    Return(&service.AuthResult{...}, nil)
-```
-
-See `docs/SERVICE_INTERFACES.md` for detailed documentation.
-
-## Request Validation
-
-The validation package uses `go-playground/validator` with custom validators:
-
-### Validation Tags
-
-| Tag | Description | Example |
-|-----|-------------|---------|
-| `required` | Field is required | `validate:"required"` |
-| `email` | Valid email format | `validate:"email"` |
-| `phone` | Valid E.164 phone | `validate:"phone"` |
-| `min` | Minimum length | `validate:"min=8"` |
-| `max` | Maximum length | `validate:"max=255"` |
-| `omitempty` | Skip if empty | `validate:"omitempty,email"` |
-
-### Validation Error Response
-
-```json
-[
-  {
-    "field": "Email",
-    "message": "Email must be a valid email address"
-  },
-  {
-    "field": "Password",
-    "message": "Password must be at least 8 characters"
-  }
-]
-```
-
-## Error Handling
-
-All errors follow a consistent format:
-
-```json
-{
-  "error": "Bad Request",
-  "code": "VALIDATION_ERROR",
-  "message": "Validation failed"
-}
-```
-
-### Error Codes
-
-| Code | HTTP Status | Description |
-|------|-------------|-------------|
-| `INTERNAL_ERROR` | 500 | Server error |
-| `NOT_FOUND` | 404 | Resource not found |
-| `UNAUTHORIZED` | 401 | Authentication required |
-| `FORBIDDEN` | 403 | Insufficient permissions |
-| `BAD_REQUEST` | 400 | Invalid request |
-| `CONFLICT` | 409 | Resource conflict |
-| `VALIDATION_ERROR` | 400 | Validation failed |
-| `RATE_LIMITED` | 429 | Too many requests |
-| `INVALID_TOKEN` | 401 | Invalid/expired token |
-| `INVALID_CREDENTIALS` | 401 | Wrong email/phone or password |
-| `EMAIL_EXISTS` | 409 | Email already registered |
-
-## Rate Limiting
-
-- Redis-backed distributed rate limiting
-- Rate limit headers in response:
-  - `X-RateLimit-Limit` - Maximum requests per window
-  - `X-RateLimit-Remaining` - Remaining requests
-  - `X-RateLimit-Reset` - Seconds until window resets
-
-## Deployment
-
-### Docker
-
-#### Development (with hot reload)
-```bash
-make docker-dev-up
-```
-
-#### Production
-```bash
-make docker-prod-up
-```
-
-### Manual Deployment
-
-1. Build the binary:
-   ```bash
-   make build
-   ```
-
-2. Generate keys:
-   ```bash
-   make generate-keys
-   ```
-
-3. Set environment variables
-
-4. Run migrations:
-   ```bash
-   make migrate-up
-   ```
-
-5. Run the binary:
-   ```bash
-   ./bin/api
-   ```
-
-### Health Check
-
-The health endpoint verifies all dependencies:
-
-```bash
-curl http://localhost:8080/health
-```
-
-Response:
-```json
-{
-  "status": "healthy",
-  "checks": {
-    "database": "ok",
-    "redis": "ok"
-  }
-}
-```
-
-## Security Considerations
-
-- **RSA JWT Signing** - Uses asymmetric encryption (RS256)
-- **Argon2id Password Hashing** - Memory-hard algorithm resistant to GPU attacks
-- **Refresh Token Rotation** - Old refresh tokens are revoked on use
-- **Rate Limiting** - Prevents brute force attacks
-- **CORS** - Configurable allowed origins
-- **Soft Delete** - Notes can be recovered if deleted accidentally
-- **Request Timeout** - Prevents DoS from slow requests
-- **Circuit Breaker** - Prevents cascading failures
-- **Password Redaction** - Passwords never appear in logs
 
 ## Documentation
 
-- **API Documentation** - `http://localhost:8080/swagger/index.html`
-- **Service Interfaces** - `docs/SERVICE_INTERFACES.md`
-- **Resilience Patterns** - `docs/RESILIENCE.md`
-- **Production Plan** - `nextplan.md`
+| Document | What's in it |
+|---|---|
+| [Architecture](docs/ARCHITECTURE.md) | Components, ledger model, order states, payment sequence, jobs, security |
+| [Design decisions](docs/DECISIONS.md) | Why River and not RabbitMQ, escrow timing, idempotency, fees, disputes, … |
+| [Engineering log](docs/ENGINEERING_LOG.md) | What the audit found, how it was fixed, bugs only the real ledger caught |
+| [Business analysis](docs/BUSINESS_ANALYSIS.md) | Unit economics, risks, a sharper wedge, pilot kill criteria |
+| [Roadmap](docs/ROADMAP.md) | Status, launch checklist, next features |
+| [Original spec](docs/original-spec.md) | The March 2026 design the project started from |
 
-## Contributing
+## Status
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests and linters (`make test lint`)
-5. Submit a pull request
+The Phase 1 MVP is complete and passes its end-to-end test against Blnk with the Chapa mock. It has not yet been run against the live Chapa sandbox or AfroMessage, and a production launch needs an NBE-compliant escrow arrangement. See the [roadmap](docs/ROADMAP.md).
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+[MIT](LICENSE) © 2026 Natnael Alemayehu
