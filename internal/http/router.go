@@ -87,7 +87,7 @@ func NewRouter(d Deps) *Router {
 	userHandler := handler.NewUserHandler(d.UserService)
 	merchantHandler := handler.NewMerchantHandler(d.MerchantService)
 	categoryHandler := handler.NewCategoryHandler(d.CategoryService)
-	productHandler := handler.NewProductHandler(d.ProductService, d.VariantService, d.InventoryService)
+	productHandler := handler.NewProductHandler(d.ProductService, d.VariantService, d.InventoryService, d.MerchantService)
 	addressHandler := handler.NewAddressHandler(d.AddressService)
 	healthHandler := handler.NewHealthHandler(d.DB, d.Redis, d.BlnkClient)
 	cartHandler := handler.NewCartHandler(d.CartService, d.VariantRepo)
@@ -173,6 +173,7 @@ func NewRouter(d Deps) *Router {
 
 			r.Get("/merchant/products", productHandler.ListMyProducts)
 			r.Post("/merchant/products", productHandler.CreateProduct)
+			r.Get("/merchant/products/{id}", productHandler.GetMyProduct)
 			r.Put("/merchant/products/{id}", productHandler.UpdateProduct)
 			r.Delete("/merchant/products/{id}", productHandler.DeleteProduct)
 			r.Post("/merchant/products/{id}/variants", productHandler.AddVariant)

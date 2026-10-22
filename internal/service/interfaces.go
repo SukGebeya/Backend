@@ -264,9 +264,10 @@ type MarkOrderShippedInput struct {
 }
 
 type OrderWithDetails struct {
-	Order    domain.Order
-	Items    []domain.OrderItem
-	Shipment *domain.Shipment
+	Order           domain.Order
+	Items           []domain.OrderItem
+	Shipment        *domain.Shipment
+	ShippingAddress *domain.Address
 }
 
 type WalletManager interface {

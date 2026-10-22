@@ -680,6 +680,8 @@ definitions:
         $ref: '#/definitions/internal_http_handler.OrderResponse'
       shipment:
         $ref: '#/definitions/internal_http_handler.ShipmentResponse'
+      shipping_address:
+        $ref: '#/definitions/internal_http_handler.AddressResponse'
     type: object
   internal_http_handler.OrderItemResponse:
     properties:
@@ -789,6 +791,11 @@ definitions:
         type: array
       product:
         $ref: '#/definitions/internal_http_handler.ProductResponse'
+      shop:
+        allOf:
+        - $ref: '#/definitions/internal_http_handler.ShopResponse'
+        description: Shop is set on the public product page so buyers see the seller
+          and delivery fee before paying.
       variants:
         items:
           $ref: '#/definitions/internal_http_handler.VariantResponse'
@@ -1005,6 +1012,8 @@ definitions:
       is_verified:
         type: boolean
       logo_url:
+        type: string
+      merchant_id:
         type: string
       shop_name:
         type: string
@@ -2995,6 +3004,45 @@ paths:
       security:
       - BearerAuth: []
       summary: Delete a product
+      tags:
+      - merchant
+    get:
+      consumes:
+      - application/json
+      description: Get a product you own in any status, with all its variants (including
+        inactive ones), stock and images.
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Product details with variants
+          schema:
+            $ref: '#/definitions/internal_http_handler.ProductDetailResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "404":
+          description: Product not found
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get one of your products
       tags:
       - merchant
     put:

@@ -155,6 +155,18 @@ expect 200 "$out" "Amharic search"
 [ "$(echo "$BODY" | jq -r '.items[0].in_stock')" = "true" ] || fail "listing shows stock"
 [ "$(echo "$BODY" | jq -r '.items[0].primary_image_url')" = "https://cdn.example.com/kemis.jpg" ] || fail "listing shows image"
 pass "listing shows price, stock and image"
+out=$(curl -s -w '\n%{http_code}' "$API/products/$PRODUCT")
+expect 200 "$out" "public product page"
+[ "$(echo "$BODY" | jq -r .shop.delivery_fee_cents)" = "15000" ] || fail "product page shows the shop's delivery fee"
+[ "$(echo "$BODY" | jq -r .shop.merchant_id)" = "$MERCHANT_ID" ] || fail "product page shows the shop"
+pass "product page shows the shop and its delivery fee"
+out=$(req GET "/merchant/products/$PRODUCT" "$SELLER")
+expect 200 "$out" "seller reads own product"
+[ "$(echo "$BODY" | jq -r '.variants | length')" = "1" ] || fail "seller sees the variant"
+out=$(req GET /merchant/products "$SELLER")
+expect 200 "$out" "seller lists products"
+[ "$(echo "$BODY" | jq -r '.items[0].id')" = "$PRODUCT" ] || fail "seller product list uses lowercase keys"
+pass "seller product list uses the standard paginated shape"
 
 step "Checkout"
 out=$(req POST /addresses "$BUYER" "{\"full_name\":\"Abebe Bikila\",\"phone\":\"09${SUFFIX}1\",\"line1\":\"Bole Sub-city, Woreda 03\",\"city\":\"Addis Ababa\",\"subcity\":\"Bole\",\"woreda\":\"03\",\"is_default\":true}")
@@ -180,6 +192,10 @@ FEES_BEFORE=$(blnk_balance "$FEES_ID")
 
 step "Payment and settlement"
 pay
+out=$(req GET "/merchant/orders/$ORDER" "$SELLER")
+expect 200 "$out" "merchant reads the order"
+[ "$(echo "$BODY" | jq -r .shipping_address.subcity)" = "Bole" ] || fail "merchant sees the delivery address"
+pass "merchant sees the delivery address"
 ship
 out=$(req POST "/orders/$ORDER/confirm-delivery" "$BUYER")
 expect 200 "$out" "buyer confirms delivery"

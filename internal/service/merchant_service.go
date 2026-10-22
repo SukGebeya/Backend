@@ -200,6 +200,10 @@ func (s *MerchantService) GetByUserID(ctx context.Context, userID uuid.UUID) (*d
 	return s.merchantRepo.GetByUserID(ctx, userID)
 }
 
+func (s *MerchantService) GetByID(ctx context.Context, id uuid.UUID) (*domain.MerchantProfile, error) {
+	return s.merchantRepo.GetByID(ctx, id)
+}
+
 func (s *MerchantService) GetBySlug(ctx context.Context, slug string) (*domain.MerchantProfile, error) {
 	return s.merchantRepo.GetBySlug(ctx, slug)
 }

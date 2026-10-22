@@ -36,6 +36,14 @@ type OrderService struct {
 	txManager     repository.TransactionManager
 	enqueuer      jobs.Enqueuer
 	autoConfirm   time.Duration
+	addressRepo   repository.AddressRepository
+}
+
+// WithAddresses lets order details include the delivery address, which the
+// merchant needs to ship and cannot read through the buyer's address book.
+func (s *OrderService) WithAddresses(repo repository.AddressRepository) *OrderService {
+	s.addressRepo = repo
+	return s
 }
 
 // WithAutoConfirm sets how long after shipping a delivery is confirmed on the
@@ -254,10 +262,20 @@ func (s *OrderService) GetOrderWithDetails(ctx context.Context, orderID uuid.UUI
 		shipment, _ = s.shipmentRepo.GetByOrderID(ctx, orderID)
 	}
 
+	// The address is a reference, not a snapshot: a buyer who deletes it leaves the order without one.
+	var address *domain.Address
+	if s.addressRepo != nil && order.ShippingAddressID != nil {
+		address, err = s.addressRepo.GetByID(ctx, *order.ShippingAddressID)
+		if err != nil && !domainerrors.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to get shipping address: %w", err)
+		}
+	}
+
 	return &OrderWithDetails{
-		Order:    *order,
-		Items:    items,
-		Shipment: shipment,
+		Order:           *order,
+		Items:           items,
+		Shipment:        shipment,
+		ShippingAddress: address,
 	}, nil
 }
 

@@ -7,6 +7,8 @@
 
 **Gebeya** (ገበያ, "marketplace") is a backend for small and informal merchants in Ethiopia. Merchants get a storefront and a wallet. Buyers pay with Telebirr, CBE Birr or card through [Chapa](https://chapa.co), and the money is held in escrow until the buyer confirms delivery. Every birr is recorded in a [Blnk](https://github.com/blnkfinance/blnk) double-entry ledger, which becomes each merchant's verifiable sales history: the basis for working-capital loans later.
 
+**Frontend:** a SvelteKit web app for buyers and sellers lives in [SukGebeya/Frontend](https://github.com/SukGebeya/Frontend).
+
 ## Highlights
 
 - **Escrow that reconciles.** Payments are re-verified with Chapa (status, exact amount, live mode) before escrow is created. Settlement, refunds, chargebacks and payouts are retryable background jobs, idempotent through deterministic ledger references. A daily job cross-checks the ledger against Postgres.
@@ -22,7 +24,7 @@
   - Order status changes are compare-and-set.
   - Stock reservations move from cart to order without double counting.
   - Idempotency keys are scoped per user and locked against concurrent duplicates.
-- **Tested against the real thing.** 99 test functions (Postgres and Redis via testcontainers, about 15 s) plus an HTTP end-to-end script that runs the whole money flow against a live Blnk ledger and checks balances.
+- **Tested against the real thing.** 100 test functions (Postgres and Redis via testcontainers, about 15 s) plus an HTTP end-to-end script that runs the whole money flow against a live Blnk ledger and checks balances.
 
 ## How money moves
 
@@ -88,7 +90,7 @@ All routes are under `/api/v1`; Swagger has the full contract. Endpoints that mo
 | Catalog (public) | `GET /products?q=&category_id=&merchant_id=`, `/products/{id or slug}`, `/categories`, `/shops/{slug}` |
 | Cart (guest or signed in) | `GET/DELETE /cart`, `POST /cart/items`, `PUT/DELETE /cart/items/{variantId}`, `POST /cart/merge` |
 | Buyer | `/addresses…`, `POST /orders/checkout`, `GET /orders[/{id}]`, `POST /orders/{id}/{cancel,confirm-delivery,dispute,payment/refresh}` |
-| Merchant | `POST /merchant/onboard`, `GET /merchant/dashboard`, `/merchant/products…` (variants, stock, images), `/merchant/orders…` (`status`, `ship`, `cancel`) |
+| Merchant | `POST /merchant/onboard`, `GET /merchant/dashboard`, `/merchant/products…` (any status, variants, stock, images), `/merchant/orders…` (with the delivery address; `status`, `ship`, `cancel`) |
 | Wallet | `GET /merchant/wallet[/transactions,/banks,/payouts]`, `POST /merchant/wallet/payout` |
 | Admin | users and KYC, merchant verification and wallets, `POST /admin/orders/{id}/resolve`, payouts `process`/`reject`, `GET /admin/reconciliation` |
 | Payments | `POST /webhooks/chapa` (signature verified), `GET /payments/chapa/callback` |

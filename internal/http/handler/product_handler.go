@@ -16,17 +16,20 @@ type ProductHandler struct {
 	productService   *service.ProductService
 	variantService   *service.ProductVariantService
 	inventoryService *service.InventoryService
+	merchantService  *service.MerchantService
 }
 
 func NewProductHandler(
 	productService *service.ProductService,
 	variantService *service.ProductVariantService,
 	inventoryService *service.InventoryService,
+	merchantService *service.MerchantService,
 ) *ProductHandler {
 	return &ProductHandler{
 		productService:   productService,
 		variantService:   variantService,
 		inventoryService: inventoryService,
+		merchantService:  merchantService,
 	}
 }
 
@@ -95,6 +98,8 @@ type ProductDetailResponse struct {
 	Product  ProductResponse   `json:"product"`
 	Variants []VariantResponse `json:"variants"`
 	Images   []ImageResponse   `json:"images"`
+	// Shop is set on the public product page so buyers see the seller and delivery fee before paying.
+	Shop *ShopResponse `json:"shop,omitempty"`
 }
 
 type ProductSummaryResponse struct {
@@ -263,6 +268,45 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	merchant, err := h.merchantService.GetByID(r.Context(), product.MerchantID)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	h.writeProductDetail(w, r, product, variants, toShopResponse(merchant))
+}
+
+// GetMyProduct godoc
+// @Summary Get one of your products
+// @Description Get a product you own in any status, with all its variants (including inactive ones), stock and images.
+// @Tags merchant
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Product ID"
+// @Success 200 {object} ProductDetailResponse "Product details with variants"
+// @Failure 401 {object} response.ErrorResponse "Unauthorized"
+// @Failure 403 {object} response.ErrorResponse "Forbidden"
+// @Failure 404 {object} response.ErrorResponse "Product not found"
+// @Failure 500 {object} response.ErrorResponse "Internal server error"
+// @Router /merchant/products/{id} [get]
+func (h *ProductHandler) GetMyProduct(w http.ResponseWriter, r *http.Request) {
+	product, ok := h.ownedProduct(w, r)
+	if !ok {
+		return
+	}
+
+	variants, err := h.variantService.GetByProduct(r.Context(), product.ID)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+
+	h.writeProductDetail(w, r, product, variants, nil)
+}
+
+func (h *ProductHandler) writeProductDetail(w http.ResponseWriter, r *http.Request, product *domain.Product, variants []domain.ProductVariant, shop *ShopResponse) {
 	stock, err := h.inventoryService.GetByProductID(r.Context(), product.ID)
 	if err != nil {
 		response.Error(w, err)
@@ -289,6 +333,7 @@ func (h *ProductHandler) GetProduct(w http.ResponseWriter, r *http.Request) {
 		Product:  toProductResponse(product),
 		Variants: variantResponses,
 		Images:   toImageResponses(images),
+		Shop:     shop,
 	})
 }
 
@@ -422,7 +467,18 @@ func (h *ProductHandler) ListMyProducts(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	response.JSON(w, http.StatusOK, result)
+	products := make([]ProductResponse, len(result.Items))
+	for i, p := range result.Items {
+		products[i] = toProductResponse(&p)
+	}
+
+	response.JSON(w, http.StatusOK, response.PaginatedResponse{
+		Items:      products,
+		Total:      result.Total,
+		Page:       result.Page,
+		PerPage:    result.PerPage,
+		TotalPages: result.TotalPages,
+	})
 }
 
 // CreateProduct godoc

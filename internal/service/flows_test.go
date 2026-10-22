@@ -232,6 +232,22 @@ func TestFulfilmentAndSettlement(t *testing.T) {
 	require.Equal(t, int64(20000), merchant.TotalSalesCents)
 }
 
+func TestOrderDetails_IncludeShippingAddress(t *testing.T) {
+	h := newHarness(t)
+	f := h.seed(t, 10000, 10)
+	order := h.paidOrder(t, f, 1)
+
+	details, err := h.order.GetOrderWithDetails(h.ctx, order.ID)
+	require.NoError(t, err)
+	require.NotNil(t, details.ShippingAddress, "the merchant needs the address to deliver")
+	require.Equal(t, f.address.ID, details.ShippingAddress.ID)
+
+	require.NoError(t, h.addresses.Delete(h.ctx, f.address.ID))
+	details, err = h.order.GetOrderWithDetails(h.ctx, order.ID)
+	require.NoError(t, err)
+	require.Nil(t, details.ShippingAddress)
+}
+
 func TestSettleOrder_RetriesAfterPartialFailure(t *testing.T) {
 	h := newHarness(t)
 	f := h.seed(t, 10000, 10)

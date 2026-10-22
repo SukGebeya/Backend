@@ -97,7 +97,8 @@ func newHarness(t *testing.T) *harness {
 		Orders: h.orders, Payments: h.payments, Inventory: h.inventory, Merchants: h.merchants, WalletTxns: h.walletTxns,
 		Blnk: h.blnk, Chapa: h.chapa, TxManager: txManager, Enqueuer: h.enqueuer,
 	})
-	h.order = NewOrderService(h.orders, h.merchants, h.shipments, h.walletTxns, h.payments, h.blnk, h.inventory, txManager, h.enqueuer)
+	h.order = NewOrderService(h.orders, h.merchants, h.shipments, h.walletTxns, h.payments, h.blnk, h.inventory, txManager, h.enqueuer).
+		WithAddresses(h.addresses)
 	h.wallet = NewWalletService(h.merchants, h.users, h.walletTxns, h.payouts, h.blnk, h.chapa, txManager, h.enqueuer).
 		WithPolicy(PayoutPolicy{MinCents: 100, DailyLimitCents: 1_000_000, RequireKYC: true})
 	h.inventorySvc = NewInventoryService(h.inventory)

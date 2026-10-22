@@ -84,6 +84,7 @@ type UpdateMerchantRequest struct {
 }
 
 type ShopResponse struct {
+	MerchantID   string `json:"merchant_id"`
 	ShopSlug     string `json:"shop_slug"`
 	ShopName     string `json:"shop_name"`
 	Description  string `json:"description,omitempty"`
@@ -344,6 +345,7 @@ func toMerchantProfileResponse(m *domain.MerchantProfile) *MerchantProfileRespon
 
 func toShopResponse(m *domain.MerchantProfile) *ShopResponse {
 	return &ShopResponse{
+		MerchantID:   m.ID.String(),
 		ShopSlug:     m.ShopSlug,
 		ShopName:     m.ShopName,
 		Description:  ptrToStr(m.ShopDescription),

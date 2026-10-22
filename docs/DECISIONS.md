@@ -2,6 +2,18 @@
 
 A running record of decisions that shaped the system, newest first. Each entry gives the choice, the alternatives considered, and why.
 
+## D-016 · The API trusts one proxy hop when the frontend fronts it (Oct 2026)
+
+**Choice:** Run the API with `TRUSTED_PROXY_COUNT=1`; the frontend server sets `X-Forwarded-For` to the browser's address on every call.
+**Alternatives:** Keep `0` and rate-limit by socket address; exempt the frontend from rate limits.
+**Why:** With a backend-for-frontend, every request reaches the API from the frontend server's address, so all users shared one rate-limit bucket. The first end-to-end run through the UI hit the 100-a-minute limit and the auth limit within seconds. Trusting one hop restores per-user limits. Requests without the header (Chapa webhooks, direct callers) still fall back to the socket address, so they can't borrow another bucket. In production the reverse proxy in front of both appends the caller's address, so the entry the API trusts is always one a trusted hop wrote; the frontend reads the same entry (`ADDRESS_HEADER`, `XFF_DEPTH=1`) and forwards it.
+
+## D-015 · SvelteKit frontend as a backend-for-frontend, scoped to the payment-link wedge (Oct 2026)
+
+**Choice:** A separate SvelteKit 3 app ([SukGebeya/Frontend](https://github.com/SukGebeya/Frontend)) whose server makes every API call. Tokens live in httpOnly cookies, every change is a form action that works without JavaScript, and the pages cover the wedge from [BUSINESS_ANALYSIS.md](BUSINESS_ANALYSIS.md): a shareable product link, checkout, payment return, orders, and the seller's shop, orders and wallet. Admin stays in Swagger.
+**Alternatives:** A React SPA holding tokens in browser storage; a full marketplace UI with browsing and search.
+**Why:** Tokens out of JavaScript's reach removes a whole class of XSS impact for an app that moves money. Server-rendered forms suit cheap Android phones on slow networks. Building browsing and search first would invest in the destination-marketplace path the business analysis rates weakest. Svelte was the owner's choice.
+
 ## D-014 · Keep River instead of RabbitMQ (Oct 2026)
 
 **Choice:** River, a Postgres-backed job queue, for all background work.

@@ -200,7 +200,8 @@ func run() error {
 	addressService := service.NewAddressService(addressRepo)
 	cartService := service.NewCartService(cartRepo, cartItemRepo, sessionRepo, variantRepo, inventoryRepo, enqueuer).WithCatalog(productRepo)
 	orderService := service.NewOrderService(orderRepo, merchantRepo, shipmentRepo, walletRepo, paymentRepo, blnkClient, inventoryRepo, txManager, enqueuer).
-		WithAutoConfirm(time.Duration(cfg.Platform.AutoConfirmDeliveryDays) * 24 * time.Hour)
+		WithAutoConfirm(time.Duration(cfg.Platform.AutoConfirmDeliveryDays) * 24 * time.Hour).
+		WithAddresses(addressRepo)
 	checkoutService := service.NewCheckoutService(cartRepo, cartItemRepo, orderRepo, paymentRepo, addressRepo, inventoryRepo, productRepo, variantRepo, userRepo, merchantRepo, chapaClient, txManager, enqueuer, service.CheckoutConfig{
 		FeePercent:               cfg.Platform.FeePercent,
 		PaymentTimeout:           cfg.Platform.PaymentTimeout,

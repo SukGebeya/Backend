@@ -56,9 +56,10 @@ type ShipmentResponse struct {
 }
 
 type OrderDetailResponse struct {
-	Order    OrderResponse       `json:"order"`
-	Items    []OrderItemResponse `json:"items"`
-	Shipment *ShipmentResponse   `json:"shipment,omitempty"`
+	Order           OrderResponse       `json:"order"`
+	Items           []OrderItemResponse `json:"items"`
+	Shipment        *ShipmentResponse   `json:"shipment,omitempty"`
+	ShippingAddress *AddressResponse    `json:"shipping_address,omitempty"`
 }
 
 type OrderItemResponse struct {
@@ -545,11 +546,16 @@ func toOrderDetailResponseWithShipment(od *service.OrderWithDetails) OrderDetail
 		}
 	}
 
-	return OrderDetailResponse{
+	resp := OrderDetailResponse{
 		Order:    toOrderResponse(&od.Order),
 		Items:    items,
 		Shipment: toShipmentResponse(od.Shipment),
 	}
+	if od.ShippingAddress != nil {
+		addr := toAddressResponse(od.ShippingAddress)
+		resp.ShippingAddress = &addr
+	}
+	return resp
 }
 
 // GetMerchantOrder godoc

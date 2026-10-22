@@ -2495,6 +2495,65 @@ const docTemplate = `{
             }
         },
         "/merchant/products/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a product you own in any status, with all its variants (including inactive ones), stock and images.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "merchant"
+                ],
+                "summary": "Get one of your products",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Product details with variants",
+                        "schema": {
+                            "$ref": "#/definitions/internal_http_handler.ProductDetailResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Product not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_SukGebeya_Backend_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "put": {
                 "security": [
                     {
@@ -5559,6 +5618,9 @@ const docTemplate = `{
                 },
                 "shipment": {
                     "$ref": "#/definitions/internal_http_handler.ShipmentResponse"
+                },
+                "shipping_address": {
+                    "$ref": "#/definitions/internal_http_handler.AddressResponse"
                 }
             }
         },
@@ -5722,6 +5784,14 @@ const docTemplate = `{
                 },
                 "product": {
                     "$ref": "#/definitions/internal_http_handler.ProductResponse"
+                },
+                "shop": {
+                    "description": "Shop is set on the public product page so buyers see the seller and delivery fee before paying.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/internal_http_handler.ShopResponse"
+                        }
+                    ]
                 },
                 "variants": {
                     "type": "array",
@@ -6034,6 +6104,9 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "logo_url": {
+                    "type": "string"
+                },
+                "merchant_id": {
                     "type": "string"
                 },
                 "shop_name": {

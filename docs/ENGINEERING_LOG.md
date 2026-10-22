@@ -81,15 +81,34 @@ Business decisions taken in this session: keep River rather than RabbitMQ, no ca
 
 **Result:** the e2e script covers phone sign-up, SMS verification, an Amharic shop and product, checkout with delivery, settlement (merchant receives 4,900 ETB; revenue keeps the 250 ETB fee minus Chapa's 180.25 ETB), a dispute leading to a refund, payout gating and completion, and reconciliation. All 9 merchant wallets reconciled.
 
+## October 2026, session 3: a frontend
+
+A SvelteKit 3 / Svelte 5 web app now lives in a sibling repo, [SukGebeya/Frontend](https://github.com/SukGebeya/Frontend) (decision D-015). Its Playwright test drives a seller and a buyer through the same flow as `scripts/e2e-money-flow.sh`, in the browser: sign-up with SMS code, onboarding, listing a product, paying through the shared link, shipping, confirming delivery, settlement into the wallet, and a payout request.
+
+Building real screens against the API surfaced gaps the curl-based script never hit:
+
+| Found | Fix |
+|---|---|
+| The seller's order had only `shipping_address_id`, and addresses are readable only by their owner, so a seller could not see where to deliver | Order details include `shipping_address` (`OrderService.WithAddresses`) |
+| The public product page had no shop, so buyers could not see the seller, the verified badge or the delivery fee before paying | `GET /products/{slug}` includes `shop`; `ShopResponse` gains `merchant_id` so a shop page can list its products |
+| Sellers had no way to read a draft product or a hidden option | `GET /merchant/products/{id}` returns any status and all options |
+| `GET /merchant/products` serialized a Go struct without JSON tags (`Items`, `TotalPages`), unlike every other list | Mapped to the standard paginated response |
+| Behind the frontend, every user shared one rate-limit bucket | `TRUSTED_PROXY_COUNT=1` with the frontend forwarding the client address (D-016) |
+
+Frontend findings worth recording:
+- swag marks every response field optional; the frontend's codegen reads the Go structs and marks fields required unless they are `omitempty`.
+- Svelte's `value={…}` overwrote what people typed before the page hydrated; inputs use `defaultValue` instead, which matters on slow mobile connections.
+- `pattern="[0-9]{6}"` in Svelte markup becomes `[0-9]6` (the braces are an expression), which silently blocked the SMS code form.
+
 ## Numbers
 
 | | Before | After |
 |---|---|---|
 | Test suite runtime | 8+ min, failing | ~15 s, passing with `-race` |
-| Test functions | ~30 | 99 |
+| Test functions | ~30 | 100 |
 | golangci-lint findings | 958 (config ignored) | 0 |
 | Migrations | 16 | 22 |
-| HTTP routes | ~60 | 81 |
+| HTTP routes | ~60 | 82 |
 
 ## Open questions to write about
 
