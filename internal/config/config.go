@@ -47,6 +47,9 @@ type Argon2Config struct {
 type RateLimitConfig struct {
 	Requests int
 	Window   time.Duration
+	// AuthRequests limits login, registration, SMS codes and password resets per
+	// client per minute.
+	AuthRequests int
 }
 
 type LoggerConfig struct {
@@ -71,6 +74,12 @@ type ChapaConfig struct {
 	WebhookSecret string
 	CallbackURL   string
 	ReturnURL     string
+
+	// Used only with CHAPA_MODE=mock: where the API serves the mock Chapa, where
+	// the mock sends webhooks, and how long its transfers stay pending.
+	MockURL           string
+	MockWebhookURL    string
+	MockTransferDelay time.Duration
 }
 
 const (
@@ -86,6 +95,9 @@ type PlatformConfig struct {
 	PayoutDailyLimitCents    int64
 	RequirePhoneVerification bool
 	Timezone                 *time.Location
+	// PayoutRecheckInterval is how long the payout job waits before asking Chapa
+	// whether a transfer has settled.
+	PayoutRecheckInterval time.Duration
 }
 
 const (
@@ -116,8 +128,9 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("error loading .env file: %w", err)
 	}
 
+	port := getEnv("PORT", "8080")
 	cfg := &Config{
-		Port:        getEnv("PORT", "8080"),
+		Port:        port,
 		Environment: getEnv("ENVIRONMENT", "development"),
 		DatabaseURL: os.Getenv("DATABASE_URL"),
 		RedisURL:    os.Getenv("REDIS_URL"),
@@ -139,6 +152,8 @@ func Load() (*Config, error) {
 		RateLimit: RateLimitConfig{
 			Requests: parseInt(getEnv("RATE_LIMIT_REQUESTS", "100"), 100),
 			Window:   parseDuration(getEnv("RATE_LIMIT_WINDOW", "1m"), time.Minute),
+
+			AuthRequests: parseInt(getEnv("AUTH_RATE_LIMIT_REQUESTS", "10"), 10),
 		},
 		Logger: LoggerConfig{
 			Format: getEnv("LOG_FORMAT", "text"),
@@ -160,6 +175,10 @@ func Load() (*Config, error) {
 			WebhookSecret: os.Getenv("CHAPA_WEBHOOK_SECRET"),
 			CallbackURL:   getEnv("CHAPA_CALLBACK_URL", ""),
 			ReturnURL:     getEnv("CHAPA_RETURN_URL", ""),
+
+			MockURL:           strings.TrimRight(getEnv("CHAPA_MOCK_URL", "http://localhost:"+port+"/mock-chapa"), "/"),
+			MockWebhookURL:    getEnv("CHAPA_MOCK_WEBHOOK_URL", "http://localhost:"+port+"/api/v1/webhooks/chapa"),
+			MockTransferDelay: parseDuration(getEnv("CHAPA_MOCK_TRANSFER_DELAY", "5s"), 5*time.Second),
 		},
 		CORS: CORSConfig{
 			AllowedOrigins: parseStringSlice(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173"), []string{"http://localhost:3000", "http://localhost:5173"}),
@@ -174,6 +193,7 @@ func Load() (*Config, error) {
 			PayoutMinCents:           int64(parseInt(getEnv("PAYOUT_MIN_CENTS", "10000"), 10000)),
 			PayoutDailyLimitCents:    int64(parseInt(getEnv("PAYOUT_DAILY_LIMIT_CENTS", "10000000"), 10000000)),
 			RequirePhoneVerification: getEnv("REQUIRE_PHONE_VERIFICATION", "true") == "true",
+			PayoutRecheckInterval:    parseDuration(getEnv("PAYOUT_RECHECK_INTERVAL", "2m"), 2*time.Minute),
 		},
 		SMS: SMSConfig{
 			Provider:          getEnv("SMS_PROVIDER", SMSProviderLog),

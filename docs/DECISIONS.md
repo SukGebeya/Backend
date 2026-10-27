@@ -2,6 +2,12 @@
 
 A running record of decisions that shaped the system, newest first. Each entry gives the choice, the alternatives considered, and why.
 
+## D-017 · Mock Chapa is an HTTP server the real client talks to (Oct 2026)
+
+**Choice:** With `CHAPA_MODE=mock`, the API serves an imitation of Chapa at `/mock-chapa` (`internal/chapamock`) and points the real `chapa.Client` at it. The buyer lands on a hosted checkout, picks Telebirr, CBE Birr or a test card, and pays, declines or cancels. The mock then sends signed webhooks and the GET callback the way Chapa does. Refunds succeed. Transfers settle after `CHAPA_MOCK_TRANSFER_DELAY`, and account numbers ending in `0000` fail. A dashboard lists everything and can reverse a payment (a chargeback).
+**Alternatives:** Keep the in-process `chapa.FakeClient`, which verified every payment as successful; run the mock as a separate container; wait for sandbox credentials.
+**Why:** The fake skipped the parts most likely to break: the redirect to Chapa and back, webhook signatures, the callback, Chapa's request validation (local phone format, tx_ref length, currency), and every unhappy path (declines, cancellations, failed transfers, chargebacks). Talking HTTP also tests the real client's request building and response parsing. Serving it from the API process means nothing extra to run. It is mounted outside the router so the API's rate limits don't apply to its pages, and its state lives in Redis so it survives restarts. Telebirr needs no separate integration: Chapa offers it as a payment method and as a transfer destination (bank code 855), and that is what the mock imitates. The mock can only encode what Chapa documents, so the sandbox checks in [ROADMAP.md](ROADMAP.md) still stand.
+
 ## D-016 · The API trusts one proxy hop when the frontend fronts it (Oct 2026)
 
 **Choice:** Run the API with `TRUSTED_PROXY_COUNT=1`; the frontend server sets `X-Forwarded-For` to the browser's address on every call.

@@ -1,10 +1,10 @@
 # Roadmap and status
 
-Last updated: 2026-10-22.
+Last updated: 2026-10-27.
 
 ## Status
 
-The Phase 1 MVP is implemented. `go test -race ./...` passes, golangci-lint reports 0 issues, and `scripts/e2e-money-flow.sh` passes against Blnk 0.15.6 (API auth on) with the Chapa mock. The Chapa sandbox and AfroMessage have **not** been tested live.
+The Phase 1 MVP is implemented. `go test -race ./...` passes, golangci-lint reports 0 issues, and `scripts/e2e-money-flow.sh` passes against Blnk 0.15.6 (API auth on). `scripts/e2e-endpoints.sh` calls all 83 routes and checks their data. Both pay through the mock Chapa (D-017), whose hosted checkout offers Telebirr, CBE Birr and a test card, and which also handles refunds, payouts and chargebacks. The Chapa sandbox and AfroMessage have **not** been tested live.
 
 A SvelteKit web app ([SukGebeya/Frontend](https://github.com/SukGebeya/Frontend)) covers the buyer and seller flows in Amharic and English; its Playwright test runs the same money flow through the browser. Admin work is still done in Swagger.
 
@@ -37,6 +37,7 @@ Smaller follow-ups found while building the frontend:
 - **Per-order Chapa `return_url`** (`…/payment/complete?order=<id>`). Today the frontend remembers the order in a cookie, which fails if the buyer finishes paying on another device.
 - **Admin pages** for KYC, shop verification, disputes and payout approval.
 - **A status filter** on `GET /merchant/orders`.
+- **Clearing a product description.** `PUT /merchant/products/{id}` ignores empty fields, so a seller can replace a description but not remove it.
 
 ## Not planned for the MVP
 

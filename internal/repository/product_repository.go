@@ -11,6 +11,7 @@ import (
 	domainerrors "github.com/SukGebeya/Backend/internal/errors"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -24,6 +25,18 @@ func NewProductRepository(pool *pgxpool.Pool) ProductRepository {
 }
 
 var _ ProductRepository = (*productRepository)(nil)
+
+// ErrStillReferenced is returned by Delete when orders still point at the row
+// (order_items restricts deleting a variant that was sold).
+var ErrStillReferenced = errors.New("still referenced by orders")
+
+func mapDeleteError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+		return ErrStillReferenced
+	}
+	return err
+}
 
 func (r *productRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Product, error) {
 	product, err := r.queries.GetProductByID(ctx, id)
@@ -202,7 +215,7 @@ func (r *productRepository) Update(ctx context.Context, product *domain.Product)
 }
 
 func (r *productRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.queries.DeleteProduct(ctx, id)
+	return mapDeleteError(r.queries.DeleteProduct(ctx, id))
 }
 
 func (r *productRepository) CountByMerchant(ctx context.Context, merchantID uuid.UUID) (int64, error) {
@@ -435,7 +448,7 @@ func (r *productVariantRepository) Update(ctx context.Context, variant *domain.P
 }
 
 func (r *productVariantRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.queries.DeleteVariant(ctx, id)
+	return mapDeleteError(r.queries.DeleteVariant(ctx, id))
 }
 
 func (r *productVariantRepository) DeleteByProduct(ctx context.Context, productID uuid.UUID) error {

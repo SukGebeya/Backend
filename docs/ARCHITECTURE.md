@@ -30,7 +30,7 @@ flowchart LR
 | Services | `internal/service` | All business rules and orchestration. Each method that changes state does it in one DB transaction and enqueues follow-up jobs inside that same transaction. |
 | Jobs | `internal/jobs` | River job types and thin workers. Workers call services through small interfaces (`PaymentProcessor`, `OrderSettler`, …) to avoid an import cycle. |
 | Data | `internal/repository`, `internal/db` | sqlc-generated queries (`sqlc/queries/*.sql`) wrapped in repositories that map rows to domain types and errors to `internal/errors`. |
-| Integrations | `internal/blnk`, `internal/chapa`, `pkg/sms` | Clients for the ledger, payments and SMS, plus an in-memory Chapa fake for development. |
+| Integrations | `internal/blnk`, `internal/chapa`, `pkg/sms` | Clients for the ledger, payments and SMS, plus `internal/chapamock`, an HTTP imitation of Chapa the real client talks to in development (`CHAPA_MODE=mock`). |
 | Shared | `pkg/phone`, `pkg/jwt`, `pkg/password`, `pkg/validation`, `pkg/logger`, `pkg/response` | Reusable building blocks. |
 
 Wiring happens in one place, `cmd/api/main.go`. The router receives every dependency through `apphttp.Deps`.
@@ -146,4 +146,4 @@ Jobs are inserted with `jobs.Enqueuer.EnqueueTx` inside the business transaction
 - **Unit tests:** run with `go test -short ./...`.
 - **Integration tests:** use one Postgres and one Redis container per package (testcontainers). Each test clones a fresh database from a migrated template, so the suite runs in about 15 seconds.
 - **Service flows:** the harness in `internal/service/harness_test.go` runs real Postgres and mocks Blnk and Chapa (`internal/mocks`).
-- **End to end:** `scripts/e2e-money-flow.sh` drives the whole money flow through HTTP against real Blnk and checks ledger balances.
+- **End to end:** `scripts/e2e-money-flow.sh` drives the whole money flow through HTTP against real Blnk and checks ledger balances. `scripts/e2e-endpoints.sh` calls every route, including the unhappy payment paths, and fails if any route never returned a 2xx. Both pay through the mock Chapa's hosted checkout.

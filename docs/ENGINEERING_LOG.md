@@ -100,15 +100,38 @@ Frontend findings worth recording:
 - Svelte's `value={…}` overwrote what people typed before the page hydrated; inputs use `defaultValue` instead, which matters on slow mobile connections.
 - `pattern="[0-9]{6}"` in Svelte markup becomes `[0-9]6` (the braces are an expression), which silently blocked the SMS code form.
 
+## October 2026, session 4: every endpoint end to end, with a mock Chapa
+
+The goal: every endpoint working and every important piece of data flowing end to end, with no Chapa account. Chapa, including Telebirr, is now an HTTP mock served by the API (D-017), and the real client talks to it. `scripts/e2e-endpoints.sh` calls all 83 routes, checks the data each returns, and fails unless every route returned a 2xx at least once (it compares its calls with `go run ./cmd/routes`).
+
+Its payment scenarios:
+- A Telebirr payment that is shipped and delivered.
+- A card payment the buyer cancels and a CBE Birr payment the seller cancels, both refunded at the mock.
+- A dispute released to the seller.
+- A declined payment, and an abandoned one the buyer then cancels. Stock ends where it started.
+- Three payouts: one completed, one rejected by the admin, and one that fails at the provider and returns to the wallet.
+- A chargeback after settlement, clawed back from the merchant's wallet.
+
+`scripts/e2e-money-flow.sh` now pays through the hosted checkout too, instead of signing its own webhook.
+
+| Found | Fix |
+|---|---|
+| `PUT /users/me` with only `full_name` was rejected ("at least one of email or phone is required") | Any one of email, phone or full_name is enough |
+| Updating an option without a title (the frontend's Hide/Show button) blanked the title | `title` is optional on update |
+| Deleting a product or option only archived or hid it, even if it had never sold | Deleted for real; archived or hidden only when order items reference it (FK violation → `repository.ErrStillReferenced`) |
+| Add-to-cart and quantity-change responses had an empty `product_name` | `CartService.DescribeItem` fills it the same way `GET /cart` does |
+| Payouts were re-checked only after a fixed two minutes | `PAYOUT_RECHECK_INTERVAL` (2m by default, 10s in `.env.example`) |
+| The auth rate limit (10 a minute) blocked any scripted run longer than a few sign-ins | `AUTH_RATE_LIMIT_REQUESTS` (10 by default, 60 in `.env.example`) |
+
 ## Numbers
 
 | | Before | After |
 |---|---|---|
 | Test suite runtime | 8+ min, failing | ~15 s, passing with `-race` |
-| Test functions | ~30 | 100 |
+| Test functions | ~30 | 113 |
 | golangci-lint findings | 958 (config ignored) | 0 |
 | Migrations | 16 | 22 |
-| HTTP routes | ~60 | 82 |
+| HTTP routes | ~60 | 83 |
 
 ## Open questions to write about
 

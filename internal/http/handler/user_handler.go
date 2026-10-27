@@ -98,9 +98,9 @@ func (h *UserHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Email == nil && req.Phone == nil {
+	if req.Email == nil && req.Phone == nil && req.FullName == nil {
 		response.JSON(w, http.StatusBadRequest, validation.ValidationErrors{
-			{Field: "email", Message: "at least one of email or phone is required"},
+			{Field: "email", Message: "at least one of email, phone or full_name is required"},
 		})
 		return
 	}

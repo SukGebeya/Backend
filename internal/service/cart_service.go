@@ -453,31 +453,35 @@ func (s *CartService) GetCartWithItems(ctx context.Context, cartID uuid.UUID) (*
 	}
 
 	for i, item := range items {
-		variant, err := s.variantRepo.GetByID(ctx, item.VariantID)
-		if err != nil {
-			slog.Error("failed to get variant for cart item", "variant_id", item.VariantID, "error", err)
-			result.Items[i] = domain.CartItemWithDetails{
-				CartItem:     item,
-				VariantTitle: "Unknown",
-				Currency:     "ETB",
-			}
-			continue
-		}
-
-		details := domain.CartItemWithDetails{
-			CartItem:     item,
-			VariantTitle: variant.Title,
-			Currency:     variant.Currency,
-		}
-		if s.productRepo != nil {
-			if product, err := s.productRepo.GetByID(ctx, variant.ProductID); err == nil {
-				details.ProductName = product.Name
-				details.ProductSlug = product.Slug
-				details.MerchantID = product.MerchantID.String()
-			}
-		}
-		result.Items[i] = details
+		result.Items[i] = s.DescribeItem(ctx, item)
 	}
 
 	return result, nil
+}
+
+// DescribeItem adds the option and product names a cart line shows.
+func (s *CartService) DescribeItem(ctx context.Context, item domain.CartItem) domain.CartItemWithDetails {
+	variant, err := s.variantRepo.GetByID(ctx, item.VariantID)
+	if err != nil {
+		slog.Error("failed to get variant for cart item", "variant_id", item.VariantID, "error", err)
+		return domain.CartItemWithDetails{
+			CartItem:     item,
+			VariantTitle: "Unknown",
+			Currency:     "ETB",
+		}
+	}
+
+	details := domain.CartItemWithDetails{
+		CartItem:     item,
+		VariantTitle: variant.Title,
+		Currency:     variant.Currency,
+	}
+	if s.productRepo != nil {
+		if product, err := s.productRepo.GetByID(ctx, variant.ProductID); err == nil {
+			details.ProductName = product.Name
+			details.ProductSlug = product.Slug
+			details.MerchantID = product.MerchantID.String()
+		}
+	}
+	return details
 }

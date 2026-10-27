@@ -9,10 +9,11 @@ import (
 	"sync"
 )
 
-// FakeClient is an in-memory stand-in for Chapa used when CHAPA_MODE=mock.
-// Every initialized payment verifies as successful for the exact amount, with a
-// 3.5% processing charge like Chapa's, in test mode. Transfers and refunds
-// always succeed.
+// FakeClient is an in-memory stand-in for Chapa for unit tests. Every
+// initialized payment verifies as successful for the exact amount, with a 3.5%
+// processing charge like Chapa's, in test mode. Transfers and refunds always
+// succeed. CHAPA_MODE=mock runs the real Client against internal/chapamock
+// instead, so payments can also fail, be cancelled or be reversed.
 type FakeClient struct {
 	webhookSecret string
 	returnURL     string

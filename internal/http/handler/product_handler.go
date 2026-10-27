@@ -74,7 +74,7 @@ type InventoryResponse struct {
 }
 
 type UpdateVariantRequest struct {
-	Title             string         `json:"title" validate:"omitempty,min=2,max=200" example:"500g Ground Coffee"`
+	Title             *string        `json:"title" validate:"omitempty,min=2,max=200" example:"500g Ground Coffee"`
 	PriceCents        *int64         `json:"price_cents" validate:"omitempty,min=1" example:"25000"`
 	ComparePriceCents *int64         `json:"compare_price_cents" validate:"omitempty,min=1" example:"30000"`
 	Attributes        map[string]any `json:"attributes"`
@@ -904,7 +904,7 @@ func (h *ProductHandler) UpdateVariant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updated, err := h.variantService.Update(r.Context(), variantID, service.UpdateVariantInput{
-		Title:             &req.Title,
+		Title:             req.Title,
 		PriceCents:        req.PriceCents,
 		ComparePriceCents: req.ComparePriceCents,
 		Attributes:        req.Attributes,

@@ -57,6 +57,10 @@ type WorkerDeps struct {
 	WebhookEvents repository.WebhookEventRepository
 	OrderRepo     repository.OrderRepository
 	UserRepo      repository.UserRepository
+
+	// TransferRecheck overrides how long a payout waits before its transfer is
+	// checked again (default two minutes).
+	TransferRecheck time.Duration
 }
 
 func AddWorkers(workers *river.Workers, deps WorkerDeps) {
@@ -68,7 +72,11 @@ func AddWorkers(workers *river.Workers, deps WorkerDeps) {
 	river.AddWorker(workers, &AutoConfirmDeliveryWorker{orders: deps.Orders})
 	river.AddWorker(workers, &ProcessPaymentReversalWorker{payments: deps.Payments, webhookEvents: deps.WebhookEvents})
 	river.AddWorker(workers, &ReconcileLedgerWorker{reconciler: deps.Reconciler})
-	river.AddWorker(workers, &ProcessPayoutWorker{payouts: deps.Payouts})
+	recheck := deps.TransferRecheck
+	if recheck <= 0 {
+		recheck = transferPendingSnooze
+	}
+	river.AddWorker(workers, &ProcessPayoutWorker{payouts: deps.Payouts, recheck: recheck})
 	river.AddWorker(workers, &SendOrderNotificationWorker{orderRepo: deps.OrderRepo, userRepo: deps.UserRepo, sms: deps.SMS})
 }
 
@@ -253,6 +261,7 @@ func (w *SettleOrderWorker) Work(ctx context.Context, job *river.Job[SettleOrder
 type ProcessPayoutWorker struct {
 	river.WorkerDefaults[ProcessPayoutArgs]
 	payouts PayoutProcessor
+	recheck time.Duration
 }
 
 func (w *ProcessPayoutWorker) Timeout(*river.Job[ProcessPayoutArgs]) time.Duration {
@@ -260,5 +269,5 @@ func (w *ProcessPayoutWorker) Timeout(*river.Job[ProcessPayoutArgs]) time.Durati
 }
 
 func (w *ProcessPayoutWorker) Work(ctx context.Context, job *river.Job[ProcessPayoutArgs]) error {
-	return outcome(job.JobRow, w.payouts.ProcessPayout(ctx, job.Args.PayoutID), transferPendingSnooze)
+	return outcome(job.JobRow, w.payouts.ProcessPayout(ctx, job.Args.PayoutID), w.recheck)
 }

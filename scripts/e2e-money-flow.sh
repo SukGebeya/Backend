@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # End-to-end check of the Ethiopian marketplace money flow against a running API + Blnk:
 # phone registration (any local format) -> SMS verification -> merchant onboarding with
-# delivery fee -> KYC -> stock -> cart -> checkout -> signed webhook -> paid -> ship ->
+# delivery fee -> KYC -> stock -> cart -> checkout -> Telebirr on mock Chapa's hosted
+# checkout -> signed webhook -> paid -> ship ->
 # deliver -> settlement (merchant credit, platform fee, Chapa fee) -> dispute + refund ->
 # payout -> reconciliation.
 #
 # Requires: API running with ENVIRONMENT=development, CHAPA_MODE=mock, SMS_PROVIDER=log,
-# OTP_DEV_CODE set; `make local` services; jq, curl, openssl.
+# OTP_DEV_CODE set; `make local` services; jq, curl.
 # Usage: ./scripts/e2e-money-flow.sh [base_url]
 set -euo pipefail
 
 BASE="${1:-http://localhost:8080}"
 API="$BASE/api/v1"
-WEBHOOK_SECRET="${CHAPA_WEBHOOK_SECRET:-dev-webhook-secret}"
 OTP_CODE="${OTP_DEV_CODE:-123456}"
 BLNK="${BLNK_BASE_URL:-http://localhost:5001}"
 BLNK_KEY="${BLNK_SECRET_KEY:-dev-blnk-secret}"
@@ -94,14 +94,16 @@ checkout() {
 	ORDER=$(echo "$BODY" | jq -r .order_id)
 	TXREF=$(echo "$BODY" | jq -r .chapa_tx_ref)
 	TOTAL=$(echo "$BODY" | jq -r .total_cents)
+	PAYMENT_URL=$(echo "$BODY" | jq -r .payment_url)
 }
 
+# pay: the buyer approves the payment with Telebirr on mock Chapa's hosted checkout,
+# which then sends the signed charge.success webhook.
 pay() {
-	local payload sig code
-	payload="{\"event\":\"charge.success\",\"tx_ref\":\"$TXREF\",\"status\":\"success\",\"currency\":\"ETB\"}"
-	sig=$(printf '%s' "$payload" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" -hex | sed 's/^.* //')
-	code=$(curl -s -o /dev/null -w '%{http_code}' -XPOST "$API/webhooks/chapa" -H 'Content-Type: application/json' -H "x-chapa-signature: $sig" -d "$payload")
-	[ "$code" = "200" ] || fail "signed webhook accepted (got $code)"
+	local code
+	code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$PAYMENT_URL" \
+		--data-urlencode action=pay --data-urlencode method=telebirr --data-urlencode "phone=09${SUFFIX}1")
+	[ "$code" = "303" ] || fail "paid with Telebirr on the hosted checkout (got $code)"
 	wait_for "order is paid" "field /orders/$ORDER '$BUYER' .order.status" "paid"
 }
 
@@ -182,6 +184,7 @@ expect 201 "$out" "checkout"
 ORDER=$(echo "$BODY" | jq -r .order_id)
 TXREF=$(echo "$BODY" | jq -r .chapa_tx_ref)
 TOTAL=$(echo "$BODY" | jq -r .total_cents)
+PAYMENT_URL=$(echo "$BODY" | jq -r .payment_url)
 [ "$TOTAL" = "515000" ] || fail "total = 5,000 ETB goods + 150 ETB delivery (got $TOTAL)"
 pass "total is 5,150.00 ETB including delivery"
 [ ${#TXREF} -le 50 ] || fail "tx_ref fits Chapa (len ${#TXREF})"
@@ -239,7 +242,8 @@ expect 200 "$out" "merchant dashboard"
 pass "dashboard: 900.00 ETB available, 4,000.00 ETB held"
 out=$(req POST "/admin/payouts/$PAYOUT/process" "$ADMIN")
 expect 202 "$out" "admin approves the payout"
-# The payout job starts the Chapa transfer, then re-checks it two minutes later.
+# The payout job starts the Chapa transfer, then re-checks it PAYOUT_RECHECK_INTERVAL later
+# (2 minutes by default, 10s in .env.example).
 wait_for "payout completed" "field /merchant/wallet/payouts/$PAYOUT '$SELLER' .status" "completed" 180
 wait_for "merchant wallet now 900.00 ETB" "blnk_balance $WALLET" "90000"
 

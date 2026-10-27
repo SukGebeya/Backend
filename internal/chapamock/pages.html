@@ -1,0 +1,143 @@
+{{define "head"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.}} · Mock Chapa</title>
+<style>
+	:root { color-scheme: light dark; --bg: #f4f5f7; --card: #fff; --ink: #16181d; --muted: #5d6370; --line: #dfe2e8; --accent: #0b7a53; --warn-bg: #fff4d6; --warn: #6b4a00; --bad: #b42318; }
+	@media (prefers-color-scheme: dark) { :root { --bg: #111317; --card: #1b1e24; --ink: #eef0f3; --muted: #9aa1ad; --line: #2c3039; --accent: #3ecf8e; --warn-bg: #3a2f10; --warn: #f5d27a; --bad: #ff8a80; } }
+	* { box-sizing: border-box; }
+	body { margin: 0; font: 16px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+	main { max-width: 440px; margin: 0 auto; padding: 16px; }
+	main.wide { max-width: 1080px; }
+	.banner { background: var(--warn-bg); color: var(--warn); font-size: 14px; padding: 8px 16px; text-align: center; }
+	.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; margin-bottom: 16px; }
+	h1 { font-size: 20px; margin: 0 0 4px; }
+	h2 { font-size: 17px; margin: 0 0 12px; }
+	.muted { color: var(--muted); font-size: 14px; }
+	.amount { font-size: 30px; font-weight: 700; margin: 8px 0; font-variant-numeric: tabular-nums; }
+	fieldset { border: 0; padding: 0; margin: 0 0 16px; }
+	legend { font-weight: 600; margin-bottom: 8px; }
+	.option { display: flex; gap: 12px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer; }
+	.option:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+	.option input { width: 20px; height: 20px; accent-color: var(--accent); }
+	label.field { display: block; font-weight: 600; margin-bottom: 6px; }
+	input[type=tel] { width: 100%; font: inherit; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); }
+	button, .btn { display: block; width: 100%; font: inherit; font-weight: 600; padding: 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; margin-top: 10px; text-align: center; text-decoration: none; }
+	button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+	button.danger { color: var(--bad); }
+	.error { color: var(--bad); font-weight: 600; margin: 8px 0; }
+	.status { font-weight: 700; text-transform: capitalize; }
+	table { width: 100%; border-collapse: collapse; font-size: 14px; }
+	th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+	td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+	td form { display: inline; }
+	td button { display: inline; width: auto; padding: 4px 12px; margin: 0 4px 0 0; font-size: 13px; }
+	.scroll { overflow-x: auto; }
+	code { font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="banner" role="note">Mock Chapa for development. No real money moves.</div>
+{{end}}
+
+{{define "checkout"}}{{template "head" "Pay"}}
+<main>
+	{{with .Payment}}
+	<section class="card" aria-labelledby="pay-h">
+		<p class="muted">{{.Title}}{{if .Description}} · {{.Description}}{{end}}</p>
+		<h1 id="pay-h">Pay {{etb .AmountCents}}</h1>
+		<p class="muted">{{.FirstName}} {{.LastName}}{{if .Email}} · {{.Email}}{{end}}</p>
+	</section>
+	{{end}}
+
+	{{if eq .Payment.Status "pending"}}
+	<form method="post" class="card">
+		{{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+		<fieldset>
+			<legend>Pay with</legend>
+			<label class="option"><input type="radio" name="method" value="telebirr" {{if eq .Method "telebirr"}}checked{{end}}> Telebirr</label>
+			<label class="option"><input type="radio" name="method" value="cbebirr" {{if eq .Method "cbebirr"}}checked{{end}}> CBE Birr</label>
+			<label class="option"><input type="radio" name="method" value="card" {{if eq .Method "card"}}checked{{end}}> Card (test card ending 4242)</label>
+		</fieldset>
+		<label class="field" for="phone">Mobile money number</label>
+		<input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" value="{{.Phone}}" aria-describedby="phone-hint">
+		<p class="muted" id="phone-hint">For Telebirr or CBE Birr. A real payment asks you to approve it on this phone.</p>
+		<button class="primary" name="action" value="pay">Pay {{etb .Payment.AmountCents}}</button>
+		<button name="action" value="decline">Decline payment</button>
+		<button class="danger" name="action" value="cancel">Cancel payment</button>
+		{{if .Payment.ReturnURL}}<a class="btn" href="{{.Payment.ReturnURL}}">Go back without paying</a>{{end}}
+	</form>
+	{{else}}
+	<section class="card" aria-live="polite">
+		<h2>Payment <span class="status">{{.Payment.Status}}</span></h2>
+		{{if .Payment.Method}}<p class="muted">Paid with {{.Payment.Method}}{{if .Payment.PayerPhone}} · {{.Payment.PayerPhone}}{{end}}</p>{{end}}
+		{{if .Payment.ReturnURL}}<a class="btn" href="{{.Payment.ReturnURL}}">Return to the shop</a>{{end}}
+	</section>
+	{{end}}
+	<p class="muted">Reference <code>{{.Payment.TxRef}}</code> · <a href="{{.Base}}/">All mock payments</a></p>
+</main>
+</body>
+</html>
+{{end}}
+
+{{define "dashboard"}}{{template "head" "Dashboard"}}
+<main class="wide">
+	<h1>Mock Chapa</h1>
+	<p class="muted">Payments started at checkout and payouts sent by the API. Transfers settle {{.TransferDelay}} after they're queued; an account number ending in {{.FailingSuffix}} fails at the provider.</p>
+
+	<section class="card" aria-labelledby="p-h">
+		<h2 id="p-h">Payments</h2>
+		{{if .Payments}}
+		<div class="scroll"><table>
+			<thead><tr><th>Reference</th><th>Status</th><th>Method</th><th class="num">Amount</th><th>Webhook</th><th>Updated</th><th></th></tr></thead>
+			<tbody>
+			{{range .Payments}}
+			<tr>
+				<td><code>{{.TxRef}}</code><br><span class="muted">{{.Description}}</span></td>
+				<td class="status">{{.Status}}</td>
+				<td>{{.Method}}{{if .PayerPhone}}<br><span class="muted">{{.PayerPhone}}</span>{{end}}</td>
+				<td class="num">{{etb .AmountCents}}{{if .ChargeCents}}<br><span class="muted">charge {{etb .ChargeCents}}</span>{{end}}</td>
+				<td class="muted">{{.Webhook}}</td>
+				<td class="muted">{{time .UpdatedAt}}</td>
+				<td>
+					{{if eq .Status "pending"}}<a href="{{$.Base}}/checkout/{{.TxRef}}">Open checkout</a>{{end}}
+					{{if eq .Status "success"}}<form method="post" action="{{$.Base}}/payments/{{.TxRef}}/reverse"><button class="danger">Reverse (chargeback)</button></form>{{end}}
+				</td>
+			</tr>
+			{{end}}
+			</tbody>
+		</table></div>
+		{{else}}<p class="muted">No payments yet.</p>{{end}}
+	</section>
+
+	<section class="card" aria-labelledby="t-h">
+		<h2 id="t-h">Transfers</h2>
+		{{if .Transfers}}
+		<div class="scroll"><table>
+			<thead><tr><th>Reference</th><th>Status</th><th>To</th><th class="num">Amount</th><th>Updated</th><th></th></tr></thead>
+			<tbody>
+			{{range .Transfers}}
+			<tr>
+				<td><code>{{.Reference}}</code></td>
+				<td class="status">{{.Status}}</td>
+				<td>{{.BankName}} · {{.AccountNumber}}<br><span class="muted">{{.AccountName}}</span></td>
+				<td class="num">{{etb .AmountCents}}</td>
+				<td class="muted">{{time .UpdatedAt}}</td>
+				<td>
+					{{if eq .Status "pending"}}
+					<form method="post" action="{{$.Base}}/transfers/{{.Reference}}/sent"><button>Mark sent</button></form>
+					<form method="post" action="{{$.Base}}/transfers/{{.Reference}}/failed"><button class="danger">Mark failed</button></form>
+					{{end}}
+				</td>
+			</tr>
+			{{end}}
+			</tbody>
+		</table></div>
+		{{else}}<p class="muted">No transfers yet.</p>{{end}}
+	</section>
+</main>
+</body>
+</html>
+{{end}}

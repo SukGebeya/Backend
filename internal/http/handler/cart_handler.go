@@ -169,7 +169,7 @@ func (h *CartHandler) AddItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.JSON(w, http.StatusOK, toCartItemResponse(item, variant.Title, variant.Currency))
+	response.JSON(w, http.StatusOK, toCartItemResponse(h.cartService.DescribeItem(r.Context(), *item)))
 }
 
 // UpdateItem godoc
@@ -238,13 +238,7 @@ func (h *CartHandler) UpdateItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	variant, err := h.variantRepo.GetByID(r.Context(), item.VariantID)
-	if err != nil {
-		response.Error(w, apperrors.Internal("failed to get variant", err))
-		return
-	}
-
-	response.JSON(w, http.StatusOK, toCartItemResponse(item, variant.Title, variant.Currency))
+	response.JSON(w, http.StatusOK, toCartItemResponse(h.cartService.DescribeItem(r.Context(), *item)))
 }
 
 // RemoveItem godoc
@@ -384,20 +378,8 @@ func toCartResponse(cart *domain.CartWithDetails) *CartResponse {
 	items := make([]CartItemResponse, len(cart.Items))
 
 	for i, item := range cart.Items {
-		subtotal := item.PriceSnapshotCents * int64(item.Quantity)
-		totalCents += subtotal
-
-		items[i] = CartItemResponse{
-			ID:                 item.ID.String(),
-			CartID:             item.CartID.String(),
-			VariantID:          item.VariantID.String(),
-			ProductName:        item.ProductName,
-			VariantTitle:       item.VariantTitle,
-			Quantity:           item.Quantity,
-			PriceSnapshotCents: item.PriceSnapshotCents,
-			Currency:           item.Currency,
-			SubtotalCents:      subtotal,
-		}
+		items[i] = *toCartItemResponse(item)
+		totalCents += items[i].SubtotalCents
 	}
 
 	currency := "ETB"
@@ -416,15 +398,16 @@ func toCartResponse(cart *domain.CartWithDetails) *CartResponse {
 	}
 }
 
-func toCartItemResponse(item *domain.CartItem, variantTitle, currency string) *CartItemResponse {
+func toCartItemResponse(item domain.CartItemWithDetails) *CartItemResponse {
 	return &CartItemResponse{
 		ID:                 item.ID.String(),
 		CartID:             item.CartID.String(),
 		VariantID:          item.VariantID.String(),
-		VariantTitle:       variantTitle,
+		ProductName:        item.ProductName,
+		VariantTitle:       item.VariantTitle,
 		Quantity:           item.Quantity,
 		PriceSnapshotCents: item.PriceSnapshotCents,
-		Currency:           currency,
+		Currency:           item.Currency,
 		SubtotalCents:      item.PriceSnapshotCents * int64(item.Quantity),
 	}
 }

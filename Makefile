@@ -4,7 +4,7 @@
 	docker-dev-up docker-dev-down docker-dev-logs docker-dev-build \
 	docker-prod-up docker-prod-down docker-prod-logs docker-prod-build \
 	redis-cli psql air dev local all \
-	mocks test-unit test-integration \
+	mocks test-unit test-integration test-endpoints \
 	seed seed-dev seed-reset seed-blnk
 
 BINARY_NAME=api
@@ -32,6 +32,9 @@ test-unit: ## Run unit tests only (short tests without integration)
 
 test-integration: ## Run the end-to-end money flow against a running API (make local + make run)
 	./scripts/e2e-money-flow.sh
+
+test-endpoints: ## Call every route against a running API with CHAPA_MODE=mock (make local + make run)
+	./scripts/e2e-endpoints.sh
 
 test-coverage: test
 	go tool cover -html=coverage.out

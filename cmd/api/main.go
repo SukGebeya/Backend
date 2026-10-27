@@ -39,6 +39,7 @@ import (
 
 	"github.com/SukGebeya/Backend/internal/blnk"
 	"github.com/SukGebeya/Backend/internal/chapa"
+	"github.com/SukGebeya/Backend/internal/chapamock"
 	"github.com/SukGebeya/Backend/internal/config"
 	apphttp "github.com/SukGebeya/Backend/internal/http"
 	httpmiddleware "github.com/SukGebeya/Backend/internal/http/middleware"
@@ -164,7 +165,7 @@ func run() error {
 		return fmt.Errorf("failed to initialize Blnk client: %w", err)
 	}
 
-	chapaClient := newChapaClient(cfg.Chapa)
+	chapaClient, chapaMock := newChapaClient(cfg.Chapa, redisClient)
 
 	jwtManager, err := jwt.NewManagerFromFiles(
 		cfg.JWT.AccessPrivateKeyPath,
@@ -239,6 +240,8 @@ func run() error {
 		WebhookEvents: webhookEventRepo,
 		OrderRepo:     orderRepo,
 		UserRepo:      userRepo,
+
+		TransferRecheck: cfg.Platform.PayoutRecheckInterval,
 	})
 
 	riverClient, err := river.NewClient(riverpgxv5.New(pool), &river.Config{
@@ -264,7 +267,7 @@ func run() error {
 	appLogger.Info("River job queue started")
 
 	rateLimiter := httpmiddleware.NewRateLimiter(rateLimitRepo, cfg.RateLimit.Requests, int64(cfg.RateLimit.Window.Seconds()))
-	authRateLimiter := httpmiddleware.NewNamedRateLimiter(rateLimitRepo, "auth", 10, 60)
+	authRateLimiter := httpmiddleware.NewNamedRateLimiter(rateLimitRepo, "auth", cfg.RateLimit.AuthRequests, 60)
 
 	router := apphttp.NewRouter(apphttp.Deps{
 		AuthService:      authService,
@@ -299,9 +302,20 @@ func run() error {
 		TrustedProxies:   cfg.Server.TrustedProxyCount,
 	})
 
+	var handler http.Handler = router
+	if chapaMock != nil {
+		// Served beside the API rather than through its router, so the API's own
+		// calls to the mock don't count against its rate limits.
+		mux := http.NewServeMux()
+		mux.Handle("/mock-chapa/", http.StripPrefix("/mock-chapa", chapaMock))
+		mux.Handle("/", router)
+		handler = mux
+		appLogger.Info("Mock Chapa dashboard", "url", cfg.Chapa.MockURL+"/")
+	}
+
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           router,
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      35 * time.Second,
@@ -388,7 +402,9 @@ func newSMSSender(cfg config.SMSConfig) sms.Sender {
 	return sms.LogSender{}
 }
 
-func newChapaClient(cfg config.ChapaConfig) chapa.ChapaClient {
+// newChapaClient returns the Chapa client and, with CHAPA_MODE=mock, the mock
+// Chapa it talks to, which the caller serves at cfg.MockURL.
+func newChapaClient(cfg config.ChapaConfig, rdb redis.Cmdable) (chapa.ChapaClient, http.Handler) {
 	chapaCfg := chapa.Config{
 		BaseURL:       cfg.BaseURL,
 		SecretKey:     cfg.SecretKey,
@@ -400,10 +416,21 @@ func newChapaClient(cfg config.ChapaConfig) chapa.ChapaClient {
 		slog.Warn("CHAPA_WEBHOOK_SECRET is empty: all Chapa webhooks will be rejected")
 	}
 	if cfg.Mode == config.ChapaModeMock {
-		slog.Warn("CHAPA_MODE=mock: payments, transfers and refunds are simulated in memory")
-		return chapa.NewFakeClient(chapaCfg)
+		slog.Warn("CHAPA_MODE=mock: payments, refunds and transfers go to the mock Chapa; no real money moves", "url", cfg.MockURL)
+		mock := chapamock.New(chapamock.Config{
+			PublicURL:     cfg.MockURL,
+			WebhookURL:    cfg.MockWebhookURL,
+			WebhookSecret: cfg.WebhookSecret,
+			TransferDelay: cfg.MockTransferDelay,
+			Redis:         rdb,
+		})
+		chapaCfg.BaseURL = cfg.MockURL + "/v1"
+		if chapaCfg.SecretKey == "" {
+			chapaCfg.SecretKey = "CHASECK_TEST-mock"
+		}
+		return chapa.NewClient(chapaCfg), mock.Handler()
 	}
-	return chapa.NewClient(chapaCfg)
+	return chapa.NewClient(chapaCfg), nil
 }
 
 func runMigrations(databaseURL string) error {

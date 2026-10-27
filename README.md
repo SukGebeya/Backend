@@ -67,18 +67,20 @@ The full design is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), including th
 Requirements: Go 1.26+, Docker, and `jq`, `curl` and `openssl` for the end-to-end script.
 
 ```bash
-cp .env.example .env          # development defaults: Chapa simulated in memory, SMS printed to the log
+cp .env.example .env          # development defaults: mock Chapa at /mock-chapa, SMS printed to the log
 make generate-keys            # RSA keys for JWT
 make local                    # Postgres, Redis, Blnk server + worker
 make seed-blnk                # create the ETB ledger and platform balances; writes their IDs into .env
 make run                      # API on :8080 (runs migrations on start)
 ./scripts/e2e-money-flow.sh   # sign-up → SMS verify → shop → checkout → settlement → dispute → payout
+./scripts/e2e-endpoints.sh    # every route, with Telebirr, CBE Birr and card payments, refunds, payouts, a chargeback
 ```
 
 - Swagger UI: http://localhost:8080/swagger/index.html
 - Health: http://localhost:8080/health (Postgres, Redis and ledger status)
+- Mock Chapa: http://localhost:8080/mock-chapa/ (payments and payouts; reverse a payment to test a chargeback)
 
-In development, `CHAPA_MODE=mock`, `SMS_PROVIDER=log` and `OTP_DEV_CODE=123456` make the flow scriptable; config refuses all three outside development. To use the Chapa sandbox, set `CHAPA_MODE=live`, a `CHASECK_TEST-…` key, the webhook secret hash from the Chapa dashboard, and a public `CHAPA_CALLBACK_URL`. Every setting is documented in [.env.example](.env.example) and [.env.production.example](.env.production.example).
+In development, `CHAPA_MODE=mock`, `SMS_PROVIDER=log` and `OTP_DEV_CODE=123456` make the flow scriptable; config refuses all three outside development. The mock is an HTTP imitation of Chapa served by the API, and the real Chapa client talks to it. Checkout sends the buyer to its hosted page, where they pay with Telebirr, CBE Birr or a test card, decline or cancel. It then sends signed webhooks as Chapa does. Payouts settle after `CHAPA_MOCK_TRANSFER_DELAY`, and an account number ending in `0000` fails. To use the Chapa sandbox, set `CHAPA_MODE=live`, a `CHASECK_TEST-…` key, the webhook secret hash from the Chapa dashboard, and a public `CHAPA_CALLBACK_URL`. Every setting is documented in [.env.example](.env.example) and [.env.production.example](.env.production.example).
 
 ## API overview
 

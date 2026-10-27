@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/SukGebeya/Backend/internal/domain"
@@ -115,11 +116,14 @@ func (s *ProductService) Update(ctx context.Context, id uuid.UUID, input UpdateP
 	return s.productRepo.Update(ctx, product)
 }
 
-// Delete archives the product rather than removing it: past orders reference its
-// variants and must keep resolving.
+// Delete removes a product with its options, images and stock. A product that
+// has been ordered is archived instead, so order history keeps its options.
 func (s *ProductService) Delete(ctx context.Context, id uuid.UUID) error {
 	product, err := s.productRepo.GetByID(ctx, id)
 	if err != nil {
+		return err
+	}
+	if err := s.productRepo.Delete(ctx, id); !errors.Is(err, repository.ErrStillReferenced) {
 		return err
 	}
 	product.Status = domain.ProductStatusArchived
@@ -275,10 +279,14 @@ func (s *ProductVariantService) Update(ctx context.Context, id uuid.UUID, input 
 	return s.variantRepo.Update(ctx, variant)
 }
 
-// Delete deactivates the variant; order history keeps pointing at it.
+// Delete removes an option and its stock. An option that has been ordered is
+// hidden instead, since order items still point at it.
 func (s *ProductVariantService) Delete(ctx context.Context, id uuid.UUID) error {
 	variant, err := s.variantRepo.GetByID(ctx, id)
 	if err != nil {
+		return err
+	}
+	if err := s.variantRepo.Delete(ctx, id); !errors.Is(err, repository.ErrStillReferenced) {
 		return err
 	}
 	variant.IsActive = false
